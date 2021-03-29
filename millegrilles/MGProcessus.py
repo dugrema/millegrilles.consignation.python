@@ -1167,6 +1167,8 @@ class MGProcessus:
                     elif message['type'] == 'transaction':
                         self.controleur.generateur_transactions.soumettre_transaction(
                             message['contenu'], message['domaine'])
+                        if message.get('blocking') and self._requete is None:
+                            self._commande_blocking = message['domaine']
 
             # Transmettre la requete inter-domaine, au besoin
             if self._requete is not None:
@@ -1403,12 +1405,15 @@ class MGProcessus:
             commande['blocking'] = True
         self._messages_a_transmettre.append(commande)
 
-    def ajouter_transaction_a_soumettre(self, domaine, transaction):
-        self._messages_a_transmettre.append({
+    def ajouter_transaction_a_soumettre(self, domaine, transaction, blocking=False):
+        transaction = {
             'type': 'transaction',
             'domaine': domaine,
             'contenu': transaction,
-        })
+        }
+        if blocking:
+            transaction['blocking'] = True
+        self._messages_a_transmettre.append(transaction)
 
     def get_transaction_token_connecte(self, token):
         """

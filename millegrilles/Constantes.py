@@ -1027,6 +1027,8 @@ class ConstantesGrosFichiers:
     LIBVAL_VITRINE_FICHIERS = 'vitrine.fichiers'
     LIBVAL_VITRINE_ALBUMS = 'vitrine.albums'
 
+    LIBVAL_UUID_COLLECTION_USAGERS = 'usagers'
+
     LIBELLE_PUBLICATION_CACHERFICHIERS = 'cacherfichiers'
     LIBELLE_PUBLICATION_TOP = 'top'
     LIBELLE_PUBLICATION_CAROUSEL = 'carousel'
@@ -1104,6 +1106,8 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_TORRENT_HASHSTRING = 'torrent_hashstring'
 
+    CHAMP_CREER_PARENT = 'creerParent'
+
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion' % DOMAINE_NOM
     TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE = '%s.demandeThumbnailProtege' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
@@ -1141,6 +1145,8 @@ class ConstantesGrosFichiers:
     TRANSACTION_TORRENT_SEEDING = '%s.seedingTorrent' % DOMAINE_NOM
 
     TRANSACTION_PUBLIER_COLLECTION = '%s.publierCollection' % DOMAINE_NOM
+
+    TRANSACTION_NOUVEAU_FICHIER_USAGER = '%s.nouveauFichierUsager' % DOMAINE_NOM
 
     EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE = 'confirmationMajCollectionPublique'
 

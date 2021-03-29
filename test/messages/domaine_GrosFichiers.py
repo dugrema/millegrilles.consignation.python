@@ -291,6 +291,23 @@ class MessagesSample(BaseCallback):
         print("Ajouter favori: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_nouveau_fichier_usager(self):
+        fuuid = 'DUMMY' + str(uuid4())
+        transaction = {
+            'nom_fichier': 'fichier_usager_1',
+            # 'securite': '3.protege',
+            'fuuid': fuuid,
+            'mimetype': 'application/blarghs',
+            'taille': 1190698,
+            'hachage': fuuid,
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_USAGER,
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Envoi metadata: %s" % enveloppe_val)
+        return enveloppe_val
+
     def requete_activite(self):
         requete = {
             'skip': 0,
@@ -535,6 +552,8 @@ class MessagesSample(BaseCallback):
 
         # enveloppe = sample.transaction_changer_favoris()
 
+        sample.transaction_nouveau_fichier_usager()
+
         # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe = sample.requete_activite()
         # enveloppe = sample.requete_corbeille()
@@ -549,7 +568,7 @@ class MessagesSample(BaseCallback):
         # sample.requete_permission_dechiffrage_fichier_public()
         # sample.requete_collections_publiques()
         # sample.requete_detail_collections_publiques()
-        sample.commande_regenerer_previews()
+        # sample.commande_regenerer_previews()
         # sample.requete_fichier_par_fuuid()
         # sample.commande_transcoder_video()
         # sample.evenement_progres_fichier()
