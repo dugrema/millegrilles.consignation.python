@@ -3776,8 +3776,16 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
         if mimetype == 'video':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
 
-            # Transmettre commande transcodage web de basse resolution
-            pass
+            fuuid = info['fuuid']
+
+            # Transmettre commande transcodage video pour formats web
+            domaine = 'commande.fichiers.transcoderVideo'
+
+            commande = {'fuuid': fuuid, 'mimetype': 'video/mp4'}
+            self.ajouter_commande_a_transmettre(domaine, commande)
+
+            commande = {'fuuid': fuuid, 'mimetype': 'video/webm'}
+            self.ajouter_commande_a_transmettre(domaine, commande)
 
         elif mimetype == 'image':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
