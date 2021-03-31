@@ -1329,23 +1329,34 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine.update_one(filtre, ops)
 
     def associer_video_transcode(self, transaction):
-        uuid_fichier = transaction['uuid']
-        fuuid_fichier = transaction['fuuid']
-        resolution = transaction['height'] + 'p'
+        fuuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        mimetype = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+        resolution = transaction['height']
+        bitrate = transaction['bitrate']
+
+        fuuid_video = transaction['fuuidVideo']
+
+        # Cle de format du video
+        cle_video = ';'.join([mimetype, str(resolution), str(bitrate)])
+
         info_video = {
-            'fuuid': transaction['fuuidVideo'],
-            'mimetype': transaction['mimetypeVideo'],
-            'hachage': transaction['hachage'],
+            'fuuid': fuuid_video,
+            'hachage': fuuid_video,
+            'mimetype': mimetype,
+            'codecVideo': transaction['codec'],
+            'width': transaction['width'],
+            'height': resolution,
+            'bitrate': bitrate,
             'taille': transaction['tailleFichier'],
         }
 
         set_ops = {
-            'versions.%s.video.%s' % (fuuid_fichier, resolution): info_video,
+            'versions.%s.video.%s' % (fuuid_fichier, cle_video): info_video,
         }
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            'versions.' + fuuid_fichier: {'$exists': True},
         }
 
         ops = {
@@ -3630,9 +3641,10 @@ class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.transaction
 
-        self.controleur.gestionnaire.associer_video_transcode(transaction)
+        document_fichier = self.controleur.gestionnaire.associer_video_transcode(transaction)
+        uuid_document = document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         try:
-            self.evenement_maj_fichier_public(transaction['uuid'])
+            self.evenement_maj_fichier_public(uuid_document)
         except Exception:
             self.__logger.exception("Erreur verification collection publique")
 

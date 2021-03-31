@@ -15,7 +15,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = '0617e5e0-3b3f-11eb-a514-01471259bf93'
+        self.__fuuid = 'z8VtxBXa2Fer7M3622YHkw3XRQz1tkJfktayte1nifX79ukc4uhgVv5U6HQVf6442forrZk32DzT9ArbXwHXW1aUvSg'
         self.event_termine = Event()
 
     def commande_restaurerGrosFichiers(self):
@@ -26,11 +26,11 @@ class TestConsignationFichiers(DomaineTest):
             params, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
 
     def commande_transcoderVideo(self):
-        permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
+        # permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
         params = {
-            'permission': permission,
             'fuuid': self.__fuuid,
-            'resolution': '480p',
+            'mimetype': 'video/webm',
+            # 'mimetype': 'video/mp4',
         }
         domaine = 'commande.fichiers.transcoderVideo'
         self.generateur.transmettre_commande(
@@ -62,21 +62,21 @@ class TestConsignationFichiers(DomaineTest):
     #
     #     raise Exception("Permission non recue")
 
-    def preparer_permission_dechiffrage_fichier(self, fuuid):
-        permission = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
-        }
-        # Signer
-        generateur_transactions = self._contexte.generateur_transactions
-        commande_permission = generateur_transactions.preparer_enveloppe(
-            permission,
-            '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
-                      Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
-        )
-
-        return commande_permission
+    # def preparer_permission_dechiffrage_fichier(self, fuuid):
+    #     permission = {
+    #         ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
+    #         Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
+    #         Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
+    #     }
+    #     # Signer
+    #     generateur_transactions = self._contexte.generateur_transactions
+    #     commande_permission = generateur_transactions.preparer_enveloppe(
+    #         permission,
+    #         '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+    #                   Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
+    #     )
+    #
+    #     return commande_permission
 
 # --- MAIN ---
 if __name__ == '__main__':
