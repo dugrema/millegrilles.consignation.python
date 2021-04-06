@@ -1020,7 +1020,7 @@ class ConstantesGrosFichiers:
     LIBVAL_COLLECTION_FIGEE = 'collection.figee'
     LIBVAL_RAPPORT = 'rapport'
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
-    LIBVAL_CONVERSION_MEDIA = 'conversionMedia'
+    LIBVAL_TRANSCODAGE_MEDIA = 'transcodageMedia'
     LIBVAL_PUBLICATION_FICHIERS = 'publicationFichiers'
     LIBVAL_UPLOAD_AWSS3 = 'uploadAwss3'
 
@@ -1084,7 +1084,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTIONS = 'collections'
     DOCUMENT_FAVORIS = 'favoris'
     DOCUMENT_UUID_PARENT = 'uuid_parent'
-    DOCUMENT_PREVIEWS = 'previews'
+    DOCUMENT_POSTERS = 'posters'
     DOCUMENT_VIDEO = 'video'
     DOCUMENT_TRANSCODAGE = 'transcodage'
     DOCUMENT_NOEUD_IDS_PUBLIES = 'noeud_ids_publies'

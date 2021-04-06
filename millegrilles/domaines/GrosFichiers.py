@@ -9,7 +9,6 @@ from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
 import logging
-import uuid
 import datetime
 import json
 import uuid
@@ -211,8 +210,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
 
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA, {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA, {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         })
 
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_PUBLICATION_FICHIERS, {
@@ -1369,7 +1368,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # MAJ document medias, retirer la demande de video (complete)
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
         unset_ops = {
             ConstantesGrosFichiers.DOCUMENT_VIDEO + '.' + fuuid_fichier: True
@@ -1541,7 +1540,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #                     (resultat.matched_count, len(liste_uuid)))
 
     def resoumettre_conversions_manquantes(self):
-        filtre_doc_media = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA}
+        filtre_doc_media = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA}
         collection_documents = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_conversion_media = collection_documents.find_one(filtre_doc_media)
         self._logger.debug("Resoumettre les conversions manquantes : %s" % str(document_conversion_media))
@@ -1839,16 +1838,16 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine.update_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS}, ops)
 
-    def ajouter_conversion_preview(self, info: dict):
+    def ajouter_conversion_poster(self, info: dict):
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
 
         info_copy = info.copy()
         info_copy['derniere_activite'] = datetime.datetime.utcnow()
         set_ops = {
-            ConstantesGrosFichiers.DOCUMENT_PREVIEWS + '.' + info['fuuid']: info_copy
+            ConstantesGrosFichiers.DOCUMENT_POSTERS + '.' + info['fuuid']: info_copy
         }
 
         ops = {'$set': set_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
@@ -1856,17 +1855,22 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.update_one(filtre, ops)
 
-    def ajouter_conversion_video(self, info: dict):
+    def ajouter_transcodage_video(self, info: dict, mimetype='video/mp4', resolution=480, bitrate=600000):
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
 
         info_copy = info.copy()
         info_copy['derniere_activite'] = datetime.datetime.utcnow()
         # info_copy['progres'] = 0
+        key_doc = '.'.join([
+            ConstantesGrosFichiers.DOCUMENT_VIDEO,
+            info['fuuid'],
+            ';'.join([mimetype, str(resolution), str(bitrate)])
+        ])
         set_ops = {
-            ConstantesGrosFichiers.DOCUMENT_VIDEO + '.' + info['fuuid']: info_copy
+            key_doc: info_copy
         }
 
         ops = {'$set': set_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
@@ -1916,10 +1920,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # MAJ document medias, retirer la demande de preview (complete)
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
         unset_ops = {
-            ConstantesGrosFichiers.DOCUMENT_PREVIEWS + '.' + fuuid: True
+            ConstantesGrosFichiers.DOCUMENT_POSTERS + '.' + fuuid: True
         }
         ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
         collection_domaine.update_one(filtre, ops)
@@ -2135,7 +2139,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             info.update(f[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid_courant])
 
             mimetype = info['mimetype'].split('/')[0]
-            commande_preview = self.preparer_generer_preview(info)
+            commande_preview = self.preparer_generer_poster(info)
 
             if mimetype == 'video':
                 domaine_action = 'commande.fichiers.genererPreviewVideo'
@@ -2155,15 +2159,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def preparer_generer_preview(self, info: dict):
+    def preparer_generer_poster(self, info: dict):
         """
-        Transmettre une commande de transcodage
+        Transmettre une commande de creation de poster
         :param info:
         :return:
         """
 
         # Sauvegarder demande conversion
-        self.ajouter_conversion_preview(info)
+        self.ajouter_conversion_poster(info)
 
         commande_preview = info.copy()
         for c in info.keys():
@@ -2214,7 +2218,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         info_version = info_fichier['versions'][fuuid]
 
         # Marquer document media
-        self.ajouter_conversion_video(info_version)
+        self.ajouter_transcodage_video(info_version)
 
         # Transmettre commande a consignation_fichiers
         commande = {
@@ -2644,7 +2648,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
     def _traiter_media(self, info: dict):
         # # Transmettre une commande de transcodage
         mimetype = info['mimetype'].split('/')[0]
-        commande_preview = self.controleur.gestionnaire.preparer_generer_preview(info)
+        commande_preview = self.controleur.gestionnaire.preparer_generer_poster(info)
         if mimetype == 'video':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
         elif mimetype == 'image':
@@ -3772,7 +3776,7 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
     def _traiter_media(self, info: dict):
         # # Transmettre une commande de transcodage
         mimetype = info['mimetype'].split('/')[0]
-        commande_preview = self.controleur.gestionnaire.preparer_generer_preview(info)
+        commande_preview = self.controleur.gestionnaire.preparer_generer_poster(info)
         if mimetype == 'video':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
 
@@ -3780,9 +3784,18 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
 
             # Transmettre commande transcodage video pour formats web
             domaine = 'commande.fichiers.transcoderVideo'
+            mimetype = 'video/mp4'
+            resolution = 480
+            bitrate = 600000
 
-            commande = {'fuuid': fuuid, 'mimetype': 'video/mp4'}
+            commande = {
+                'fuuid': fuuid,
+                'mimetype': mimetype,
+                'height': resolution,
+                'videoBitrate': bitrate,
+            }
             self.ajouter_commande_a_transmettre(domaine, commande)
+            self.controleur.gestionnaire.ajouter_transcodage_video(info, mimetype, resolution, bitrate)
 
             # commande = {'fuuid': fuuid, 'mimetype': 'video/webm'}
             # self.ajouter_commande_a_transmettre(domaine, commande)
