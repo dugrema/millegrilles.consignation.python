@@ -3784,8 +3784,8 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
             commande = {'fuuid': fuuid, 'mimetype': 'video/mp4'}
             self.ajouter_commande_a_transmettre(domaine, commande)
 
-            commande = {'fuuid': fuuid, 'mimetype': 'video/webm'}
-            self.ajouter_commande_a_transmettre(domaine, commande)
+            # commande = {'fuuid': fuuid, 'mimetype': 'video/webm'}
+            # self.ajouter_commande_a_transmettre(domaine, commande)
 
         elif mimetype == 'image':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
