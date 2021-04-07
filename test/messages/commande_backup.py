@@ -387,7 +387,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
-        # sample.commande_regenerer()
+        sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
 
         # sample.trigger_backup_global()
@@ -417,7 +417,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_restaurer_liensgrosfichiers()
 
         # sample.trigger_backup_reset_global()
-        sample.trigger_backup_global()
+        # sample.trigger_backup_global()
         # sample.trigger_backup('Publication')
         # sample.trigger_backup('MaitreDesCles')
         # sample.trigger_backup('Topologie')

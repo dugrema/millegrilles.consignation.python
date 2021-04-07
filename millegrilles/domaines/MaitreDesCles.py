@@ -453,7 +453,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         domaines_permis = None
         user_id_permis = None
 
-        if permission.get('roles_permis') is not None or permission.get('user_id') is not None:
+        if evenement.get('permission'):
             self._logger.debug("Verification de permission pour dechiffrer une cle : %s" % permission)
 
             if Constantes.SECURITE_SECURE in enveloppe_permission.get_exchanges:

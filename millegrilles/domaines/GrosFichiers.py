@@ -1,7 +1,7 @@
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres, ConstantesSecurite
+from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres, ConstantesSecurite, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
     TraitementMessageDomaineRequete, HandlerBackupDomaine, RegenerateurDeDocuments, GroupeurTransactionsARegenerer, \
     TraitementCommandesProtegees, TraitementMessageDomaineEvenement
@@ -473,9 +473,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return documents
 
-    def mapper_fichier_version(self, curseur_documents):
+    def mapper_fichier_version(self, curseur_documents, extra_out: dict = None):
         # Extraire docs du curseur, filtrer donnees
         documents = list()
+        liste_fuuids = list()
         for doc in curseur_documents:
             doc_filtre = dict()
             for key, value in doc.items():
@@ -485,7 +486,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             if libelle_doc == ConstantesGrosFichiers.LIBVAL_FICHIER:
                 fuuid_v_courante = doc['fuuid_v_courante']
                 doc_filtre['version_courante'] = doc['versions'][fuuid_v_courante]
+                liste_fuuids.extend(doc[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS])
             documents.append(doc_filtre)
+
+        if extra_out is not None:
+            extra_out[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS] = liste_fuuids
 
         return documents
 
@@ -572,6 +577,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return documents
 
     def get_contenu_collection(self, params: dict):
+        enveloppe_certificat = self.validateur_message.verifier(params)
+        exchanges = enveloppe_certificat.get_exchanges
+
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
@@ -585,6 +593,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             (ConstantesGrosFichiers.DOCUMENT_COLLECTIONS, 1)
         ]
         info_collection = collection_domaine.find_one(filtre_collection, hint=hint_collection)
+
+        # Verifier si on doit generer une permission (requis pour collection privee ou protegee)
+        securite_collection = info_collection[Constantes.DOCUMENT_INFODOC_SECURITE]
+        if Constantes.SECURITE_PROTEGE in exchanges or Constantes.SECURITE_SECURE in exchanges:
+            permission = None  # Certificat donne acces directement, permission non requise
+        elif Constantes.SECURITE_PRIVE in exchanges and securite_collection == Constantes.SECURITE_PRIVE:
+            permission = {
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 12 * 60 * 60,  # 12 heures
+            }
+        else:
+            permission = None
 
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$all': [uuid_collection]},
@@ -612,12 +631,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         limit = params.get('limit') or 1000
 
         curseur_documents = collection_domaine.find(filtre).collation({'locale': 'en'}).hint(hint_fichiers).sort(sort_key).skip(skip).limit(limit)
-        documents = self.mapper_fichier_version(curseur_documents)
+        extra_out = dict()
+        documents = self.mapper_fichier_version(curseur_documents, extra_out)
 
-        return {
+        reponse = {
             'collection': info_collection,
             'documents': documents,
         }
+
+        if permission is not None:
+            permission[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES] = extra_out[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS]
+            permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+            reponse['permission'] = permission
+
+        return reponse
 
     def get_documents_par_uuid(self, params: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
