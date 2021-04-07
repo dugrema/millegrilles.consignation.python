@@ -23,6 +23,7 @@ import logging
 import datetime
 import re
 import multibase
+import pytz
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
@@ -441,32 +442,46 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
         enveloppe_evenement = self.extraire_certificat(evenement)
 
+        try:
+            permission = evenement['permission']
+            enveloppe_permission = self.extraire_certificat(permission)
+        except KeyError:
+            permission = evenement
+            enveloppe_permission = enveloppe_evenement
+
+        hachage_bytes_permission = set(permission[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES])
         domaines_permis = None
+        user_id_permis = None
 
-        if evenement.get('roles_permis') is not None:
-            self._logger.debug("Verification de permission pour dechiffrer une cle : %s" % evenement)
+        if permission.get('roles_permis') is not None or permission.get('user_id') is not None:
+            self._logger.debug("Verification de permission pour dechiffrer une cle : %s" % permission)
 
-            if Constantes.SECURITE_SECURE in enveloppe_evenement.get_exchanges:
+            if Constantes.SECURITE_SECURE in enveloppe_permission.get_exchanges:
                 # Un certificat 4.secure peut donner acces a n'importe quel domaine
-                domaines_permis = evenement.get('roles_permis')
-            elif Constantes.SECURITE_PROTEGE in enveloppe_evenement.get_exchanges:
+                domaines_permis = permission.get('roles_permis')
+                user_id_permis = permission.get('user_id')
+            elif Constantes.SECURITE_PROTEGE in enveloppe_permission.get_exchanges:
                 # Faire l'intersection entre les roles du certificat de la permission et les roles explicitement permis
                 # Evite de donner acces a un role que le certificat d'origine n'as pas acces
-                set_domaines_evenement = set(enveloppe_evenement.get_roles)
-                set_domaines_permis = set(evenement.get('roles_permis'))
+                set_domaines_evenement = set(enveloppe_permission.get_roles)
+                set_domaines_permis = set(permission.get('roles_permis'))
                 domaines_permis = list(set_domaines_evenement.intersection(set_domaines_permis))
+                user_id_permis = permission.get('user_id')
             else:
                 self._logger.debug("Une permission ne peut pas etre donnee par "
-                                   "un certificat 1.public ou 2.prive : %s" % evenement)
+                                   "un certificat 1.public ou 2.prive : %s" % permission)
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
             # Par defaut, 30 minutes pour une permission
             # Verifier si la validite de la permission de dechiffrage est expiree
-            estampille_evenement = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            estampille_evenement = permission[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
-            duree_permission = evenement.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION) or (30 * 60)
+            duree_permission = permission.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION) or (30 * 60)
+            date_estampille_evenement = datetime.datetime.fromtimestamp(estampille_evenement, tz=pytz.utc)
 
-            if estampille_evenement > datetime.datetime.utcnow() - datetime.timedelta(seconds=duree_permission):
+            date_expiration = pytz.utc.localize(datetime.datetime.utcnow()) - datetime.timedelta(seconds=duree_permission)
+
+            if date_estampille_evenement > date_expiration:
                 # Extraire certificats de rechiffrage
                 rechiffrage_pems = \
                     evenement.get('_certificat_tiers') or \
@@ -476,6 +491,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             else:
                 self._logger.debug("Permission expiree : %s" % evenement)
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+            if user_id_permis is not None:
+                # Verifier que le certificat de la requete est du bon user id
+                enveloppe_user_id = enveloppe_evenement.get_user_id
+                if enveloppe_user_id is None or enveloppe_user_id != user_id_permis:
+                    self._logger.debug("Requete du mauvais user_id : %s" % evenement)
+                    return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
         else:
             self._logger.debug("Verification de certificat pour dechiffrer une cle : %s" % evenement)
@@ -495,11 +517,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                                    "1.public ou 2.prive : %s" % evenement)
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
+        # Conserver tous les hachages bytes demandes qui sont inclus dans la permission (et rejeter les autres)
+        hachages_bytes_demandes = set(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]).intersection(hachage_bytes_permission)
+
         # Charger la cle
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: {
-                '$in': evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]
+                '$in': list(hachages_bytes_demandes)
             }
         }
         hint = [(ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES, 1)]

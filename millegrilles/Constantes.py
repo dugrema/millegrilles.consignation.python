@@ -790,6 +790,7 @@ class ConstantesMaitreDesCles:
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
 
     REQUETE_DECHIFFRAGE = 'dechiffrage'
+    REQUETE_PERMISSION = 'permission'  # Permission de dechiffrage (embedded dans requete)
 
     # REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     # REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
@@ -841,6 +842,8 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_HACHAGE_BYTES = 'hachage_bytes'
     TRANSACTION_CHAMP_NON_DECHIFFRABLE = 'non_dechiffrable'
     TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES = 'liste_hachage_bytes'
+    TRANSACTION_CHAMP_PERMISSION = 'permission'
+    TRANSACTION_CHAMP_USERID = 'user_id'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -1071,6 +1074,7 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'
+    DOCUMENT_LISTE_FUUIDS = 'fuuids'
 
     DOCUMENT_COLLECTION_NOMCOLLECTION = 'nom_collection'
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'

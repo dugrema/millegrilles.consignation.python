@@ -71,7 +71,7 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
         elif action == ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID:
             reponse = {'resultats': self.gestionnaire.get_documents_par_uuid(message_dict)}
         elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTION_PERSONNELLE:
-            reponse = {'resultats': self.gestionnaire.get_contenu_collection_personnelle(message_dict)}
+            reponse = self.gestionnaire.get_contenu_collection_personnelle(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_DOCUMENT_PAR_FUUID:
             reponse = self.gestionnaire.get_document_par_fuuid(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
@@ -2573,7 +2573,43 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Extraire la liste des fichiers
         fichiers = self.mapper_fichier_version(curseur)
 
-        return fichiers
+        # Generer permission pour recuperer les cles des fichiers
+        fuuid_fichiers = list()
+        # fuuid_fichiers.extend( [f[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE] for f in fichiers] )
+
+        for fichier in fichiers:
+            fuuid_fichiers.append(fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE])
+            v_courante = fichier['version_courante']
+            videos = v_courante.get(ConstantesGrosFichiers.DOCUMENT_VIDEO)
+
+            if v_courante.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW):
+                fuuid_fichiers.append(v_courante[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW])
+
+            if videos is not None:
+                # Extraire tous les fuuid videos (pour toutes les resolutions)
+                fuuid_videos = [vid[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID] for vid in videos.values()]
+                fuuid_fichiers.extend(fuuid_videos)
+
+        permission = self.generer_permission(fuuid_fichiers, user_id=user_id)
+
+        reponse = {
+            'fichiers': fichiers,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_PERMISSION: permission,
+        }
+
+        return reponse
+
+    def generer_permission(self, fuuids: list, user_id: str = None) -> dict:
+        permission = {
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: fuuids,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 12 * 60 * 60,  # 12 heures
+        }
+        if user_id:
+            permission[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_USERID] = user_id
+
+        permission = self.generateur_transactions.preparer_enveloppe(permission, Constantes.ConstantesMaitreDesCles.REQUETE_PERMISSION)
+
+        return permission
 
     def traiter_evenement_fichiers(self, message: dict, routing_key: str):
         filtre = {
