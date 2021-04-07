@@ -43,6 +43,10 @@ class TraitementEvenementProtege(TraitementMessageDomaineEvenement):
             self.gestionnaire.maj_collection_publique(message_dict)
         elif action == 'publicAwsS3':
             self.gestionnaire.traiter_evenement_awss3(message_dict)
+        elif action == 'transcodageProgres':
+            self.gestionnaire.traiter_evenement_fichiers(message_dict, routing_key)
+        elif action == 'transcodageErreur':
+            self.gestionnaire.traiter_evenement_fichiers(message_dict, routing_key)
         else:
             raise Exception("GrosFichiers evenement protege inconnu : " + routing_key)
 
@@ -198,6 +202,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'routing': [
                 'evenements.%s.#.*' % self.get_nom_domaine(),
                 'evenement.fichiers.publicAwsS3',
+                'evenement.fichiers.*.transcodageProgres',
+                'evenement.fichiers.*.transcodageErreur',
             ],
             'exchange': self.configuration.exchange_protege,
             'ttl': 300000,
@@ -1371,12 +1377,41 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
         unset_ops = {
-            ConstantesGrosFichiers.DOCUMENT_VIDEO + '.' + fuuid_fichier: True
+            'video.' + fuuid_fichier + '.' + cle_video: True
         }
         ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
         collection_domaine.update_one(filtre, ops)
 
         return document_fichier
+
+    def progres_video_transcode(self, message: dict):
+        fuuid_fichier = message[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        mimetype = message[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+        resolution = message['height']
+        bitrate = message['videoBitrate']
+
+        # Cle de format du video
+        cle_video = ';'.join([mimetype, str(resolution), str(bitrate)])
+        cle_progres = '.'.join(['video', fuuid_fichier, cle_video, 'pct_progres'])
+        cle_activite = '.'.join(['video', fuuid_fichier, cle_video, 'derniere_activite'])
+        progres = message['pctProgres']
+
+        set_ops = {
+            cle_progres: progres
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                cle_activite: True,
+            }
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA,
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(filtre, ops)
 
     def enregistrer_image_info(self, image_info):
 
@@ -1552,7 +1587,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         unset_ops = dict()
         current_date = dict()
         if document_conversion_media:
-            previews_en_cours = document_conversion_media.get('previews')
+            previews_en_cours = document_conversion_media.get(ConstantesGrosFichiers.DOCUMENT_POSTERS)
 
             if previews_en_cours:
                 for fuuid, doc in previews_en_cours.items():
@@ -1588,6 +1623,26 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
                         if routing_key is not None:
                             self.generateur_transactions.transmettre_commande(commande_preview, routing_key)
+
+            task_expiree = pytz.utc.localize(datetime.datetime.utcnow()) - datetime.timedelta(minutes=30)
+
+            transcodage_en_cours = document_conversion_media.get(ConstantesGrosFichiers.DOCUMENT_VIDEO)
+            if transcodage_en_cours is not None:
+                # Nettoyer tous les elements vides
+                for key, value in transcodage_en_cours.items():
+                    if value is None or len(value) == 0:
+                        unset_ops['.'.join([ConstantesGrosFichiers.DOCUMENT_VIDEO, key])] = True
+                    else:
+                        for task_key, task_value in value.items():
+                            if task_value is None or len(task_value) == 0:
+                                unset_ops['.'.join([ConstantesGrosFichiers.DOCUMENT_VIDEO, key, task_key])] = True
+                            elif task_value.get('derniere_activite') and (task_value.get('pctProgres') is not None or task_value.get('err') is not None):
+                                derniere_activite = pytz.utc.localize(task_value.get('derniere_activite'))
+                                if derniere_activite < task_expiree:
+                                    unset_ops['.'.join([ConstantesGrosFichiers.DOCUMENT_VIDEO, key, task_key])] = True
+                            else:
+                                # Task sans date derniere activite (c'est un bug, cleanup)
+                                unset_ops['.'.join([ConstantesGrosFichiers.DOCUMENT_VIDEO, key, task_key])] = True
 
         current_date[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = True
         ops = {
@@ -2519,6 +2574,36 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fichiers = self.mapper_fichier_version(curseur)
 
         return fichiers
+
+    def traiter_evenement_fichiers(self, message: dict, routing_key: str):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
+        }
+
+        key_doc = '.'.join([
+            ConstantesGrosFichiers.DOCUMENT_VIDEO,
+            message['fuuid'],
+            ';'.join([message['mimetype'], str(message['height']), str(message['videoBitrate'])])
+        ])
+
+        set_ops = dict()
+
+        action = routing_key.split('.').pop()
+        if action == 'transcodageProgres':
+            set_ops[key_doc + '.pctProgres'] = message['pctProgres']
+        elif action == 'transcodageErreur':
+            set_ops[key_doc + '.err'] = message['err']
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                key_doc + '.derniere_activite': True,
+            }
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(filtre, ops)
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
