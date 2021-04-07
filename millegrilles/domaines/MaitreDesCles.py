@@ -452,6 +452,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         hachage_bytes_permission = set(permission[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES])
         domaines_permis = None
         user_id_permis = None
+        securite_permise = None
 
         if evenement.get('permission'):
             self._logger.debug("Verification de permission pour dechiffrer une cle : %s" % permission)
@@ -460,6 +461,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 # Un certificat 4.secure peut donner acces a n'importe quel domaine
                 domaines_permis = permission.get('roles_permis')
                 user_id_permis = permission.get('user_id')
+                securite_permise = permission.get(Constantes.DOCUMENT_INFODOC_SECURITE)
             elif Constantes.SECURITE_PROTEGE in enveloppe_permission.get_exchanges:
                 # Faire l'intersection entre les roles du certificat de la permission et les roles explicitement permis
                 # Evite de donner acces a un role que le certificat d'origine n'as pas acces
@@ -467,6 +469,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 set_domaines_permis = set(permission.get('roles_permis'))
                 domaines_permis = list(set_domaines_evenement.intersection(set_domaines_permis))
                 user_id_permis = permission.get('user_id')
+                securite_permise = permission.get(Constantes.DOCUMENT_INFODOC_SECURITE)
             else:
                 self._logger.debug("Une permission ne peut pas etre donnee par "
                                    "un certificat 1.public ou 2.prive : %s" % permission)
@@ -497,6 +500,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 enveloppe_user_id = enveloppe_evenement.get_user_id
                 if enveloppe_user_id is None or enveloppe_user_id != user_id_permis:
                     self._logger.debug("Requete du mauvais user_id : %s" % evenement)
+                    return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+            if securite_permise is not None:
+                exchanges_user = enveloppe_evenement.get_exchanges
+                if securite_permise not in exchanges_user:
                     return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
         else:

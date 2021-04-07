@@ -601,6 +601,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         elif Constantes.SECURITE_PRIVE in exchanges and securite_collection == Constantes.SECURITE_PRIVE:
             permission = {
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 12 * 60 * 60,  # 12 heures
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
             }
         else:
             permission = None
