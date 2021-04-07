@@ -500,9 +500,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return documents
 
     def get_collections(self, params: dict):
+
+        # Verifier le niveau d'acces du demandeur
+        enveloppe_certificat = self.validateur_message.verifier(params)
+        exchanges = enveloppe_certificat.get_exchanges
+        if Constantes.SECURITE_SECURE in exchanges or Constantes.SECURITE_PROTEGE in exchanges:
+            niveaux_securite = ConstantesSecurite.cascade_public(Constantes.SECURITE_PROTEGE)
+        elif Constantes.SECURITE_PRIVE in exchanges:
+            niveaux_securite = ConstantesSecurite.cascade_public(Constantes.SECURITE_PRIVE)
+        elif Constantes.SECURITE_PUBLIC in exchanges:
+            niveaux_securite = ConstantesSecurite.cascade_public(Constantes.SECURITE_PUBLIC)
+        else:
+            return list()  # Aucun acces permis
+
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': niveaux_securite},
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
         projection = {

@@ -311,8 +311,11 @@ class ConstantesSecurite:
         niveaux = ConstantesSecurite.LISTE_NIVEAUX.copy()
 
         niveaux.reverse()
-        while niveaux[0] != niveau:
-            niveaux.pop(0)
+        try:
+            while niveaux[0] != niveau:
+                niveaux.pop(0)
+        except IndexError:
+            niveaux = list()
 
         return niveaux
 
