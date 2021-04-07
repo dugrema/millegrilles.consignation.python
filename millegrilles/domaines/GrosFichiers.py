@@ -387,6 +387,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             name='document-fuuid-vcourante'
         )
 
+        # Index tous les fuuids dans un fichier
+        collection_domaine.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS, 1),
+            ],
+            name='document-liste-fuuids'
+        )
+
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
 
@@ -730,6 +738,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
         addToSet = dict()
+        addToSet[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS] = fuuid
 
         uuid_collection = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID)
         if(uuid_collection):
@@ -1373,6 +1382,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'versions.%s.video.%s' % (fuuid_fichier, cle_video): info_video,
         }
 
+        addtoset_ops = {
+            ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: fuuid_video
+        }
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
             'versions.' + fuuid_fichier: {'$exists': True},
@@ -1380,6 +1393,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         ops = {
             '$set': set_ops,
+            '$addToSet': addtoset_ops,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
@@ -1685,6 +1699,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             uuid_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_fichier
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+            try:
+                liste_hachage.extend(fichier[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS])
+            except KeyError:
+                pass
 
         fuuid_associes = list()
 
@@ -1983,8 +2001,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 set_ops_fichier[key_version] = value
         ops_fichier = {
             '$set': set_ops_fichier,
+            '$addToSet': {
+                # Ajouter fuuid poster a la liste des fuuids associes au fichier
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
+            },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
+
         collection_domaine.update_one(filtre_fichier, ops_fichier)
 
         # MAJ document medias, retirer la demande de preview (complete)
@@ -1994,7 +2017,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         unset_ops = {
             ConstantesGrosFichiers.DOCUMENT_POSTERS + '.' + fuuid: True
         }
-        ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
+        ops = {
+            '$unset': unset_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
         collection_domaine.update_one(filtre, ops)
 
     def generer_permission_dechiffrage_fichier_public(self, params: dict):
@@ -2005,9 +2031,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Recuperer le fichier
         filtre_fichier = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            'versions.' + fuuid: {'$exists': True}
+            ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$all': [fuuid]},
         }
-        projection_fichier = ['collections', 'uuid', 'versions.' + fuuid, 'nom_fichier']
+        projection_fichier = ['collections', 'uuid', 'versions.' + fuuid, 'nom_fichier', ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS]
         fichier = collection_domaine.find_one(filtre_fichier, projection=projection_fichier)
 
         try:
