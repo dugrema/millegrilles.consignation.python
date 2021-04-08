@@ -1154,6 +1154,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_PUBLIER_COLLECTION = '%s.publierCollection' % DOMAINE_NOM
 
     TRANSACTION_NOUVEAU_FICHIER_USAGER = '%s.nouveauFichierUsager' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_FICHIER_USAGER = 'supprimerFichierUsager'
 
     EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE = 'confirmationMajCollectionPublique'
     EVENEMENT_MAJ_FICHIER = 'majFichier'

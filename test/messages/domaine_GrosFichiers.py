@@ -532,6 +532,14 @@ class MessagesSample(BaseCallback):
             evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_CLEAR_FICHIER_PUBLIE,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def transaction_supprimer_fichier_usager(self):
+        evenement = {
+            'fuuid': 'z8VvTURY8zhxx5ahBuk47WHjP8s6PwqnGvR5TFgP6Jy8b9c9iWxzTZFU4PynmPuWfYGzKgyjVa9Jw4y4a8XX3NkRbMy',
+        }
+        self.generateur.soumettre_transaction(
+            evenement, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER_USAGER,
+            reply_to=self.queue_name, correlation_id='abcd')
+
     def requete_transferts_en_cours(self):
         self.generateur.transmettre_requete(
             dict(),
@@ -587,7 +595,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_transferts_en_cours()
         # sample.commande_clear_fichier_publie()
 
-        sample.requete_collection_personnelle()
+        # sample.requete_collection_personnelle()
+        sample.transaction_supprimer_fichier_usager()
 
         pass
 

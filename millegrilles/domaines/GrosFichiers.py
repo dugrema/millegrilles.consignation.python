@@ -268,6 +268,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_USAGER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierUsager"
+        elif domaine_action == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER_USAGER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichierUsager"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -1366,8 +1368,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return entree_filtree
 
-    def retirer_fichiers_collection(self, uuid_collection: str, uuid_documents: list):
+    def retirer_fichiers_collection(self, uuid_collection: str, uuid_documents: list = None, fuuid_documents: list = None):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        if uuid_documents is None:
+            uuid_documents = list()
+
+        if fuuid_documents is not None:
+            filtre_fuuids = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$in': fuuid_documents}
+            }
+            curseur_fichiers = collection_domaine.find(filtre_fuuids)
+            uuid_fichiers = [u['uuid'] for u in curseur_fichiers]
+            uuid_documents.extend(uuid_fichiers)
 
         filtre_documents = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_documents},
@@ -1734,7 +1748,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             if previews_en_cours:
                 for fuuid, doc in previews_en_cours.items():
                     debut_resoumission = doc.get('debut_resoumission')
-                    securite = doc['securite']
 
                     if debut_resoumission is None:
                         self._logger.debug("Debut periode resoumission preview %s" % fuuid)
@@ -3915,6 +3928,30 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
 
         elif mimetype == 'image':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
+
+
+class ProcessusTransactionSupprimerFichierUsager(ProcessusGrosFichiers):
+
+    def initiale(self):
+        certificat = self.certificat
+        niveaux_securite = certificat.get_exchanges
+        user_id = certificat.get_user_id
+
+        if user_id is None or not any([n in ConstantesSecurite.cascade_secure(Constantes.SECURITE_PRIVE) for n in niveaux_securite]):
+            raise Exception("Niveau de securite ne permet pas de supprimer un fichier")
+
+        transaction = self.transaction
+        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        # Note : la suppression de fichier usager ne fait que retirer le lien a la collection de l'usager
+        #        le fichier devient orphelin sauf s'il est aussi utilise ailleurs (e.g. forum)
+        uuid_collection = user_id
+        self.controleur.gestionnaire.retirer_fichiers_collection(uuid_collection, [uuid_fichier])
+
+        self.set_etape_suivante()  # Termine
+        return {
+            'ok': True
+        }
 
 
 class CollectionAbsenteException(Exception):
