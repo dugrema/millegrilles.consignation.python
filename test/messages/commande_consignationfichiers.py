@@ -15,7 +15,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = 'z8Vwq1t95b1BELL8azvBNfsDom9Sz8GJ8LUngRVjF6MZf4VGBCXnQEnCQZRRMCk6uJ9QvqmXsBiWJpMm2cs2dmkin8M'
+        self.__fuuid = 'z8Vuc7B5z76T6LrqZs1Tw7hTch61xiine33wMpfiwrKx6NnttEybLVmUzg4kcYsbEQLNaPyX44PBCxp6NdeE5n8SJM3'
         self.event_termine = Event()
 
     def commande_restaurerGrosFichiers(self):
@@ -29,8 +29,8 @@ class TestConsignationFichiers(DomaineTest):
         # permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
         params = {
             'fuuid': self.__fuuid,
-            'mimetype': 'video/webm',
-            # 'mimetype': 'video/mp4',
+            # 'mimetype': 'video/webm',
+            'mimetype': 'video/mp4',
         }
         domaine = 'commande.fichiers.transcoderVideo'
         self.generateur.transmettre_commande(

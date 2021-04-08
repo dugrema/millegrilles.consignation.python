@@ -1156,6 +1156,9 @@ class ConstantesGrosFichiers:
     TRANSACTION_NOUVEAU_FICHIER_USAGER = '%s.nouveauFichierUsager' % DOMAINE_NOM
 
     EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE = 'confirmationMajCollectionPublique'
+    EVENEMENT_MAJ_FICHIER = 'majFichier'
+    EVENEMENT_ASSOCIATION_POSTER = 'associationPoster'
+    EVENEMENT_AJOUT_VIDEO = 'ajoutVideo'
 
     REQUETE_VITRINE_FICHIERS = '%s.vitrineFichiers' % DOMAINE_NOM
     REQUETE_VITRINE_ALBUMS = '%s.vitrineAlbums' % DOMAINE_NOM

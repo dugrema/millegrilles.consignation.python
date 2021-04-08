@@ -1,3 +1,4 @@
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
@@ -856,23 +857,108 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger.debug("maj_fichier: filtre = %s" % filtre)
         self._logger.debug("maj_fichier: operations = %s" % operations)
         try:
-            resultat = collection_domaine.update_one(filtre, operations, upsert=True)
-            if resultat.upserted_id is None and resultat.matched_count != 1:
-                raise Exception("Erreur mise a jour fichier fuuid: %s" % fuuid)
+            fichier_maj = collection_domaine.find_one_and_update(
+                filtre, operations, upsert=True, return_document=ReturnDocument.AFTER)
         except DuplicateKeyError as dke:
             self._logger.info("Cle dupliquee sur fichier %s, on ajoute un id unique dans le nom" % fuuid)
             nom_fichier = '%s_%s' % (uuid.uuid1(), transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER])
             set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
-            resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+            fichier_maj = collection_domaine.find_one_and_update(
+                filtre, operations, upsert=True, return_document=ReturnDocument.AFTER)
 
-        self._logger.debug("maj_fichier resultat %s" % str(resultat))
+        if fichier_maj is None:
+            raise Exception("Erreur ajout/maj fichier %s" % uuid_fichier)
+        self._logger.debug("maj_fichier resultat %s" % str(fichier_maj))
+
+        self.emettre_evenement_fichier_maj(fuuid, fichier_maj)
 
         # Mettre a jour les etiquettes du fichier au besoin
         etiquettes = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES)
         if etiquettes is not None:
             self.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
 
-        return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier, 'info_version': info_version}
+        fichier_maj['version_courante'] = fichier_maj['versions'][fuuid]
+
+        return {
+            'plus_recent': plus_recente_version,
+            'uuid_fichier': uuid_fichier,
+            'info_version': info_version,
+            'fichier': fichier_maj
+        }
+
+    def emettre_evenement_fichier_maj(self, fuuid, fichier: dict = None, action=ConstantesGrosFichiers.EVENEMENT_MAJ_FICHIER):
+        if fichier is None:
+            collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+            filtre = {
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$all': [fuuid]}
+            }
+            fichier = collection_domaine.find_one(filtre)
+
+        fichier = fichier.copy()
+        fichier['version_courante'] = fichier['versions'][fuuid]
+
+        extra_out = dict()
+        domaine_action = 'evenement.grosfichiers.' + action
+        evenement = self.mapper_fichier_version([fichier], extra_out).pop()
+        evenement.update(extra_out)
+
+        # Determiner
+        # niveau_securite = self.get_niveau_securite_fichier(fuuid, fichier.get('collections'))
+        # exchanges = ConstantesSecurite.cascade_secure(niveau_securite)
+        # exchanges.pop()  # Retirer 4.secure
+
+        self.generateur_transactions.emettre_message(
+            evenement,
+            domaine_action,
+            exchanges=[Constantes.SECURITE_PROTEGE]
+        )
+
+        # Emettre un evenement plus limite sur exchange prive, uniquement les ids
+        evenement_prive = {
+            'uuid': evenement['uuid'],
+            'fuuid': fuuid,
+            'collections': evenement['collections'],
+        }
+        self.generateur_transactions.emettre_message(
+            evenement_prive,
+            domaine_action,
+            exchanges=[Constantes.SECURITE_PRIVE]
+        )
+
+    def get_niveau_securite_fichier(self, fuuid, collections: list = None):
+        if collections is None:
+            collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+            filtre = {
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$all': [fuuid]}
+            }
+            fichier = collection_domaine.find_one(filtre)
+            collections = fichier.get('collections')
+
+        # Par defaut, niveau est 3.protege
+        niveau_securite = Constantes.SECURITE_PROTEGE
+
+        if collections is None or len(collections) == 0:
+            return niveau_securite
+
+        filtre_collections = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': collections},
+            Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]},
+        }
+        projection_collection = [Constantes.DOCUMENT_INFODOC_SECURITE]
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        curseur_collections = collection_domaine.find(filtre_collections, projection=projection_collection)
+
+        # Verifier qu'au moins une collection est de securite 1.public
+        for coll in curseur_collections:
+            sec_coll = coll[Constantes.DOCUMENT_INFODOC_SECURITE]
+            if sec_coll == Constantes.SECURITE_PUBLIC:
+                niveau_securite = Constantes.SECURITE_PUBLIC
+            elif niveau_securite == Constantes.SECURITE_PROTEGE and sec_coll == Constantes.SECURITE_PRIVE:
+                niveau_securite = Constantes.SECURITE_PRIVE
+
+        return niveau_securite
 
     def renommer_document(self, uuid_doc, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -2036,7 +2122,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        collection_domaine.update_one(filtre_fichier, ops_fichier)
+        fichier_maj = collection_domaine.find_one_and_update(filtre_fichier, ops_fichier, return_document=ReturnDocument.AFTER)
+        self.emettre_evenement_fichier_maj(fuuid, fichier_maj, ConstantesGrosFichiers.EVENEMENT_ASSOCIATION_POSTER)
 
         # MAJ document medias, retirer la demande de preview (complete)
         filtre = {
@@ -3365,126 +3452,6 @@ class ProcessusTransactionChangerFavoris(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
 
-class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersActivite):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-
-        uuid_collection_figee = transaction['uuid']
-        fuuid_torrent = transaction['uuid-torrent']
-
-        # Appliquer quelques changements pour pouvoir reutiliser maj_fichier
-        transaction_copie = transaction.copy()
-        transaction_copie['nom'] = '%s.torrent' % transaction_copie['nom']
-        transaction_copie[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES] = ['torrent']
-        transaction_copie['fuuid'] = fuuid_torrent
-        transaction_copie['mimetype'] = 'application/x-bittorrent'
-
-        # Verifier si l'entree fichier de torrent pour la collection existe deja
-        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID]
-        transaction_copie[ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID] = uuid_collection
-        fichier_torrent = self._controleur.gestionnaire.get_torrent_par_collection(uuid_collection)
-        if fichier_torrent is not None:
-            transaction_copie[ConstantesGrosFichiers.DOCUMENT_UUID_GENERIQUE] = fichier_torrent[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-
-        # Conserver l'information du fichier torrent (comme nouveau fichier)
-        resultat = self._controleur.gestionnaire.maj_fichier(transaction_copie)
-
-        self.set_etape_suivante()
-
-        # Preparer le token pour resumer le processus principal de creation de torrent
-        # On utilise le fuuid du torrent, c'est la meme valeur que le uuid de la collection privee
-        token_resumer_creertorrent = 'collection_figee_torrent:%s' % uuid_collection_figee
-        self.resumer_processus([token_resumer_creertorrent])
-
-        return resultat
-
-
-class ProcessusTransactionTorrentSeeding(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-        uuid_collection_figee = transaction['uuid-collection']
-        hashstring = transaction['hashstring-torrent']
-        self.controleur.gestionnaire.associer_hashstring_torrent(uuid_collection_figee, hashstring)
-        self.set_etape_suivante()
-
-        return {'uuid_collection_figee': uuid_collection_figee, 'hashstring': hashstring}
-
-
-class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-        fuuid = transaction['fuuid']
-        securite_destination = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
-        if securite_destination is None:
-            securite_destination = Constantes.SECURITE_PRIVE
-
-        # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
-        transaction_maitredescles = {
-            'fuuid': fuuid
-        }
-        domaine = 'millegrilles.domaines.MaitreDesCles.declasserCleGrosFichier'
-        # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
-        self.ajouter_transaction_a_soumettre(domaine, transaction_maitredescles)
-
-        if not self.controleur.is_regeneration:
-            token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
-            self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
-        else:
-            token_attente = 'decrypterFichier_nouveauFichier:%s' % fuuid
-            self.set_etape_suivante('finale', [token_attente])
-
-        return {
-            'fuuid': fuuid,
-            ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
-        }
-
-    def decrypter_fichier(self):
-        # transaction_id = self.parametres['decrypterFichier_cleSecrete'].get('_id-transaction')
-        # collection_transaction_nom = self.controleur.gestionnaire.get_collection_transaction_nom()
-        # collection_transaction = self.controleur.document_dao.get_collection(collection_transaction_nom)
-        # information_cle_secrete = collection_transaction.find_one({'_id': ObjectId(transaction_id)})
-        information_cle_secrete = self.parametres['decrypterFichier_cleSecrete']
-
-        cle_secrete = information_cle_secrete['cle_secrete_decryptee']
-        iv = information_cle_secrete['iv']
-
-        information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
-
-        self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
-
-        fuuid = self.parametres['fuuid']
-        token_attente = 'decrypterFichier_nouveauFichier:%s' % fuuid
-
-        # Transmettre commande a grosfichiers
-
-        commande = {
-            'fuuid': fuuid,
-            'cleSecreteDecryptee': cle_secrete,
-            'iv': iv,
-            'nomfichier': information_fichier['nom'],
-            'mimetype': information_fichier['mimetype'],
-            'extension': information_fichier.get('extension'),
-            'securite': self.parametres[ConstantesGrosFichiers.DOCUMENT_SECURITE],
-        }
-        self.ajouter_commande_a_transmettre('commande.grosfichiers.decrypterFichier', commande)
-
-        self.set_etape_suivante('finale', [token_attente])
-
-
 class ProcessusTransactionCleSecreteFichier(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
@@ -3506,50 +3473,6 @@ class ProcessusTransactionCleSecreteFichier(ProcessusGrosFichiers):
             'cle_secrete_decryptee': cle_secrete,
             'iv': iv,
         }
-
-
-class ProcessusTransactionNouveauFichierDecrypte(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-
-        fuuid_crypte = transaction.get('fuuid_crypte')
-        fuuid_decrypte = transaction.get('fuuid_decrypte')
-
-        info_fichier = self.controleur.gestionnaire.enregistrer_fichier_decrypte(transaction)
-        uuid_fichier = info_fichier['uuid']
-
-        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
-
-        token_resumer = 'decrypterFichier_nouveauFichier:%s' % fuuid_crypte
-        self.resumer_processus([token_resumer])
-
-        self.set_etape_suivante()
-
-        return {'fuuid_crypte': fuuid_decrypte, 'fuuid_decrypte': fuuid_decrypte}
-
-
-class ProcessusTransactionAssocierThumbnail(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-
-        fuuid = transaction['fuuid']
-        thumbnail = transaction['thumbnail']
-        metadata = transaction.get('metadata')
-
-        self.controleur.gestionnaire.associer_thumbnail(fuuid, thumbnail, metadata)
-
-        token_resumer = 'associer_thumbnail:%s' % fuuid
-        self.resumer_processus([token_resumer])
-
-        self.set_etape_suivante()
 
 
 class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
@@ -3948,6 +3871,7 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
         resultat = {
             'uuid': resultat['uuid_fichier'],
             'fuuid': fuuid,
+            'fichier': resultat['fichier'],
             'collection_uuid': collection_usager,
             'mimetype': transaction['mimetype'],
             'extension': extension,
