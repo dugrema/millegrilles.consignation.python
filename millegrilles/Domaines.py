@@ -552,7 +552,7 @@ class GestionnaireDomaine:
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
         self.__logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
-        self._watchers = list()
+        # self._watchers = list()
         self.channel_mq = None
         self._arret_en_cours = False
         self._stop_event = Event()
@@ -857,9 +857,10 @@ class GestionnaireDomaine:
         :param exchange_router: Routeur pour determiner sur quels exchanges le document sera place.
         :return:
         """
-        watcher = WatcherCollectionMongoThread(self._contexte, self._stop_event, nom_collection_mongo, routing_key, exchange_router)
-        self._watchers.append(watcher)
-        watcher.start()
+        # watcher = WatcherCollectionMongoThread(self._contexte, self._stop_event, nom_collection_mongo, routing_key, exchange_router)
+        # self._watchers.append(watcher)
+        # watcher.start()
+        self.__logger.warning("Deprecated: Domaines.demarrer_watcher_collection()")
 
     def identifier_processus(self, domaine_transaction):
         nom_domaine = self.get_nom_domaine()
@@ -882,16 +883,16 @@ class GestionnaireDomaine:
         self.__logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
 
         # Desactiver temporairement toutes les threads de watchers
-        try:
-            for watcher in self._watchers:
-                watcher.stop()
+        # try:
+            # for watcher in self._watchers:
+            #     watcher.stop()
 
-            processeur_regeneration = MGPProcesseurRegeneration(self, self.__contexte)
-            processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
-        finally:
-            # Reactiver les watchers
-            for watcher in self._watchers:
-                watcher.start()
+        processeur_regeneration = MGPProcesseurRegeneration(self, self.__contexte)
+        processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
+        # finally:
+        #     # Reactiver les watchers
+        #     for watcher in self._watchers:
+        #         watcher.start()
 
         self.__logger.info("Fin regeneration des documents de %s" % self.get_nom_domaine())
 
@@ -1049,11 +1050,11 @@ class GestionnaireDomaine:
         self.__logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
         self._stop_event.set()
-        for watcher in self._watchers:
-            try:
-                watcher.stop()
-            except Exception as e:
-                self.__logger.info("Erreur fermeture watcher: %s" % str(e))
+        # for watcher in self._watchers:
+        #     try:
+        #         watcher.stop()
+        #     except Exception as e:
+        #         self.__logger.info("Erreur fermeture watcher: %s" % str(e))
 
     def rapport_stats_transactions(self):
         """
