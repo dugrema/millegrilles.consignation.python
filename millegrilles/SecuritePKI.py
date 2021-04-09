@@ -563,7 +563,7 @@ class UtilCertificats:
             if 'expired' in msg:
                 self._logger.info("Un des certificats est expire, verifier en fonction de la date de reference")
                 # Le certificat est expire, on fait la validation pour la fin de la periode de validite
-                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+                date_reference = enveloppe.not_valid_after
 
                 validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
                 validator = CertificateValidator(
