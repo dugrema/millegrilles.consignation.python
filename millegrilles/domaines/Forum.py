@@ -497,6 +497,17 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         # Recuperer le forum_id du post - la transaction ne contient pas le forum_id sur update de post
         forum_id = post[ConstantesForum.CHAMP_FORUM_ID]
 
+        # Associer fichier media au post (si applicable)
+        if params.get(ConstantesForum.CHAMP_MEDIA_UUID):
+            transaction_media_collection = {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: forum_id,
+                ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS: [params[ConstantesForum.CHAMP_MEDIA_UUID]],
+            }
+            self.generateur_transactions.soumettre_transaction(
+                transaction_media_collection,
+                ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION
+            )
+
         # Flag dirty sur forum
         filtre = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_POSTS: True}}
