@@ -5,7 +5,7 @@ import pytz
 from pymongo import ReturnDocument
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesSecurite, ConstantesForum, ConstantesGrosFichiers
+from millegrilles.Constantes import ConstantesSecurite, ConstantesForum, ConstantesGrosFichiers, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementMessageDomaineCommande, TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -624,8 +624,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUM_POSTS
         for forum in curseur_forum:
             securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
-            exchanges = ConstantesSecurite.cascade_secure(securite_forum)
-            exchanges.pop()  # Enlever 4.secure
+            exchanges = ConstantesSecurite.cascade_protege(securite_forum)
 
             document_forum_posts = self.generer_doc_forum(forum, params)
 
@@ -641,6 +640,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         nom_forum = forum.get(ConstantesForum.CHAMP_NOM_FORUM) or forum_id
         self.__logger.debug("Traitement posts du forum %s (%s)" % (nom_forum, forum_id))
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        filtre_forum = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
+        form_doc = collection_forums.find_one(filtre_forum)
+        securite_forum = form_doc[Constantes.DOCUMENT_INFODOC_SECURITE]
 
         champs_projection = [
             ConstantesForum.CHAMP_POST_ID,
@@ -658,20 +662,36 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         # Genrer doc posts plus recent
         posts_plus_recents = list()
-        filtre = {
+        filtre_forum = {
             ConstantesForum.CHAMP_FORUM_ID: forum[ConstantesForum.CHAMP_FORUM_ID],
         }
         sort = [(ConstantesForum.CHAMP_DATE_CREATION, -1)]
         limit = 500
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
-        posts = collection_posts.find(filtre, projection=champs_projection, sort=sort, limit=limit)
+        posts = collection_posts.find(filtre_forum, projection=champs_projection, sort=sort, limit=limit)
+        fuuids = set()
         for post in posts:
             post_filtre = dict()
             for key, value in post.items():
                 if key in champs_projection:
                     post_filtre[key] = value
             posts_plus_recents.append(post_filtre)
+
+            if post.get(ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW):
+                fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW])
+
+        if securite_forum == Constantes.SECURITE_PRIVE:
+            # On ajoute une permission de niveau prive pour tous les medias du forum
+            fuuids = list(set(fuuids))  # Dedupe
+            permission = {
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: fuuids,
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
+            }
+            permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+        else:
+            permission = None
 
         # Signer le document
         document_forum_posts = {
@@ -681,13 +701,16 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_POSTS: posts_plus_recents,
             ConstantesForum.CHAMP_SORT_TYPE: 'plusRecent',
         }
+        if permission is not None:
+            document_forum_posts['permission'] = permission
+
         document_forum_posts = self.generateur_transactions.preparer_enveloppe(
             document_forum_posts,
             domaine='Forum.' + ConstantesForum.LIBVAL_FORUM_POSTS,
             ajouter_certificats=True
         )
 
-        filtre = {
+        filtre_forum = {
             ConstantesForum.CHAMP_FORUM_ID: forum_id,
             ConstantesForum.CHAMP_SORT_TYPE: ConstantesForum.TRI_PLUSRECENT,
         }
@@ -697,12 +720,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
         forum_posts = collection_forums_posts.find_one_and_update(
-            filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+            filtre_forum, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
-        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-        filtre = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
+        # Set flag dirty sur le forum
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_POSTS: False}}
-        collection_forums.update_one(filtre, ops)
+        collection_forums.update_one(filtre_forum, ops)
 
         return forum_posts
 
