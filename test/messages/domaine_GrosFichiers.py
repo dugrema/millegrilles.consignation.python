@@ -193,11 +193,12 @@ class MessagesSample(BaseCallback):
 
     def transaction_renommer_collection(self):
         transaction = {
-            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
-            "nom": "sous_test_change_2",
+            "uuid": "57a26e70-eace-4e6b-952b-bbe01010f559",
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: "sous_test_change_2",
+            Constantes.DOCUMENT_INFODOC_SECURITE: "1.public",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.renommerCollection',
+            transaction, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION,
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -560,7 +561,7 @@ class MessagesSample(BaseCallback):
 
         # enveloppe3 = sample.transaction_creer_collection_vide()
         # enveloppe3 = sample.transaction_creer_collection_2docs()
-        # enveloppe4 = sample.transaction_renommer_collection()
+        enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
         # enveloppe = sample.transaction_changer_etiquettes_collection()
@@ -596,7 +597,7 @@ class MessagesSample(BaseCallback):
         # sample.commande_clear_fichier_publie()
 
         # sample.requete_collection_personnelle()
-        sample.transaction_supprimer_fichier_usager()
+        # sample.transaction_supprimer_fichier_usager()
 
         pass
 

@@ -5,7 +5,7 @@ import pytz
 from pymongo import ReturnDocument
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesSecurite, ConstantesForum
+from millegrilles.Constantes import ConstantesSecurite, ConstantesForum, ConstantesGrosFichiers
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementMessageDomaineCommande, TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -346,10 +346,26 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         if resultat.acknowledged is not True:
             return {'ok': False, 'err': 'Echec ajout document de forum'}
 
+        # Transmettre transaction pour creer une collection "grosfichiers" pour les fichiers du forum
+        domaine_action = ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION
+        transaction_creer_collection = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_transaction,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: uuid_transaction,
+            ConstantesGrosFichiers.DOCUMENT_UUID_PARENT: ConstantesGrosFichiers.LIBVAL_UUID_COLLECTION_FORUMS,
+            ConstantesGrosFichiers.CHAMP_CREER_PARENT: True,
+        }
+        self.generateur_transactions.soumettre_transaction(transaction_creer_collection, domaine_action)
+
         # Trigger creation du forumPosts
         commande = {ConstantesForum.CHAMP_FORUM_IDS: [uuid_transaction]}
         domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
+
+        # Emettre evenement de modification de forums
+        domaine_action = 'Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUMS
+        exchanges = ConstantesSecurite.cascade_protege(Constantes.SECURITE_PROTEGE)
+        self.generateur_transactions.emettre_message(
+            forum, 'evenement.' + domaine_action, domaine_action=domaine_action, exchanges=exchanges)
 
         return {'ok': True}
 
@@ -360,6 +376,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_NOM_FORUM,
             ConstantesForum.CHAMP_LANGUE_FORUM,
             ConstantesForum.CHAMP_DESCRIPTION_FORUM,
+            Constantes.DOCUMENT_INFODOC_SECURITE,
         ]
 
         # Transferer les valeurs a modifier en fonction de la liste de champs supportes
@@ -378,17 +395,33 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         collection_site = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-        resultats = collection_site.update_one(filtre, ops)
+        doc_forum = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
-        if resultats.modified_count != 1:
-            return {'ok': False, 'err': "Echec mise a jour, document non trouve"}
+        if doc_forum is None:
+            return {'ok': False, 'err': "Echec mise a jour, document non trouve : %s" % ref_id}
+
+        # Maj de la collection de fichiers associee (securite et nom)
+        transaction_maj_collection = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: ref_id,
+            Constantes.DOCUMENT_INFODOC_SECURITE: doc_forum[Constantes.DOCUMENT_INFODOC_SECURITE],
+            # ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: doc_forum[ConstantesForum.CHAMP_NOM_FORUM],
+        }
+        if doc_forum.get(ConstantesForum.CHAMP_NOM_FORUM):
+            transaction_maj_collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = doc_forum[ConstantesForum.CHAMP_NOM_FORUM]
+        self.generateur_transactions.soumettre_transaction(transaction_maj_collection, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
 
         # Trigger maj du forumPost
         commande = {ConstantesForum.CHAMP_FORUM_IDS: [ref_id]}
         domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
-        return {'ok': True}
+        # Emettre evenement de modification de forums
+        domaine_action = 'Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUMS
+        exchanges = ConstantesSecurite.cascade_protege(Constantes.SECURITE_PROTEGE)
+        self.generateur_transactions.emettre_message(
+            doc_forum, 'evenement.' + domaine_action, domaine_action=domaine_action, exchanges=exchanges)
+
+        return {'ok': True, 'forum': doc_forum}
 
     # def creer_post(self, params: dict):
     #     uuid_transaction = params['en-tete']['uuid_transaction']

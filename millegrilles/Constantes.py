@@ -303,6 +303,18 @@ class ConstantesSecurite:
         return niveaux
 
     @staticmethod
+    def cascade_protege(niveau):
+        """
+        :param niveau: Le moins securitaire
+        :return: Liste des niveaux de securite aussi ou plus securitaires que celui en parametre
+        """
+        niveaux = ConstantesSecurite.LISTE_NIVEAUX[:3]  # Retirer secure
+        while niveaux[0] != niveau:
+            niveaux.pop(0)
+
+        return niveaux
+
+    @staticmethod
     def cascade_public(niveau):
         """
         :param niveau: Le plus securitaire
@@ -1034,6 +1046,7 @@ class ConstantesGrosFichiers:
     LIBVAL_VITRINE_ALBUMS = 'vitrine.albums'
 
     LIBVAL_UUID_COLLECTION_USAGERS = 'usagers'
+    LIBVAL_UUID_COLLECTION_FORUMS = 'forums'
 
     LIBELLE_PUBLICATION_CACHERFICHIERS = 'cacherfichiers'
     LIBELLE_PUBLICATION_TOP = 'top'
@@ -1875,6 +1888,7 @@ class ConstantesForum:
     LIBVAL_POST_COMMENTAIRES = 'postCommentaires'
     LIBVAL_VOTE = 'vote'
 
+    EVENEMENT_MAJ_FORUMS = 'majForums'
     EVENEMENT_MAJ_FORUM_POSTS = 'majForumPosts'
     EVENEMENT_MAJ_POST_COMMENTS = 'majPostComments'
 
