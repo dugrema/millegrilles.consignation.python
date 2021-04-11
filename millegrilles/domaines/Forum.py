@@ -986,7 +986,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             if post.get(ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW):
                 fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW])
             if post.get(ConstantesForum.CHAMP_MEDIA_UUID):
-                fuuids.add(post[ConstantesForum.CHAMP_MEDIA_UUID])
+                fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA])
 
             # Chiffrer contenu post
             identificateurs_documents = {
