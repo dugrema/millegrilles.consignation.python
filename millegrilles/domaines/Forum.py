@@ -1,6 +1,8 @@
 import logging
 import datetime
 import pytz
+import multibase
+import gzip
 
 from pymongo import ReturnDocument
 
@@ -8,7 +10,10 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurite, ConstantesForum, ConstantesGrosFichiers, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementMessageDomaineCommande, TraitementCommandesProtegees
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
+from millegrilles.util.Chiffrage import CipherMsg2Chiffrer
+from millegrilles.util.JSONMessageEncoders import JSONHelper
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
@@ -115,7 +120,9 @@ class TraitementCommandesForumProtegees(TraitementCommandesProtegees):
         if action == ConstantesForum.COMMANDE_VOTER:
             resultat = self.gestionnaire.ajouter_vote(message_dict)
         elif action == ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS:
-            resultat = self.gestionnaire.generer_forums_posts(message_dict)
+            # resultat = self.gestionnaire.generer_forums_posts(message_dict)
+            self.gestionnaire.trigger_generer_forums_posts(message_dict, properties.reply_to, properties.correlation_id)
+            resultat = None
         elif action == ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES:
             resultat = self.gestionnaire.generer_posts_comments(message_dict)
         elif action == ConstantesForum.COMMANDE_TRANSMETTRE_FORUMS_POSTS:
@@ -600,7 +607,13 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def generer_forums_posts(self, params: dict):
+    def trigger_generer_forums_posts(self, params: dict, reply_to, correlation_id):
+        params = params.copy()
+        params['reply_to'] = reply_to
+        params['correlation_id'] = correlation_id
+        self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererForumsPosts', params)
+
+    def generer_forums_posts(self, params: dict, certs_chiffrage: dict = None):
         """
         Generer les documents de metadonnees pour les forums.
         :param params:
@@ -609,6 +622,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         # Si dirty_only==True, on skip les forums qui n'ont pas de posts/comments qui sont dirty
         dirty_only = params.get('dirty_only') or False
+
+        enveloppes_rechiffrage = dict()
+        if certs_chiffrage is not None:
+            # Preparer les certificats avec enveloppe, par fingerprint
+            for cert in certs_chiffrage:
+                enveloppe = EnveloppeCertificat(certificat_pem=cert)
+                fp = enveloppe.fingerprint
+                enveloppes_rechiffrage[fp] = enveloppe
 
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         filtre = {
@@ -626,7 +647,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
             exchanges = ConstantesSecurite.cascade_protege(securite_forum)
 
-            document_forum_posts = self.generer_doc_forum(forum, params)
+            document_forum_posts = self.generer_doc_forum(forum, params, enveloppes_rechiffrage)
 
             # Emettre document sous forme d'evenement
             del document_forum_posts['_id']
@@ -635,7 +656,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def generer_doc_forum(self, forum: dict, params):
+    def generer_doc_forum(self, forum: dict, params, enveloppes_rechiffrage: dict = None):
         forum_id = forum[ConstantesForum.CHAMP_FORUM_ID]
         nom_forum = forum.get(ConstantesForum.CHAMP_NOM_FORUM) or forum_id
         self.__logger.debug("Traitement posts du forum %s (%s)" % (nom_forum, forum_id))
@@ -681,11 +702,58 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             if post.get(ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW):
                 fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW])
 
+        if securite_forum in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
+            # Compresser (gzip) et chiffrer le contenu
+            contenu = {
+                ConstantesForum.CHAMP_NOM_FORUM: nom_forum,
+                ConstantesForum.CHAMP_POSTS: posts_plus_recents,
+            }
+            json_helper = JSONHelper()
+            contenu = json_helper.dict_vers_json(contenu)
+            contenu = gzip.compress(contenu)
+            cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
+            cipher.start_encrypt()
+            contenu = cipher.update(contenu)
+            contenu += cipher.finalize()
+
+            hachage_bytes = cipher.digest
+
+            # Chiffrer la cle secrete pour chaque enveloppe
+            cles = dict()
+            for fp, enveloppe in enveloppes_rechiffrage.items():
+                cle_chiffree = cipher.chiffrer_motdepasse_enveloppe(enveloppe)
+                cle_chiffree = multibase.encode('base64', cle_chiffree).decode('utf-8')
+                cles[fp] = cle_chiffree
+
+            commande_maitrecles = {
+                'domaine': 'Forum',
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    'type': ConstantesForum.LIBVAL_FORUM_POSTS,
+                    'forum_id': forum_id,
+                },
+                'format': 'mgs2',
+                'cles': cles,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+            }
+            commande_maitrecles.update(cipher.get_meta())
+
+            # Transmettre commande de sauvegarde de cle
+            self.generateur_transactions.transmettre_commande(
+                commande_maitrecles, 'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
+
+            contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
+        else:
+            contenu_chiffre = None
+            hachage_bytes = None
+
         if securite_forum == Constantes.SECURITE_PRIVE:
             # On ajoute une permission de niveau prive pour tous les medias du forum
             fuuids = list(set(fuuids))  # Dedupe
+            if hachage_bytes is not None:
+                # Ajouter hachage du forum_post (contenu chiffre)
+                fuuids.append(hachage_bytes)
             permission = {
-                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: fuuids,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: fuuids,
                 Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
             }
@@ -696,11 +764,18 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         # Signer le document
         document_forum_posts = {
             ConstantesForum.CHAMP_FORUM_ID: forum_id,
-            ConstantesForum.CHAMP_NOM_FORUM: nom_forum,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_courante,
-            ConstantesForum.CHAMP_POSTS: posts_plus_recents,
             ConstantesForum.CHAMP_SORT_TYPE: 'plusRecent',
+            Constantes.DOCUMENT_INFODOC_SECURITE: securite_forum,
         }
+
+        if contenu_chiffre is not None:
+            document_forum_posts['contenu_chiffre'] = contenu_chiffre
+            document_forum_posts['hachage_bytes'] = hachage_bytes
+        else:
+            document_forum_posts[ConstantesForum.CHAMP_NOM_FORUM] = nom_forum
+            document_forum_posts[ConstantesForum.CHAMP_POSTS] = posts_plus_recents
+
         if permission is not None:
             document_forum_posts['permission'] = permission
 
@@ -1223,3 +1298,22 @@ class ProcessusTransactionModifierCommentaire(ProcessusTransactionCommentaire):
         self.set_etape_suivante()  # Termine
 
         return reponse
+
+
+class ProcessusGenererForumsPosts(MGProcessus):
+
+    def initiale(self):
+        # Requete pour maitre des cles
+        self.set_requete('MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES, dict())
+        self.set_etape_suivante(ProcessusGenererForumsPosts.generer_forums_posts.__name__)
+
+    def generer_forums_posts(self):
+        params = self.parametres
+        reponse_requete_certs = params['reponse'][0]
+        certs = [
+            reponse_requete_certs['certificat'],
+            reponse_requete_certs['certificat_millegrille'],
+        ]
+        self.controleur.gestionnaire.generer_forums_posts(params, certs)
+
+        self.set_etape_suivante()  # Termine
