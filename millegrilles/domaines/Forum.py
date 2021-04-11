@@ -124,7 +124,9 @@ class TraitementCommandesForumProtegees(TraitementCommandesProtegees):
             self.gestionnaire.trigger_generer_forums_posts(message_dict, properties.reply_to, properties.correlation_id)
             resultat = None
         elif action == ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES:
-            resultat = self.gestionnaire.generer_posts_comments(message_dict)
+            # resultat = self.gestionnaire.generer_posts_comments(message_dict)
+            self.gestionnaire.trigger_generer_posts_comments(message_dict, properties.reply_to, properties.correlation_id)
+            resultat = None
         elif action == ConstantesForum.COMMANDE_TRANSMETTRE_FORUMS_POSTS:
             message_dict['securite'] = Constantes.SECURITE_PROTEGE
             resultat = self.gestionnaire.transmettre_forums_posts(message_dict, properties)
@@ -613,6 +615,12 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         params['correlation_id'] = correlation_id
         self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererForumsPosts', params)
 
+    def trigger_generer_posts_comments(self, params: dict, reply_to, correlation_id):
+        params = params.copy()
+        params['reply_to'] = reply_to
+        params['correlation_id'] = correlation_id
+        self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererPostsCommentaires', params)
+
     def generer_forums_posts(self, params: dict, certs_chiffrage: dict = None):
         """
         Generer les documents de metadonnees pour les forums.
@@ -708,40 +716,12 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 ConstantesForum.CHAMP_NOM_FORUM: nom_forum,
                 ConstantesForum.CHAMP_POSTS: posts_plus_recents,
             }
-            json_helper = JSONHelper()
-            contenu = json_helper.dict_vers_json(contenu)
-            contenu = gzip.compress(contenu)
-            cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
-            cipher.start_encrypt()
-            contenu = cipher.update(contenu)
-            contenu += cipher.finalize()
-
-            hachage_bytes = cipher.digest
-
-            # Chiffrer la cle secrete pour chaque enveloppe
-            cles = dict()
-            for fp, enveloppe in enveloppes_rechiffrage.items():
-                cle_chiffree = cipher.chiffrer_motdepasse_enveloppe(enveloppe)
-                cle_chiffree = multibase.encode('base64', cle_chiffree).decode('utf-8')
-                cles[fp] = cle_chiffree
-
-            commande_maitrecles = {
-                'domaine': 'Forum',
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                    'type': ConstantesForum.LIBVAL_FORUM_POSTS,
-                    'forum_id': forum_id,
-                },
-                'format': 'mgs2',
-                'cles': cles,
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+            identificateurs_documents = {
+                'type': ConstantesForum.LIBVAL_FORUM_POSTS,
+                'forum_id': forum_id,
             }
-            commande_maitrecles.update(cipher.get_meta())
-
-            # Transmettre commande de sauvegarde de cle
-            self.generateur_transactions.transmettre_commande(
-                commande_maitrecles, 'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
-
-            contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
+            contenu_chiffre, hachage_bytes = self.chiffrer_contenu(
+                contenu, enveloppes_rechiffrage, identificateurs_documents)
         else:
             contenu_chiffre = None
             hachage_bytes = None
@@ -811,11 +791,50 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         return forum_posts
 
-    def generer_posts_comments(self, params: dict):
+    def chiffrer_contenu(self, contenu, enveloppes_rechiffrage, identificateurs_documents):
+        json_helper = JSONHelper()
+        contenu = json_helper.dict_vers_json(contenu)
+        contenu = gzip.compress(contenu)
+        cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
+        cipher.start_encrypt()
+        contenu = cipher.update(contenu)
+        contenu += cipher.finalize()
+        hachage_bytes = cipher.digest
+        # Chiffrer la cle secrete pour chaque enveloppe
+        cles = dict()
+        for fp, enveloppe in enveloppes_rechiffrage.items():
+            cle_chiffree = cipher.chiffrer_motdepasse_enveloppe(enveloppe)
+            cle_chiffree = multibase.encode('base64', cle_chiffree).decode('utf-8')
+            cles[fp] = cle_chiffree
+        commande_maitrecles = {
+            'domaine': 'Forum',
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_documents,
+            'format': 'mgs2',
+            'cles': cles,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+        }
+        commande_maitrecles.update(cipher.get_meta())
+        # Transmettre commande de sauvegarde de cle
+        self.generateur_transactions.transmettre_commande(
+            commande_maitrecles, 'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
+        contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
+        return contenu_chiffre, hachage_bytes
+
+    def generer_posts_comments(self, params: dict, certs_chiffrage: dict = None):
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
 
         post_ids = params.get(ConstantesForum.CHAMP_POST_IDS)
         forum_ids = params.get(ConstantesForum.CHAMP_FORUM_IDS)
+
+        enveloppes_rechiffrage = dict()
+        if certs_chiffrage is not None:
+            # Preparer les certificats avec enveloppe, par fingerprint
+            for cert in certs_chiffrage:
+                enveloppe = EnveloppeCertificat(certificat_pem=cert)
+                fp = enveloppe.fingerprint
+                enveloppes_rechiffrage[fp] = enveloppe
+
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
 
         # Routing key pour emettre maj d'un post
         rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_POST_COMMENTS
@@ -831,7 +850,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             forum = None
             exchanges = None
             for post in curseur_posts:
-                document_post_commentaires = self.generer_doc_post(post, params)
+                if post.get(ConstantesForum.CHAMP_FORUM_ID):
+                    forum = forum = self.get_forum(post[ConstantesForum.CHAMP_FORUM_ID])
+                document_post_commentaires = self.generer_doc_post(post, params, enveloppes_rechiffrage, forum=forum)
 
                 forum_id = post[ConstantesForum.CHAMP_FORUM_ID]
                 if forum is None or forum_id != forum[ConstantesForum.CHAMP_FORUM_ID]:
@@ -864,7 +885,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                     ConstantesForum.CHAMP_FORUM_ID: forum_id,
                 })
                 for post in curseur_posts:
-                    document_post_commentaires = self.generer_doc_post(post, params)
+                    document_post_commentaires = self.generer_doc_post(post, params, enveloppes_rechiffrage)
 
                     # Emettre document sous forme d'evenement
                     del document_post_commentaires['_id']
@@ -873,16 +894,24 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def generer_doc_post(self, post: dict, params: dict):
+    def generer_doc_post(self, post: dict, params: dict, enveloppes_rechiffrage: dict, forum: dict = None):
 
         post_id = post[ConstantesForum.CHAMP_POST_ID]
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+
+        if forum is None:
+            # Assumer qu'on a un post existant
+            post = collection_posts.find({ConstantesForum.CHAMP_POST_ID: post_id})
+            forum = self.get_forum(post[ConstantesForum.CHAMP_FORUM_ID])
+
+        securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+
         champs_post = [
             ConstantesForum.CHAMP_FORUM_ID,
-            ConstantesForum.CHAMP_POST_ID,
             ConstantesForum.CHAMP_DATE_CREATION,
-            ConstantesForum.CHAMP_DATE_MODIFICATION,
+            # ConstantesForum.CHAMP_DATE_MODIFICATION,
             ConstantesForum.CHAMP_TITRE,
             ConstantesForum.CHAMP_TYPE_POST,
             ConstantesForum.CHAMP_USERID,
@@ -903,9 +932,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_COMMENT_ID,
         ]
 
-        post_dict = {
+        post_comments = {
             ConstantesForum.CHAMP_POST_ID: post_id,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_courante,
+        }
+        post_dict = {
         }
         for key, value in post.items():
             if key in champs_post:
@@ -949,9 +980,59 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 # Inserer commentaire sous le parent
                 commentaires.append(comment_dict)
 
+        unset_ops = dict()
+        if securite_forum in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_PRIVE]:
+            fuuids = set()
+            if post.get(ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW):
+                fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW])
+            if post.get(ConstantesForum.CHAMP_MEDIA_UUID):
+                fuuids.add(post[ConstantesForum.CHAMP_MEDIA_UUID])
+
+            # Chiffrer contenu post
+            identificateurs_documents = {
+                'type': ConstantesForum.LIBVAL_POST_COMMENTAIRES,
+                'post_id': post_id,
+            }
+            contenu_chiffre, hachage_bytes = self.chiffrer_contenu(
+                post_dict, enveloppes_rechiffrage, identificateurs_documents)
+
+            post_comments['contenu_chiffre'] = contenu_chiffre
+            post_comments['hachage_bytes'] = hachage_bytes
+
+            unset_ops[ConstantesForum.CHAMP_COMMENTAIRES] = True
+            for champ in champs_post:
+                unset_ops[champ] = True
+
+        else:
+            unset_ops['contenu_chiffre'] = True
+            unset_ops['hachage_bytes'] = True
+            hachage_bytes = None
+            post_comments.update(post_dict)
+            fuuids = list()
+
+        if securite_forum == Constantes.SECURITE_PRIVE:
+            # On ajoute une permission de niveau prive pour tous les medias du forum
+            fuuids = list(set(fuuids))  # Dedupe
+            if hachage_bytes is not None:
+                # Ajouter hachage du forum_post (contenu chiffre)
+                fuuids.append(hachage_bytes)
+            permission = {
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: fuuids,
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
+            }
+            permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+        else:
+            permission = None
+
+        if permission is not None:
+            post_comments['permission'] = permission
+        else:
+            unset_ops['permission'] = True
+
         # Signer le post
-        post_dict = self.generateur_transactions.preparer_enveloppe(
-            post_dict,
+        post_comments = self.generateur_transactions.preparer_enveloppe(
+            post_comments,
             domaine='Forum.' + ConstantesForum.LIBVAL_POST,
             ajouter_certificats=True
         )
@@ -961,14 +1042,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         ops = {
-            '$set': post_dict,
+            '$set': post_comments,
+            '$unset': unset_ops,
         }
 
         collection_post_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
         post_commentaires = collection_post_commentaires.find_one_and_update(
             filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
-        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
         filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_COMMENTS: False}}
         collection_posts.update_one(filtre, ops)
@@ -1323,5 +1404,24 @@ class ProcessusGenererForumsPosts(MGProcessus):
             reponse_requete_certs['certificat_millegrille'],
         ]
         self.controleur.gestionnaire.generer_forums_posts(params, certs)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusGenererPostsCommentaires(MGProcessus):
+
+    def initiale(self):
+        # Requete pour maitre des cles
+        self.set_requete('MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES, dict())
+        self.set_etape_suivante(ProcessusGenererPostsCommentaires.generer_posts_commentaires.__name__)
+
+    def generer_posts_commentaires(self):
+        params = self.parametres
+        reponse_requete_certs = params['reponse'][0]
+        certs = [
+            reponse_requete_certs['certificat'],
+            reponse_requete_certs['certificat_millegrille'],
+        ]
+        self.controleur.gestionnaire.generer_posts_comments(params, certs)
 
         self.set_etape_suivante()  # Termine
