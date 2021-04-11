@@ -769,15 +769,22 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE: securite_forum,
         }
 
+        unset = dict()
         if contenu_chiffre is not None:
             document_forum_posts['contenu_chiffre'] = contenu_chiffre
             document_forum_posts['hachage_bytes'] = hachage_bytes
+            unset[ConstantesForum.CHAMP_NOM_FORUM] = True
+            unset[ConstantesForum.CHAMP_POSTS] = True
         else:
             document_forum_posts[ConstantesForum.CHAMP_NOM_FORUM] = nom_forum
             document_forum_posts[ConstantesForum.CHAMP_POSTS] = posts_plus_recents
+            unset['contenu_chiffre'] = True
+            unset['hachage_bytes'] = True
 
         if permission is not None:
             document_forum_posts['permission'] = permission
+        else:
+            unset['permission'] = True
 
         document_forum_posts = self.generateur_transactions.preparer_enveloppe(
             document_forum_posts,
@@ -791,6 +798,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
         ops = {
             '$set': document_forum_posts,
+            '$unset': unset,
         }
 
         collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
