@@ -723,11 +723,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             }
             contenu_chiffre, hachage_bytes = self.chiffrer_contenu(
                 contenu, enveloppes_rechiffrage, identificateurs_documents)
-        else:
-            contenu_chiffre = None
-            hachage_bytes = None
 
-        if securite_forum == Constantes.SECURITE_PRIVE:
             # On ajoute une permission de niveau prive pour tous les medias du forum
             fuuids = list(set(fuuids))  # Dedupe
             if hachage_bytes is not None:
@@ -735,11 +731,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 fuuids.append(hachage_bytes)
             permission = {
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: fuuids,
-                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
+                Constantes.DOCUMENT_INFODOC_SECURITE: securite_forum,
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
             }
             permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+
         else:
+            contenu_chiffre = None
+            hachage_bytes = None
             permission = None
 
         # Signer le document
@@ -1008,14 +1007,6 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             for champ in champs_post:
                 unset_ops[champ] = True
 
-        else:
-            unset_ops['contenu_chiffre'] = True
-            unset_ops['hachage_bytes'] = True
-            hachage_bytes = None
-            post_comments.update(post_dict)
-            fuuids = list()
-
-        if securite_forum == Constantes.SECURITE_PRIVE:
             # On ajoute une permission de niveau prive pour tous les medias du forum
             fuuids = list(set(fuuids))  # Dedupe
             if hachage_bytes is not None:
@@ -1023,12 +1014,18 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 fuuids.append(hachage_bytes)
             permission = {
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: fuuids,
-                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
+                Constantes.DOCUMENT_INFODOC_SECURITE: securite_forum,
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
             }
             permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+
         else:
+            unset_ops['contenu_chiffre'] = True
+            unset_ops['hachage_bytes'] = True
+            hachage_bytes = None
             permission = None
+            post_comments.update(post_dict)
+            fuuids = list()
 
         if permission is not None:
             post_comments['permission'] = permission
