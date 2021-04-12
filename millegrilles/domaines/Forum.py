@@ -459,6 +459,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_MEDIA_MIMETYPE_PREVIEW,
             ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA,
             ConstantesForum.CHAMP_MEDIA_MIMETYPE_MEDIA,
+            ConstantesForum.CHAMP_MEDIA_VIDEO,
         ]
         for key in params:
             if key in champs_supportes:
@@ -922,6 +923,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_MEDIA_MIMETYPE_PREVIEW,
             ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA,
             ConstantesForum.CHAMP_MEDIA_MIMETYPE_MEDIA,
+            ConstantesForum.CHAMP_MEDIA_VIDEO,
         ]
 
         champs_commentaires = [
@@ -987,6 +989,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW])
             if post.get(ConstantesForum.CHAMP_MEDIA_UUID):
                 fuuids.add(post[ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA])
+            if post.get(ConstantesForum.CHAMP_MEDIA_VIDEO):
+                for vid in post[ConstantesForum.CHAMP_MEDIA_VIDEO].values():
+                    fuuids.add(vid['fuuid'])
 
             # Chiffrer contenu post
             identificateurs_documents = {
