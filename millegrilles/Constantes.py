@@ -1503,9 +1503,11 @@ class ConstantesMaitreDesComptes:
     CHAMP_IDMG_COMPTE = 'idmgCompte'
     CHAMP_TOTP = 'totp'
     CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK = 'activations_par_fingerprint_pk'
+    CHAMP_LIST_USERIDS = 'liste_userids'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
+    REQUETE_LISTE_USAGERS = 'getListeUsagers'
 
     TRANSACTION_INSCRIRE_PROPRIETAIRE = 'inscrireProprietaire'
     TRANSACTION_INSCRIRE_USAGER = 'inscrireUsager'
@@ -1924,6 +1926,7 @@ class ConstantesForum:
     CHAMP_TYPE_POST = 'typePost'
     CHAMP_CONTENU = 'contenu'
     CHAMP_USERID = 'userId'
+    CHAMP_NOM_USAGER = 'nomUsager'
     CHAMP_MEDIA_UUID = 'uuidMedia'
     CHAMP_MEDIA_FUUID_PREVIEW = 'fuuidPreview'
     CHAMP_MEDIA_MIMETYPE_PREVIEW = 'mimetypePreview'

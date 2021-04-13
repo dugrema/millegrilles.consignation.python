@@ -20,6 +20,8 @@ class TraitementRequetesProtegeesMaitreComptes(TraitementRequetesProtegees):
             reponse = self.gestionnaire.charger_usager(message_dict)
         elif action == ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE:
             reponse = self.gestionnaire.get_info_proprietaire()
+        elif action == ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS:
+            reponse = self.gestionnaire.get_liste_usagers(message_dict)
         else:
             return super().traiter_requete(ch, method, properties, body, message_dict)
             # Type de transaction inconnue, on lance une exception
@@ -201,6 +203,33 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             return {Constantes.EVENEMENT_REPONSE: False}
 
         return document_proprietaire
+
+    def get_liste_usagers(self, params):
+        """
+        Liste usagers
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                '$in': [ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE, ConstantesMaitreDesComptes.LIBVAL_USAGER]
+            },
+        }
+        liste_userids = params.get(ConstantesMaitreDesComptes.CHAMP_LIST_USERIDS)
+        if liste_userids:
+            filtre[ConstantesMaitreDesComptes.CHAMP_USER_ID] = {'$in': liste_userids}
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
+        curseur = collection.find(filtre)
+
+        batch_usagers = list()
+        for usager in curseur:
+            user_id = usager[ConstantesMaitreDesComptes.CHAMP_USER_ID]
+            nom_usager = usager[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+            batch_usagers.append({
+                ConstantesMaitreDesComptes.CHAMP_USER_ID: user_id,
+                ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+            })
+
+        return {'complet': True, 'usagers': batch_usagers}
 
     def inscrire_proprietaire(self, info_proprietaire: dict):
         date_courante = datetime.datetime.utcnow()

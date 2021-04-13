@@ -612,9 +612,26 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
     def trigger_generer_forums_posts(self, params: dict, reply_to, correlation_id):
         params = params.copy()
+
+        # Split les forum_ids, un processus par forum
+        try:
+            forum_ids = params[ConstantesForum.CHAMP_FORUM_IDS]
+            del params[ConstantesForum.CHAMP_FORUM_IDS]
+        except KeyError:
+            # Faire aller chercher la liste de tous les forums
+            collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+            projection = {ConstantesForum.CHAMP_FORUM_ID}
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM,
+            }
+            curseur = collection_forums.find(filtre, projection=projection)
+            forum_ids = [f[ConstantesForum.CHAMP_FORUM_ID] for f in curseur]
+
         params['reply_to'] = reply_to
         params['correlation_id'] = correlation_id
-        self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererForumsPosts', params)
+        for forum_id in forum_ids:
+            params[ConstantesForum.CHAMP_FORUM_ID] = forum_id
+            self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererForumsPosts', params)
 
     def trigger_generer_posts_comments(self, params: dict, reply_to, correlation_id):
         params = params.copy()
@@ -622,16 +639,31 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         params['correlation_id'] = correlation_id
         self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererPostsCommentaires', params)
 
-    def generer_forums_posts(self, params: dict, certs_chiffrage: dict = None):
+    def extraire_usagers_forums_posts(self, params: dict) -> list:
+        """
+        Extrait tous les user_ids des posts d'un forum.
+        :param params:
+        :return:
+        """
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        filtre = {ConstantesForum.CHAMP_FORUM_ID: params[ConstantesForum.CHAMP_FORUM_ID]}
+        projection = {ConstantesForum.CHAMP_USERID}
+        curseur_posts = collection_posts.find(filtre, projection=projection)
+
+        # Parcourir
+        userids_set = set()
+        for post in curseur_posts:
+            user_id = post[ConstantesForum.CHAMP_USERID]
+            userids_set.add(user_id)
+
+        return list(userids_set)
+
+    def generer_forums_posts(self, params: dict, certs_chiffrage: dict = None, usagers: dict = None):
         """
         Generer les documents de metadonnees pour les forums.
         :param params:
         :return:
         """
-
-        # Si dirty_only==True, on skip les forums qui n'ont pas de posts/comments qui sont dirty
-        dirty_only = params.get('dirty_only') or False
-
         enveloppes_rechiffrage = dict()
         if certs_chiffrage is not None:
             # Preparer les certificats avec enveloppe, par fingerprint
@@ -643,29 +675,24 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM,
+            ConstantesForum.CHAMP_FORUM_ID: params[ConstantesForum.CHAMP_FORUM_ID],
         }
 
-        # Si la liste de forum est None, indique qu'on fait tous les forums
-        forum_list = params.get(ConstantesForum.CHAMP_FORUM_IDS) or None
-        if forum_list is not None:
-            filtre[ConstantesForum.CHAMP_FORUM_ID] = {'$in': forum_list}
-
-        curseur_forum = collection_forums.find(filtre)
+        forum = collection_forums.find_one(filtre)
         rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUM_POSTS
-        for forum in curseur_forum:
-            securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
-            exchanges = ConstantesSecurite.cascade_protege(securite_forum)
+        securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+        exchanges = ConstantesSecurite.cascade_protege(securite_forum)
 
-            document_forum_posts = self.generer_doc_forum(forum, params, enveloppes_rechiffrage)
+        document_forum_posts = self.generer_doc_forum(forum, params, enveloppes_rechiffrage, usagers)
 
-            # Emettre document sous forme d'evenement
-            del document_forum_posts['_id']
-            self.generateur_transactions.emettre_message(
-                document_forum_posts, rk_evenement, exchanges=exchanges)
+        # Emettre document sous forme d'evenement
+        del document_forum_posts['_id']
+        self.generateur_transactions.emettre_message(
+            document_forum_posts, rk_evenement, exchanges=exchanges)
 
         return {'ok': True}
 
-    def generer_doc_forum(self, forum: dict, params, enveloppes_rechiffrage: dict = None):
+    def generer_doc_forum(self, forum: dict, params, enveloppes_rechiffrage: dict = None, usagers: dict = None):
         forum_id = forum[ConstantesForum.CHAMP_FORUM_ID]
         nom_forum = forum.get(ConstantesForum.CHAMP_NOM_FORUM) or forum_id
         self.__logger.debug("Traitement posts du forum %s (%s)" % (nom_forum, forum_id))
@@ -702,7 +729,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         posts = collection_posts.find(filtre_forum, projection=champs_projection, sort=sort, limit=limit)
         fuuids = set()
         for post in posts:
+            # Mapper nom usager au user_id
+            user_id = post[ConstantesForum.CHAMP_USERID]
+            nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+
             post_filtre = dict()
+            post_filtre[ConstantesForum.CHAMP_USERID] = user_id
+            post_filtre[ConstantesForum.CHAMP_NOM_USAGER] = nom_usager
+
             for key, value in post.items():
                 if key in champs_projection:
                     post_filtre[key] = value
@@ -1396,16 +1430,36 @@ class ProcessusGenererForumsPosts(MGProcessus):
     def initiale(self):
         # Requete pour maitre des cles
         self.set_requete('MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES, dict())
+        self.set_etape_suivante(ProcessusGenererForumsPosts.identifier_usagers.__name__)
+
+    def identifier_usagers(self):
+        params = self.parametres
+        usagers = self.controleur.gestionnaire.extraire_usagers_forums_posts(params)
+
+        # Faire requete pour recuperer nom usagers par user_id
+        requete = {
+            Constantes.ConstantesMaitreDesComptes.CHAMP_LIST_USERIDS: usagers
+        }
+        domaine_action = 'MaitreDesComptes.' + Constantes.ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS
+        self.set_requete(domaine_action, requete)
+
         self.set_etape_suivante(ProcessusGenererForumsPosts.generer_forums_posts.__name__)
 
     def generer_forums_posts(self):
         params = self.parametres
         reponse_requete_certs = params['reponse'][0]
+
+        # Creer dict usagers par user_id
+        usagers = dict()
+        for usager in params['reponse'][1]['usagers']:
+            user_id = usager[Constantes.ConstantesMaitreDesComptes.CHAMP_USER_ID]
+            usagers[user_id] = usager
+
         certs = [
             reponse_requete_certs['certificat'],
             reponse_requete_certs['certificat_millegrille'],
         ]
-        self.controleur.gestionnaire.generer_forums_posts(params, certs)
+        self.controleur.gestionnaire.generer_forums_posts(params, certs, usagers)
 
         self.set_etape_suivante()  # Termine
 

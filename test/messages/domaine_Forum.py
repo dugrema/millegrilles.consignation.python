@@ -151,8 +151,8 @@ class TestForum(DomaineTest):
         # self.maj_post()
         # self.creer_commentaire()
         # self.maj_commentaire()
-        # self.commande_generer_forums_posts()
-        self.commande_generer_posts_commentaires()
+        self.commande_generer_forums_posts()
+        # self.commande_generer_posts_commentaires()
         # self.commande_transmettre_forums_posts()
         # self.commande_transmettre_posts_commentaires()
 

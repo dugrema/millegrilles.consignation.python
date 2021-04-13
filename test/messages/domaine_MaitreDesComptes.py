@@ -62,6 +62,19 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def requete_liste_usagers(self):
+        requete = {
+            ConstantesMaitreDesComptes.CHAMP_LIST_USERIDS: [
+                'zQmZAHGPjqBMu9E18gvcRztsoY6okSUVsSFu7V6t5hrtsDD',
+                'zQmWApXQASWLPGgqgxj7gBYL5VSF6nqzkrwJdDp4QfRjAXX',
+            ]
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS])
+        enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def transaction_inscrire_proprietaire(self):
         transaction = {ConstantesMaitreDesComptes.CHAMP_CLE: {'ma_cle': 56896, 'autre_info': 'Da da daah'},}
         domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_PROPRIETAIRE])
@@ -217,7 +230,8 @@ class MessagesSample(BaseCallback):
         # self.transaction_associer_idmg()
         # self.transaction_ajouter_certificat_navigateur()
         # self.transaction_maj_usager_totp()
-        self.commande_activer_certificat()
+        # self.commande_activer_certificat()
+        self.requete_liste_usagers()
 
 
 # --- MAIN ---
