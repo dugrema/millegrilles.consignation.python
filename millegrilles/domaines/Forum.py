@@ -635,9 +635,23 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
     def trigger_generer_posts_comments(self, params: dict, reply_to, correlation_id):
         params = params.copy()
+        try:
+            post_ids = params[ConstantesForum.CHAMP_POST_IDS]
+            del params[ConstantesForum.CHAMP_POST_IDS]
+        except KeyError:
+            forum_ids = params[ConstantesForum.CHAMP_FORUM_IDS]
+            # Trouver les posts du forum et lancer un processus pour chaque
+            collection_posts = ConstantesForum.COLLECTION_POSTS_NOM
+            filtre = {ConstantesForum.CHAMP_FORUM_ID: {'$in': forum_ids}}
+            projection = {ConstantesForum.CHAMP_POST_ID: True}
+            curseur_posts = collection_posts.find(filtre, projection)
+            post_ids = [p[ConstantesForum.CHAMP_POST_ID] for p in curseur_posts]
+
         params['reply_to'] = reply_to
         params['correlation_id'] = correlation_id
-        self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererPostsCommentaires', params)
+        for post_id in post_ids:
+            params[ConstantesForum.CHAMP_POST_ID] = post_id
+            self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererPostsCommentaires', params)
 
     def extraire_usagers_forums_posts(self, params: dict) -> list:
         """
@@ -654,6 +668,27 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         userids_set = set()
         for post in curseur_posts:
             user_id = post[ConstantesForum.CHAMP_USERID]
+            userids_set.add(user_id)
+
+        return list(userids_set)
+
+    def extraire_usagers_posts_forums(self, params: dict) -> list:
+        post_id = params[ConstantesForum.CHAMP_POST_ID]
+
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
+        projection = {ConstantesForum.CHAMP_USERID}
+
+        post = collection_posts.find_one(filtre, projection=projection)
+
+        collection_comments = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
+        curseur_comments = collection_comments.find(filtre, projection)
+
+        # Parcourir
+        userids_set = set()
+        userids_set.add(post[ConstantesForum.CHAMP_USERID])
+        for comment in curseur_comments:
+            user_id = comment[ConstantesForum.CHAMP_USERID]
             userids_set.add(user_id)
 
         return list(userids_set)
@@ -854,11 +889,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
         return contenu_chiffre, hachage_bytes
 
-    def generer_posts_comments(self, params: dict, certs_chiffrage: dict = None):
-        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
-
-        post_ids = params.get(ConstantesForum.CHAMP_POST_IDS)
-        forum_ids = params.get(ConstantesForum.CHAMP_FORUM_IDS)
+    def generer_posts_comments(self, params: dict, certs_chiffrage: dict = None, usagers: dict = None):
+        post_id = params.get(ConstantesForum.CHAMP_POST_ID)
 
         enveloppes_rechiffrage = dict()
         if certs_chiffrage is not None:
@@ -868,67 +900,33 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 fp = enveloppe.fingerprint
                 enveloppes_rechiffrage[fp] = enveloppe
 
-        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-
         # Routing key pour emettre maj d'un post
         rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_POST_COMMENTS
 
-        if post_ids is not None:
-            # Traitement par posts individuel
-            collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
-            filtre = {ConstantesForum.CHAMP_POST_ID: {'$in': post_ids}}
-            # Trier par forum_id, permet de faire un seul fetch par forum
-            ordre_tri = [(ConstantesForum.CHAMP_FORUM_ID, 1)]
-            curseur_posts = collection_forums.find(filtre, sort=ordre_tri)
+        # Traitement par posts individuel
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        post = collection_posts.find_one({ConstantesForum.CHAMP_POST_ID: post_id})
 
-            forum = None
-            exchanges = None
-            for post in curseur_posts:
-                if post.get(ConstantesForum.CHAMP_FORUM_ID):
-                    forum = forum = self.get_forum(post[ConstantesForum.CHAMP_FORUM_ID])
-                document_post_commentaires = self.generer_doc_post(post, params, enveloppes_rechiffrage, forum=forum)
+        forum = None
+        if post.get(ConstantesForum.CHAMP_FORUM_ID):
+            forum = self.get_forum(post[ConstantesForum.CHAMP_FORUM_ID])
+        document_post_commentaires = self.generer_doc_post(post, params, enveloppes_rechiffrage, forum=forum, usagers=usagers)
 
-                forum_id = post[ConstantesForum.CHAMP_FORUM_ID]
-                if forum is None or forum_id != forum[ConstantesForum.CHAMP_FORUM_ID]:
-                    # Charger nouveau forum pour trouver le niveau de securite
-                    forum = self.get_forum(forum_id)
-                    exchanges = ConstantesSecurite.cascade_secure(forum[Constantes.DOCUMENT_INFODOC_SECURITE])
-                    exchanges.pop()  # Enlever 4.secure
+        forum_id = post[ConstantesForum.CHAMP_FORUM_ID]
+        if forum is None or forum_id != forum[ConstantesForum.CHAMP_FORUM_ID]:
+            # Charger nouveau forum pour trouver le niveau de securite
+            forum = self.get_forum(forum_id)
 
-                # Emettre document sous forme d'evenement
-                del document_post_commentaires['_id']
-                self.generateur_transactions.emettre_message(
-                    document_post_commentaires, rk_evenement, exchanges=exchanges)
+        exchanges = ConstantesSecurite.cascade_protege(forum[Constantes.DOCUMENT_INFODOC_SECURITE])
 
-        else:
-            # Traitement par forum_id
-            if forum_ids is None:
-                collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-                filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM}
-                curseur_forums = collection_forums.find(filtre)
-                forum_ids = [forum[ConstantesForum.CHAMP_FORUM_ID] for forum in curseur_forums]
-
-            for forum_id in forum_ids:
-                forum = self.get_forum(forum_id)
-                securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
-                exchanges = ConstantesSecurite.cascade_secure(securite_forum)
-                exchanges.pop()  # Enlever niveau secure
-
-                curseur_posts = collection_posts.find({
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
-                    ConstantesForum.CHAMP_FORUM_ID: forum_id,
-                })
-                for post in curseur_posts:
-                    document_post_commentaires = self.generer_doc_post(post, params, enveloppes_rechiffrage)
-
-                    # Emettre document sous forme d'evenement
-                    del document_post_commentaires['_id']
-                    self.generateur_transactions.emettre_message(
-                        document_post_commentaires, rk_evenement, exchanges=exchanges)
+        # Emettre document sous forme d'evenement
+        del document_post_commentaires['_id']
+        self.generateur_transactions.emettre_message(
+            document_post_commentaires, rk_evenement, exchanges=exchanges)
 
         return {'ok': True}
 
-    def generer_doc_post(self, post: dict, params: dict, enveloppes_rechiffrage: dict, forum: dict = None):
+    def generer_doc_post(self, post: dict, params: dict, enveloppes_rechiffrage: dict, forum: dict = None, usagers: dict = None):
 
         post_id = post[ConstantesForum.CHAMP_POST_ID]
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
@@ -971,7 +969,10 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_POST_ID: post_id,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_courante,
         }
+        user_id = post[ConstantesForum.CHAMP_USERID]
+        nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         post_dict = {
+            ConstantesForum.CHAMP_NOM_USAGER: nom_usager,
         }
         for key, value in post.items():
             if key in champs_post:
@@ -989,8 +990,12 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         post_dict[ConstantesForum.CHAMP_COMMENTAIRES] = top_level_commentaires
 
         for commentaire in curseur_commentaires:
+            user_id = commentaire[ConstantesForum.CHAMP_USERID]
+            nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
 
-            comment_dict = dict()
+            comment_dict = {
+                ConstantesForum.CHAMP_NOM_USAGER: nom_usager
+            }
             for key, value in commentaire.items():
                 if key in champs_commentaires:
                     comment_dict[key] = value
@@ -1469,15 +1474,35 @@ class ProcessusGenererPostsCommentaires(MGProcessus):
     def initiale(self):
         # Requete pour maitre des cles
         self.set_requete('MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES, dict())
+        self.set_etape_suivante(ProcessusGenererPostsCommentaires.identifier_usagers.__name__)
+
+    def identifier_usagers(self):
+        params = self.parametres
+        usagers = self.controleur.gestionnaire.extraire_usagers_posts_forums(params)
+
+        # Faire requete pour recuperer nom usagers par user_id
+        requete = {
+            Constantes.ConstantesMaitreDesComptes.CHAMP_LIST_USERIDS: usagers
+        }
+        domaine_action = 'MaitreDesComptes.' + Constantes.ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS
+        self.set_requete(domaine_action, requete)
+
         self.set_etape_suivante(ProcessusGenererPostsCommentaires.generer_posts_commentaires.__name__)
 
     def generer_posts_commentaires(self):
         params = self.parametres
         reponse_requete_certs = params['reponse'][0]
+
+        # Creer dict usagers par user_id
+        usagers = dict()
+        for usager in params['reponse'][1]['usagers']:
+            user_id = usager[Constantes.ConstantesMaitreDesComptes.CHAMP_USER_ID]
+            usagers[user_id] = usager
+
         certs = [
             reponse_requete_certs['certificat'],
             reponse_requete_certs['certificat_millegrille'],
         ]
-        self.controleur.gestionnaire.generer_posts_comments(params, certs)
+        self.controleur.gestionnaire.generer_posts_comments(params, certs, usagers)
 
         self.set_etape_suivante()  # Termine
