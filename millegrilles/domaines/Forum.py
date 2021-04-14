@@ -330,7 +330,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         del doc_post_commentaires[Constantes.DOCUMENT_INFODOC_LIBELLE]
 
         # Verification de securite (acces)
-        forum = self.get_forum(doc_post_commentaires[ConstantesForum.CHAMP_FORUM_ID])
+        try:
+            forum_id = doc_post_commentaires[ConstantesForum.CHAMP_FORUM_ID]
+        except KeyError:
+            collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+            post_doc = collection_posts.find_one({ConstantesForum.CHAMP_POST_ID: post_id})
+            forum_id = post_doc[ConstantesForum.CHAMP_FORUM_ID]
+
+        forum = self.get_forum(forum_id)
         securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
 
         if securite_forum not in ConstantesSecurite.cascade_public(niveaux_securite):
