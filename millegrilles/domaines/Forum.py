@@ -993,22 +993,30 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             user_id = commentaire[ConstantesForum.CHAMP_USERID]
             nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
 
-            comment_dict = {
-                ConstantesForum.CHAMP_NOM_USAGER: nom_usager
-            }
+            try:
+                # On a un placeholder, on va le remplir avec les valeurs reelles
+                comment_dict = commentaires_par_id[commentaire[ConstantesForum.CHAMP_COMMENT_ID]]
+            except KeyError:
+                comment_dict = dict()
+                # Conserver reference au commentaire pour inserer les sous-commentaires (hierarchie)
+                commentaires_par_id[commentaire[ConstantesForum.CHAMP_COMMENT_ID]] = comment_dict
+
+            comment_dict[ConstantesForum.CHAMP_NOM_USAGER] = nom_usager
             for key, value in commentaire.items():
                 if key in champs_commentaires:
                     comment_dict[key] = value
-
-            # Conserver reference au commentaire pour inserer les sous-commentaires (hierarchie)
-            commentaires_par_id[commentaire[ConstantesForum.CHAMP_COMMENT_ID]] = comment_dict
 
             parent_id = commentaire.get(ConstantesForum.CHAMP_COMMENT_PARENT_ID)
             if parent_id is None:
                 # Ajouter commentaire a la liste directe sous le post (top-level)
                 top_level_commentaires.append(comment_dict)
             else:
-                parent_commentaire = commentaires_par_id[parent_id]
+                try:
+                    parent_commentaire = commentaires_par_id[parent_id]
+                except KeyError:
+                    # Generer un placeholder
+                    parent_commentaire = {ConstantesForum.CHAMP_COMMENTAIRES: list()}
+                    commentaires_par_id[parent_id] = parent_commentaire
 
                 try:
                     commentaires = parent_commentaire[ConstantesForum.CHAMP_COMMENTAIRES]
