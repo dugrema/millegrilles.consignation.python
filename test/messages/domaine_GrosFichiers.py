@@ -548,6 +548,13 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='abcd'
         )
 
+    def requete_conversions_en_cours(self):
+        self.generateur.transmettre_requete(
+            dict(),
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_CONVERSIONS_MEDIA_ENCOURS,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -561,7 +568,7 @@ class MessagesSample(BaseCallback):
 
         # enveloppe3 = sample.transaction_creer_collection_vide()
         # enveloppe3 = sample.transaction_creer_collection_2docs()
-        enveloppe4 = sample.transaction_renommer_collection()
+        # enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
         # enveloppe = sample.transaction_changer_etiquettes_collection()
@@ -598,6 +605,7 @@ class MessagesSample(BaseCallback):
 
         # sample.requete_collection_personnelle()
         # sample.transaction_supprimer_fichier_usager()
+        sample.requete_conversions_en_cours()
 
         pass
 

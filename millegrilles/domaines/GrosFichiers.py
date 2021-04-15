@@ -83,6 +83,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_TRANSFERTS_EN_COURS:
             reponse = self.gestionnaire.get_transferts_en_cours()
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_CONVERSIONS_MEDIA_ENCOURS:
+            reponse = self.gestionnaire.get_conversion_media_en_cours()
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
             return
@@ -2308,6 +2310,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         doc_transferts = collection.find_one(filtre)
         return {ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: doc_transferts.get(ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST)}
+
+    def get_conversion_media_en_cours(self):
+        """
+        :return: Document de conversion media en cours
+        """
+        collection = self.get_collection()
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA,
+        }
+        doc_transcodage = collection.find_one(filtre)
+
+        del doc_transcodage['_id']
+
+        return {ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA: doc_transcodage}
 
     def get_info_collections_fichier(self, uuid_fichier: str):
         filtre = {
