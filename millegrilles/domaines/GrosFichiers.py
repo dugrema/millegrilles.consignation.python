@@ -2461,16 +2461,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.ajouter_transcodage_video(info_version)
 
         # Transmettre commande a consignation_fichiers
-        commande = {
+        commande_transcodage = {
             'fuuid': fuuid,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: fuuid,
+            'mimetype': commande['mimetype']
         }
+        champs_optionnels = ['bitrate', 'height']
+        for champ in champs_optionnels:
+            try:
+                commande_transcodage[champ] = commande[champ]
+            except KeyError:
+                pass  # OK
 
         domaine_action = 'commande.fichiers.transcoderVideo'
         reply_to = properties.reply_to
         correlation_id = properties.correlation_id
         self.generateur_transactions.transmettre_commande(
-            commande, domaine_action, reply_to=reply_to, correlation_id=correlation_id)
+            commande_transcodage, domaine_action, reply_to=reply_to, correlation_id=correlation_id)
 
     def uploader_fichiers_manquants_awss3(self, uuid_collection, noeud_ids):
         """
@@ -2804,11 +2811,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         params_vid = list()
         params_vid.append(message['mimetype'])
         try:
-            params_vid.append(message['height'])
+            params_vid.append(str(message['height']))
         except KeyError:
             pass
         try:
-            params_vid.append(message['videoBitrate'])
+            params_vid.append(str(message['videoBitrate']))
         except KeyError:
             pass
         key_doc = '.'.join([
