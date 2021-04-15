@@ -1535,7 +1535,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
         unset_ops = {
-            'video.' + fuuid_fichier + '.' + cle_video: True
+            'video.' + fuuid_fichier + '.' + cle_video: True,
+            'video.' + fuuid_fichier + '.' + mimetype: True,
         }
         ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
         collection_domaine.update_one(filtre, ops)
@@ -2800,10 +2801,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
         }
 
+        params_vid = list()
+        params_vid.append(message['mimetype'])
+        try:
+            params_vid.append(message['height'])
+        except KeyError:
+            pass
+        try:
+            params_vid.append(message['videoBitrate'])
+        except KeyError:
+            pass
         key_doc = '.'.join([
             ConstantesGrosFichiers.DOCUMENT_VIDEO,
             message['fuuid'],
-            ';'.join([message['mimetype'], str(message['height']), str(message['videoBitrate'])])
+            ';'.join(params_vid)
         ])
 
         set_ops = dict()

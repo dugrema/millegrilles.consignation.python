@@ -15,7 +15,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = 'z8Vuc7B5z76T6LrqZs1Tw7hTch61xiine33wMpfiwrKx6NnttEybLVmUzg4kcYsbEQLNaPyX44PBCxp6NdeE5n8SJM3'
+        self.__fuuid = 'z8VwcgBdE9xrhpE9UsrzZPHgZEf4WRsn5Y4fkReAB2sYML6L2aY58pS9HqtP7BLWoWLtikkrM69zySYFki3ojCMWEaB'
         self.event_termine = Event()
 
     def commande_restaurerGrosFichiers(self):
