@@ -322,17 +322,25 @@ class GestionnaireApplications:
         nginx_config = configuration_docker.get('nginx')
         if nginx_config is not None:
             path_location = nginx_config.get('path_location')
+            conf_location = nginx_config.get('conf_location')
             server_file = nginx_config.get('server_file')
-            if path_location is not None:
+            if path_location is not None or conf_location is not None:
                 elems_config = nginx_config.copy()
                 elems_config['appname'] = nom_application
-                conf = """
-                    location {path_location} {{
-                        set $upstream_{appname} {proxypass};
-                        proxy_pass $upstream_{appname};
-                        include /etc/nginx/conf.d/component_base_auth.include;
-                    }}
-                """
+                if conf_location is not None:
+                    # Utiliser configuration custom
+                    server_file_obj = io.BytesIO(b64decode(configuration_docker['scripts']))
+                    tar_content = tarfile.open(fileobj=server_file_obj)
+                    conf_file_member = tar_content.getmember(conf_location)
+                    conf = tar_content.extractfile(conf_file_member).read().decode('utf-8')
+                else:
+                    conf = """
+                        location {path_location} {{
+                            set $upstream_{appname} {proxypass};
+                            proxy_pass $upstream_{appname};
+                            include /etc/nginx/conf.d/component_base_auth.include;
+                        }}
+                    """
                 conf = conf.format(**elems_config)
 
                 # Injecter le fichier dans le repertoire de nginx
