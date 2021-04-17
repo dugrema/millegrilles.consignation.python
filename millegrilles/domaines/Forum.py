@@ -189,10 +189,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
 
-        # minutes = evenement['timestamp']['UTC'][4]
-        #
+        minutes = evenement['timestamp']['UTC'][4]
         # if minutes % 15 == 3:
-        #     self.resoumettre_conversions_manquantes()
+        # self.resoumettre_conversions_manquantes()
+        self.trigger_generer_forums_posts(dict())
+        self.trigger_generer_posts_comments(dict())
 
     def identifier_processus(self, domaine_transaction):
         domaine_action = domaine_transaction.split('.').pop()
@@ -324,6 +325,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         doc_post_commentaires = collection_post_commentaires.find_one(filtre)
 
         if doc_post_commentaires is None:
+            # Tenter de faire genrer le post, si applicable
+            self.trigger_generer_posts_comments({ConstantesForum.CHAMP_POST_IDS: [post_id]})
             return {'ok': False, 'err': "Post id inconnu"}
 
         del doc_post_commentaires['_id']
@@ -617,7 +620,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def trigger_generer_forums_posts(self, params: dict, reply_to, correlation_id):
+    def trigger_generer_forums_posts(self, params: dict, reply_to: str = None, correlation_id: str = None):
         params = params.copy()
 
         # Split les forum_ids, un processus par forum
@@ -630,32 +633,42 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             projection = {ConstantesForum.CHAMP_FORUM_ID}
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM,
+                ConstantesForum.CHAMP_DIRTY_POSTS: True,
             }
             curseur = collection_forums.find(filtre, projection=projection)
             forum_ids = [f[ConstantesForum.CHAMP_FORUM_ID] for f in curseur]
 
-        params['reply_to'] = reply_to
-        params['correlation_id'] = correlation_id
+        if reply_to:
+            params['reply_to'] = reply_to
+        if correlation_id:
+            params['correlation_id'] = correlation_id
         for forum_id in forum_ids:
             params[ConstantesForum.CHAMP_FORUM_ID] = forum_id
             self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererForumsPosts', params)
 
-    def trigger_generer_posts_comments(self, params: dict, reply_to, correlation_id):
+    def trigger_generer_posts_comments(self, params: dict, reply_to: str = None, correlation_id: str = None):
         params = params.copy()
         try:
             post_ids = params[ConstantesForum.CHAMP_POST_IDS]
             del params[ConstantesForum.CHAMP_POST_IDS]
         except KeyError:
-            forum_ids = params[ConstantesForum.CHAMP_FORUM_IDS]
-            # Trouver les posts du forum et lancer un processus pour chaque
-            collection_posts = ConstantesForum.COLLECTION_POSTS_NOM
-            filtre = {ConstantesForum.CHAMP_FORUM_ID: {'$in': forum_ids}}
+            collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
             projection = {ConstantesForum.CHAMP_POST_ID: True}
-            curseur_posts = collection_posts.find(filtre, projection)
+            try:
+                forum_ids = params[ConstantesForum.CHAMP_FORUM_IDS]
+                # Trouver les posts du forum et lancer un processus pour chaque
+                filtre = {ConstantesForum.CHAMP_FORUM_ID: {'$in': forum_ids}}
+                curseur_posts = collection_posts.find(filtre, projection)
+            except KeyError:
+                filtre = {ConstantesForum.CHAMP_DIRTY_COMMENTS: True}
+                curseur_posts = collection_posts.find(filtre, projection)
+
             post_ids = [p[ConstantesForum.CHAMP_POST_ID] for p in curseur_posts]
 
-        params['reply_to'] = reply_to
-        params['correlation_id'] = correlation_id
+        if reply_to:
+            params['reply_to'] = reply_to
+        if correlation_id:
+            params['correlation_id'] = correlation_id
         for post_id in post_ids:
             params[ConstantesForum.CHAMP_POST_ID] = post_id
             self.demarrer_processus('millegrilles_domaines_Forum:ProcessusGenererPostsCommentaires', params)
@@ -773,7 +786,10 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         for post in posts:
             # Mapper nom usager au user_id
             user_id = post[ConstantesForum.CHAMP_USERID]
-            nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+            try:
+                nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+            except KeyError:
+                nom_usager = user_id
 
             post_filtre = dict()
             post_filtre[ConstantesForum.CHAMP_USERID] = user_id
@@ -977,7 +993,10 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_courante,
         }
         user_id = post[ConstantesForum.CHAMP_USERID]
-        nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        try:
+            nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        except KeyError:
+            nom_usager = user_id
         post_dict = {
             ConstantesForum.CHAMP_NOM_USAGER: nom_usager,
         }
@@ -998,7 +1017,10 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         for commentaire in curseur_commentaires:
             user_id = commentaire[ConstantesForum.CHAMP_USERID]
-            nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+            try:
+                nom_usager = usagers[user_id][Constantes.ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+            except KeyError:
+                nom_usager = user_id
 
             try:
                 # On a un placeholder, on va le remplir avec les valeurs reelles
