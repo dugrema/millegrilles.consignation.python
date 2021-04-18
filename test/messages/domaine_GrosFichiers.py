@@ -533,6 +533,14 @@ class MessagesSample(BaseCallback):
             evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_CLEAR_FICHIER_PUBLIE,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def commande_regenerer_collectionfichiers(self):
+        evenement = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: '2cff4bac-215b-4bb0-8a97-3acb7ac6706f',
+        }
+        self.generateur.transmettre_commande(
+            evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_REGENERER_COLLECTIONFICHIERS,
+            reply_to=self.queue_name, correlation_id='abcd')
+
     def transaction_supprimer_fichier_usager(self):
         evenement = {
             'fuuid': 'z8VvTURY8zhxx5ahBuk47WHjP8s6PwqnGvR5TFgP6Jy8b9c9iWxzTZFU4PynmPuWfYGzKgyjVa9Jw4y4a8XX3NkRbMy',
@@ -605,7 +613,8 @@ class MessagesSample(BaseCallback):
 
         # sample.requete_collection_personnelle()
         # sample.transaction_supprimer_fichier_usager()
-        sample.requete_conversions_en_cours()
+        # sample.requete_conversions_en_cours()
+        sample.commande_regenerer_collectionfichiers()
 
         pass
 

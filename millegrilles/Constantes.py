@@ -1024,6 +1024,7 @@ class ConstantesGrosFichiers:
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_COLLECTIONFICHIERS_NOM = '%s/collectionFichiers' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_GrosFichiers'
 
@@ -1127,6 +1128,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_TORRENT_HASHSTRING = 'torrent_hashstring'
 
     CHAMP_CREER_PARENT = 'creerParent'
+    CHAMP_DATE_CREATION = 'dateCreation'
+    CHAMP_DATE_MODIFICATION = 'dateModification'
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion' % DOMAINE_NOM
     TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE = '%s.demandeThumbnailProtege' % DOMAINE_NOM
@@ -1197,6 +1200,7 @@ class ConstantesGrosFichiers:
     COMMANDE_RESET_FICHIERS_PUBLIES = 'resetFichiersPublies'
     COMMANDE_CLEAR_FICHIER_PUBLIE = 'clearFichierPublie'
     COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES = 'uploadCollectionsPubliques'
+    COMMANDE_REGENERER_COLLECTIONFICHIERS = 'regenererCollectionFichiers'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {

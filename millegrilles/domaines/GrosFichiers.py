@@ -5,7 +5,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres, ConstantesSecurite, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
     TraitementMessageDomaineRequete, HandlerBackupDomaine, RegenerateurDeDocuments, GroupeurTransactionsARegenerer, \
-    TraitementCommandesProtegees, TraitementMessageDomaineEvenement
+    TraitementCommandesProtegees, TraitementMessageDomaineEvenement, MGProcessus
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -112,6 +112,8 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
         elif action == ConstantesGrosFichiers.COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES:
             self.gestionnaire.maj_collection_publique(message_dict)
             return {'ok': True}
+        elif action == ConstantesGrosFichiers.COMMANDE_REGENERER_COLLECTIONFICHIERS:
+            self.gestionnaire.creer_trigger_collectionfichiers(message_dict)
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -398,6 +400,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 (ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS, 1),
             ],
             name='document-liste-fuuids'
+        )
+
+        # CollectionFichiers
+        collection_collectionfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_COLLECTIONFICHIERS_NOM)
+        collection_collectionfichiers.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
+            ],
+            name='uuid-collection'
         )
 
     def get_nom_domaine(self):
@@ -2843,6 +2854,69 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.update_one(filtre, ops)
 
+    def creer_trigger_collectionfichiers(self, params: dict, reply_to: str = None, correlation_id: str = None):
+        """
+        Genere un evenement de trigger pour regenerer la collectionFichiers
+        :param uuid_collection:
+        :return:
+        """
+        params = params.copy()
+        if reply_to:
+            params['reply_to'] = reply_to
+        if correlation_id:
+            params['correlation_id'] = correlation_id
+
+        params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        self.demarrer_processus('millegrilles_domaines_GrosFichiers:ProcessusGenererCollectionFichiers', params)
+
+    def generer_collectionfichiers(self, params: dict):
+        collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        filtre_collection = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+        champs_collections = [
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION,
+            Constantes.DOCUMENT_INFODOC_SECURITE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME,
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+        ]
+        collection_doc = collection_grosfichiers.find_one(filtre_collection)
+
+        set_ops = {
+        }
+        for champ in champs_collections:
+            valeur = collection_doc.get(champ)
+            if valeur is not None:
+                set_ops[champ] = valeur
+
+        # Trouver tous les fichiers inclus dans cette collection
+        filtre_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$all': [uuid_collection]},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+        curseur_fichiers = collection_grosfichiers.find(filtre_fichiers)
+
+        fichiers = self.mapper_fichier_version(curseur_fichiers)
+        set_ops[ConstantesGrosFichiers.DOCUMENT_COLLECTION_FICHIERS] = fichiers
+
+        collection_collectionfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_COLLECTIONFICHIERS_NOM)
+        filtre_collectionfichiers = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+                ConstantesGrosFichiers.CHAMP_DATE_CREATION: datetime.datetime.utcnow(),
+            },
+            '$currentDate': {ConstantesGrosFichiers.CHAMP_DATE_MODIFICATION: True}
+        }
+        collection_collectionfichiers.update(filtre_collectionfichiers, ops, upsert=True)
+
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
 
@@ -3986,6 +4060,14 @@ class ProcessusTransactionSupprimerFichierUsager(ProcessusGrosFichiers):
         return {
             'ok': True
         }
+
+
+class ProcessusGenererCollectionFichiers(MGProcessus):
+
+    def initiale(self):
+        params = self.parametres
+        self.controleur.gestionnaire.generer_collectionfichiers(params)
+        self.set_etape_suivante()  # Termine
 
 
 class CollectionAbsenteException(Exception):
