@@ -17,7 +17,7 @@ from millegrilles.util.BackupModule import BackupUtil, WrapperDownload
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesBackup
-from millegrilles.util.Chiffrage import CipherMsg1Dechiffrer, DecipherStream
+from millegrilles.util.Chiffrage import CipherMsg2Dechiffrer, DecipherStream
 
 
 class RestaurerApplication(ModeleConfiguration):
@@ -133,7 +133,7 @@ class RestaurerApplication(ModeleConfiguration):
             raise Exception("Acces refuse a la cle pour le backup d'application %s: %s" % (self.__nom_application, resultat_cle))
         cle = resultat_cle['cles'][archive_hachage]
         cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(cle['cle'])
-        decipher = CipherMsg1Dechiffrer(b64decode(cle['iv']), cle_dechiffree)
+        decipher = CipherMsg2Dechiffrer(cle['iv'], cle_dechiffree, compute_tag=cle['tag'])
 
         wrapper = WrapperDownload(r.iter_content(chunk_size=10 * 1024))
         decipher_stream = DecipherStream(decipher, wrapper)
