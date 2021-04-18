@@ -579,6 +579,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 domaine = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
                 hachage_bytes = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES][0]
                 iv = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV]
+                tag = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG]
+                format_chiffrage = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT]
                 self._logger.info("On insere la cle dans le maitre des cles pour permettre un "
                                   "rechiffrage subsequent de la cle %s, %s" % (domaine, hachage_bytes))
 
@@ -594,6 +596,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                         fingerprint_millegrille: cle_fournie,
                     },
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: tag,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: format_chiffrage,
                 }
 
                 self.sauvegarder_cle(information_cle)

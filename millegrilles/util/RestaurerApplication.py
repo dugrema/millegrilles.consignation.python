@@ -104,9 +104,13 @@ class RestaurerApplication(ModeleConfiguration):
             timeout=5.0
         )
 
+        headers = r.headers
+        self.__logger.debug("Headers recus : %s" % str(headers))
         archive_hachage = r.headers.get('archive_hachage')
         cle_header = r.headers.get('cle')
         iv_header = r.headers.get('iv')
+        tag_header = r.headers.get('tag')
+        format_header = r.headers.get('format_chiffrage')
 
         # Demander la cle pour dechiffrer l'archive
         chaine_certs = contexte.signateur_transactions.chaine_certs
@@ -116,6 +120,8 @@ class RestaurerApplication(ModeleConfiguration):
             # Ajouter params pour recuperation de la cle
             ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLE: cle_header,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv_header,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: tag_header,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: format_header,
 
             # Info pour trouver la cle
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesBackup.DOMAINE_NOM,
