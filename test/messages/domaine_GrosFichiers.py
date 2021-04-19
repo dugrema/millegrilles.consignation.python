@@ -535,7 +535,7 @@ class MessagesSample(BaseCallback):
 
     def commande_regenerer_collectionfichiers(self):
         evenement = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: '2cff4bac-215b-4bb0-8a97-3acb7ac6706f',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: '60c12a04-de97-4693-a14b-5010cfd6dc10',
         }
         self.generateur.transmettre_commande(
             evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_REGENERER_COLLECTIONFICHIERS,

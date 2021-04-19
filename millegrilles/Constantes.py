@@ -1042,6 +1042,7 @@ class ConstantesGrosFichiers:
     LIBVAL_TRANSCODAGE_MEDIA = 'transcodageMedia'
     LIBVAL_PUBLICATION_FICHIERS = 'publicationFichiers'
     LIBVAL_UPLOAD_AWSS3 = 'uploadAwss3'
+    LIBVAL_COLLECTION_FICHIERS = 'collectionFichiers'
 
     LIBVAL_VITRINE_FICHIERS = 'vitrine.fichiers'
     LIBVAL_VITRINE_ALBUMS = 'vitrine.albums'

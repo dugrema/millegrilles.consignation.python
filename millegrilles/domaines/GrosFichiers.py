@@ -1,3 +1,12 @@
+import os
+import logging
+import datetime
+import json
+import uuid
+import pytz
+import gzip
+import multibase
+
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
@@ -7,13 +16,9 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequete
     TraitementMessageDomaineRequete, HandlerBackupDomaine, RegenerateurDeDocuments, GroupeurTransactionsARegenerer, \
     TraitementCommandesProtegees, TraitementMessageDomaineEvenement, MGProcessus
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
-
-import os
-import logging
-import datetime
-import json
-import uuid
-import pytz
+from millegrilles.util.Chiffrage import CipherMsg2Chiffrer
+from millegrilles.util.JSONMessageEncoders import JSONHelper
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
@@ -2869,8 +2874,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         self.demarrer_processus('millegrilles_domaines_GrosFichiers:ProcessusGenererCollectionFichiers', params)
 
-    def generer_collectionfichiers(self, params: dict):
+    def generer_collectionfichiers(self, params: dict, enveloppes_rechiffrage: dict = None):
         collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_collectionfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_COLLECTIONFICHIERS_NOM)
 
         uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         filtre_collection = {
@@ -2885,12 +2891,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         ]
         collection_doc = collection_grosfichiers.find_one(filtre_collection)
 
-        set_ops = {
+        securite = collection_doc[Constantes.DOCUMENT_INFODOC_SECURITE]
+        filtre_collectionfichiers = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
         }
+
+        if securite == Constantes.SECURITE_PROTEGE:
+            # Les collections protegees ne doivent pas etre generees ou exportees
+            collection_collectionfichiers.delete_one(filtre_collectionfichiers)
+            return
+
+        contenu = dict()
         for champ in champs_collections:
             valeur = collection_doc.get(champ)
             if valeur is not None:
-                set_ops[champ] = valeur
+                contenu[champ] = valeur
 
         # Trouver tous les fichiers inclus dans cette collection
         filtre_fichiers = {
@@ -2900,22 +2915,105 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         curseur_fichiers = collection_grosfichiers.find(filtre_fichiers)
 
-        fichiers = self.mapper_fichier_version(curseur_fichiers)
-        set_ops[ConstantesGrosFichiers.DOCUMENT_COLLECTION_FICHIERS] = fichiers
+        extra_out = dict()
+        fichiers = self.mapper_fichier_version(curseur_fichiers, extra_out)
+        contenu[ConstantesGrosFichiers.DOCUMENT_COLLECTION_FICHIERS] = fichiers
 
-        collection_collectionfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_COLLECTIONFICHIERS_NOM)
-        filtre_collectionfichiers = {
+        set_ops = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+            Constantes.DOCUMENT_INFODOC_SECURITE: securite,
+            ConstantesGrosFichiers.CHAMP_DATE_CREATION: collection_doc[
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION],
+            ConstantesGrosFichiers.CHAMP_DATE_MODIFICATION: collection_doc[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: collection_doc[ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME],
         }
-        ops = {
-            '$set': set_ops,
-            '$setOnInsert': {
+        unset_ops = dict()
+
+        if securite == Constantes.SECURITE_PUBLIC:
+            # Copier le contenu tel quel
+            set_ops.update(contenu)
+
+            unset_ops['hachage_bytes'] = True
+            unset_ops['contenu_chiffre'] = True
+            unset_ops['permission'] = True
+
+        elif securite == Constantes.SECURITE_PRIVE:
+            # Chiffrer le contenu
+            identificateurs_documents = {
+                'type': 'CollectionFichiers',
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-                ConstantesGrosFichiers.CHAMP_DATE_CREATION: datetime.datetime.utcnow(),
-            },
-            '$currentDate': {ConstantesGrosFichiers.CHAMP_DATE_MODIFICATION: True}
+            }
+
+            # Permission de dechiffrage des fichiers (on va l'inserer dans le contenu chiffre)
+            fuuids = extra_out['fuuids']
+            fuuids = list(set(fuuids))  # Dedupe
+            permission = {
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: fuuids,
+                Constantes.DOCUMENT_INFODOC_SECURITE: securite,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
+            }
+            permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+            contenu['permission'] = permission
+
+            contenu_chiffre, hachage_bytes = self.chiffrer_contenu(
+                contenu, enveloppes_rechiffrage, identificateurs_documents)
+
+            # Ajouter permission de dechiffrage du forum_post (contenu chiffre)
+            permission = {
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [hachage_bytes],
+                Constantes.DOCUMENT_INFODOC_SECURITE: securite,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 10 * 365 * 24 * 60 * 60,  # 10 ans
+            }
+            permission = self.generateur_transactions.preparer_enveloppe(permission, ConstantesMaitreDesCles.REQUETE_PERMISSION)
+            set_ops['permission'] = permission
+            set_ops['hachage_bytes'] = hachage_bytes
+            set_ops['contenu_chiffre'] = contenu_chiffre
+
+            unset_ops['nom_collection'] = True
+            unset_ops['fichiers'] = True
+
+        document_forum_posts = self.generateur_transactions.preparer_enveloppe(
+            set_ops,
+            domaine='GrosFichiers.' + ConstantesGrosFichiers.LIBVAL_COLLECTION_FICHIERS,
+            ajouter_certificats=True
+        )
+
+        ops = {
+            '$set': document_forum_posts,
         }
+        if len(unset_ops) > 0:
+            ops['$unset'] = unset_ops
+
         collection_collectionfichiers.update(filtre_collectionfichiers, ops, upsert=True)
+
+    def chiffrer_contenu(self, contenu, enveloppes_rechiffrage, identificateurs_documents):
+        json_helper = JSONHelper()
+        contenu = json_helper.dict_vers_json(contenu)
+        contenu = gzip.compress(contenu)
+        cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
+        cipher.start_encrypt()
+        contenu = cipher.update(contenu)
+        contenu += cipher.finalize()
+        hachage_bytes = cipher.digest
+        # Chiffrer la cle secrete pour chaque enveloppe
+        cles = dict()
+        for fp, enveloppe in enveloppes_rechiffrage.items():
+            cle_chiffree = cipher.chiffrer_motdepasse_enveloppe(enveloppe)
+            cle_chiffree = multibase.encode('base64', cle_chiffree).decode('utf-8')
+            cles[fp] = cle_chiffree
+        commande_maitrecles = {
+            'domaine': 'Forum',
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_documents,
+            'format': 'mgs2',
+            'cles': cles,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+        }
+        commande_maitrecles.update(cipher.get_meta())
+        # Transmettre commande de sauvegarde de cle
+        self.generateur_transactions.transmettre_commande(
+            commande_maitrecles, 'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
+        contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
+        return contenu_chiffre, hachage_bytes
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
@@ -4065,8 +4163,27 @@ class ProcessusTransactionSupprimerFichierUsager(ProcessusGrosFichiers):
 class ProcessusGenererCollectionFichiers(MGProcessus):
 
     def initiale(self):
+        self.set_requete('MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES, dict())
+        self.set_etape_suivante(ProcessusGenererCollectionFichiers.generer_collectionfichiers.__name__)
+
+    def generer_collectionfichiers(self):
+
         params = self.parametres
-        self.controleur.gestionnaire.generer_collectionfichiers(params)
+
+        reponse_requete_certs = params['reponse'][0]
+        certs = [
+            reponse_requete_certs['certificat'],
+            reponse_requete_certs['certificat_millegrille'],
+        ]
+        # Preparer les certificats avec enveloppe, par fingerprint
+        enveloppes_rechiffrage = dict()
+        for cert in certs:
+            enveloppe = EnveloppeCertificat(certificat_pem=cert)
+            fp = enveloppe.fingerprint
+            enveloppes_rechiffrage[fp] = enveloppe
+
+        self.controleur.gestionnaire.generer_collectionfichiers(params, enveloppes_rechiffrage)
+
         self.set_etape_suivante()  # Termine
 
 
