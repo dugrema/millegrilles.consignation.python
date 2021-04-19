@@ -922,11 +922,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         evenement = self.mapper_fichier_version([fichier], extra_out).pop()
         evenement.update(extra_out)
 
-        # Determiner
-        # niveau_securite = self.get_niveau_securite_fichier(fuuid, fichier.get('collections'))
-        # exchanges = ConstantesSecurite.cascade_secure(niveau_securite)
-        # exchanges.pop()  # Retirer 4.secure
-
         self.generateur_transactions.emettre_message(
             evenement,
             domaine_action,
@@ -944,6 +939,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             domaine_action,
             exchanges=[Constantes.SECURITE_PRIVE]
         )
+
+        # Emettre commande de mise a jour de collectionFichiers
+        uuid_collections = fichier.get(ConstantesGrosFichiers.DOCUMENT_COLLECTIONS)
+        if uuid_collections is not None:
+            params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: uuid_collections}
+            self.creer_trigger_collectionfichiers(params)
 
     def get_niveau_securite_fichier(self, fuuid, collections: list = None):
         if collections is None:
@@ -1169,6 +1170,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.insert_one(collection)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
+
     def renommer_collection(self, uuid_collection: str, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
@@ -1188,6 +1191,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
+
     def commenter_collection(self, uuid_collection: str, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
@@ -1206,6 +1211,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Inserer la nouvelle collection
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('commenter_collection resultat: %s' % str(resultat))
+
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
 
     def supprimer_collection(self, uuid_collection: str):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1228,6 +1235,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
+
     def recuperer_collection(self, uuid_collection: str):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
@@ -1248,6 +1257,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Inserer la nouvelle collection
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
 
     def figer_collection(self, uuid_collection: str):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1323,6 +1334,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultats = collection_domaine.update_many(filtre_documents, ops)
         if resultats.matched_count != len(uuid_documents):
             raise Exception("Erreur association collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
+
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
 
     def __filtrer_entree_collection(self, entree):
         """
@@ -1422,6 +1435,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultats = collection_domaine.update_many(filtre_documents, ops)
         if resultats.matched_count != len(uuid_documents):
             raise Exception("Erreur retrait collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
+
+        self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
 
     def changer_favoris(self, docs_uuids: dict):
         self._logger.debug("Ajouter favor %s" % docs_uuids)
@@ -1555,7 +1570,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'video.' + fuuid_fichier + '.' + mimetype: True,
         }
         ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
-        collection_domaine.update_one(filtre, ops)
+        fichier_maj = collection_domaine.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
+
+        self.emettre_evenement_fichier_maj(fuuid_fichier, fichier_maj)
 
         return document_fichier
 
@@ -1587,167 +1604,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.update_one(filtre, ops)
-
-    def enregistrer_image_info(self, image_info):
-
-        fuuid_fichier = image_info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
-
-        info_image_maj = dict()
-        cle_version = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_fichier)
-
-        if image_info.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
-            libelle_thumbnail = '%s.%s' % (
-                cle_version,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
-            )
-            info_image_maj[libelle_thumbnail] = image_info[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL]
-
-        if image_info.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
-            libelle_fuuid_preview = '%s.%s' % (
-                cle_version,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW
-            )
-            info_image_maj[libelle_fuuid_preview] = image_info[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
-
-            libelle_mimetype_preview = '%s.%s' % (
-                cle_version,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW
-            )
-            info_image_maj[libelle_mimetype_preview] = image_info[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
-
-        if len(info_image_maj.keys()) > 0:
-            ops = {
-                '$set': info_image_maj,
-                '$currentDate': {
-                    Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
-                }
-            }
-
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-                cle_version: {'$exists': True}
-            }
-
-            collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-            collection_domaine.update_one(filtre, ops)
-
-    def maj_fichier_dans_collection(self, uuid_fichier):
-        """
-        Mettre a jour l'element _documents_ de toutes les collections avec le fichier.
-        """
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        fichier = collection_domaine.find_one({
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
-        })
-
-        sommaire_fichier = self.__filtrer_entree_collection(fichier)
-
-        label_versions_fuuid = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS, uuid_fichier)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            label_versions_fuuid: {'$exists': True},
-        }
-        ops = {
-            '$set': {
-                label_versions_fuuid: sommaire_fichier
-            }
-        }
-        collection_domaine.update(filtre, ops)
-
-    def associer_info_media(self, transaction: dict):
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
-        fuuid = transaction['fuuid']
-        uuid_document = transaction['uuid']
-        thumbnail = transaction.get('thumbnail')
-        preview_fuuid = transaction.get('preview_fuuid')
-        metadata = transaction.get('metadata')
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid): {
-                '$exists': True,
-            }
-        }
-        set_opts = {
-            '%s.%s.%s' % (
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-                fuuid,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
-            ): thumbnail
-        }
-        if metadata is not None:
-            if metadata.get('data_video') is not None:
-                libelle_data_video = '%s.%s.%s' % (
-                    ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-                    fuuid,
-                    ConstantesGrosFichiers.DOCUMENT_FICHIER_DATA_VIDEO
-                )
-                set_opts[libelle_data_video] = metadata['data_video']
-
-        ops = {
-            '$set': set_opts
-        }
-
-        self._logger.debug("Ajout thumbnail pour fuuid: %s" % filtre)
-        update_info = collection_domaine.update_one(filtre, ops)
-        if update_info.matched_count < 1:
-            raise Exception("Erreur ajout thumbnail pour fuuid " + fuuid)
-
-    def changer_niveau_securite_collection(self, uuid_collection, niveau_securite):
-        """
-        Change le niveau de securite de la collection.
-        N'inclus pas le traitement des fichiers
-        :param uuid:
-        :param niveau_securite:
-        :return:
-        """
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-        }
-
-        ops = {
-            '$set': {
-                ConstantesGrosFichiers.DOCUMENT_SECURITE: niveau_securite
-            }
-        }
-
-        self._logger.debug("Changement securite pour collection uuid: %s" % uuid_collection)
-        update_info = collection_domaine.update_one(filtre, ops)
-        if update_info.matched_count < 1:
-            raise Exception("Erreur changement securite pour collection " + uuid_collection)
-
-    def changer_securite_fichiers(self, liste_uuid: list, securite_destination: str):
-        """
-        Change le niveau de securite d'une liste de fichiers.
-        N'effectue pas la logique de cryptage/decryptage
-        :param liste_uuid: Liste de uuid de fichier
-        :param securite_destination: Niveau de securite destination pour les fichiers
-        :return:
-        """
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
-        set_operations = dict()
-        set_operations[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite_destination
-
-        filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': liste_uuid},
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-        }
-
-        resultat = collection_domaine.update_many(filtre, {
-            '$set': set_operations,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        })
-        # if resultat.matched_count < len(liste_uuid):
-        #     raise Exception("Nombre de fichiers modifies ne correspond pas, changes < demandes (%d < %d)" %
-        #                     (resultat.matched_count, len(liste_uuid)))
 
     def resoumettre_conversions_manquantes(self):
         filtre_doc_media = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA}
@@ -2871,8 +2727,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if correlation_id:
             params['correlation_id'] = correlation_id
 
-        params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        self.demarrer_processus('millegrilles_domaines_GrosFichiers:ProcessusGenererCollectionFichiers', params)
+        uuid_collections = set()
+        liste_collections = params.get(ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS)
+        uuid_collection = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+        if uuid_collection is not None:
+            uuid_collections.add(uuid_collection)
+        if liste_collections is not None:
+            uuid_collections.update(liste_collections)
+
+        for uuid_collection in liste_collections:
+            params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_collection
+            self.demarrer_processus('millegrilles_domaines_GrosFichiers:ProcessusGenererCollectionFichiers', params)
 
     def generer_collectionfichiers(self, params: dict, enveloppes_rechiffrage: dict = None):
         collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -2924,7 +2789,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE: securite,
             ConstantesGrosFichiers.CHAMP_DATE_CREATION: collection_doc[
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION],
-            ConstantesGrosFichiers.CHAMP_DATE_MODIFICATION: collection_doc[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
+            ConstantesGrosFichiers.CHAMP_DATE_MODIFICATION: datetime.datetime.utcnow(),
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: collection_doc[ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME],
         }
         unset_ops = dict()
@@ -3709,83 +3574,6 @@ class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
             self.__logger.exception("Erreur verification collection publique")
 
         self.set_etape_suivante()
-
-
-class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
-    """
-    Change le niveau de securite d'une collection (e.g. 4.secure vers 1.public)
-    Le comportement est different si on passe d'un niveau crypte a decrypte ou non.
-    """
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        niveau_securite_destination = transaction["niveau_securite_destination"]
-
-        collection_fichiers = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
-
-        # Determiner le sens du changement (moins->plus secure ou plus->moins secure)
-        niveau_securite_courant = collection_fichiers[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-
-        niveau_securite_courant_num = niveau_securite_courant.split('.')[0]
-        niveau_securite_destination_num = niveau_securite_destination.split('.')[0]
-
-        if niveau_securite_courant_num == niveau_securite_destination:
-            self.__logger.warning("Aucun changement au niveau de securite")
-        elif niveau_securite_courant_num > niveau_securite_destination:
-            # Diminuer le niveau de securite
-            self.set_etape_suivante()
-            self.__diminuer_securite_fichiers(uuid_collection, niveau_securite_destination)
-            self.set_etape_suivante(ChangerNiveauSecuriteCollection.changer_niveau_securite.__name__)
-        elif niveau_securite_courant_num < niveau_securite_destination:
-            # Augmenter le niveau de securite
-            # Aucun impact sur le contenu
-            self.controleur.gestionnaire.changer_niveau_securite_collection(uuid_collection, niveau_securite_destination)
-            self.set_etape_suivante()
-
-        return {
-            'uuid_collection': uuid_collection,
-            'niveau_securite_courant_num': niveau_securite_courant_num,
-            'niveau_securite_destination': niveau_securite_destination,
-            'niveau_securite_destination_num': niveau_securite_destination_num,
-        }
-
-    def changer_niveau_securite(self):
-        """
-        Changer le niveau de securite puis terminer le processus
-        """
-        uuid_collection = self.parametres['uuid_collection']
-        niveau_securite_destination = self.parametres['niveau_securite_destination']
-
-        self.controleur.gestionnaire.changer_niveau_securite_collection(uuid_collection, niveau_securite_destination)
-
-        self.set_etape_suivante()
-
-    def __diminuer_securite_fichiers(self, uuid_collection, securite_destination):
-        collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
-
-        fichier_diminuer_direct = []
-        for fichier in collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
-            if fichier.get(ConstantesGrosFichiers.DOCUMENT_SECURITE) in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
-                # Le fichier est crypte, on transmet une transaction de decryptage
-                securite_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-                if securite_fichier in [Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE]:
-                    transaction_decryptage = {
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
-                        ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
-                    }
-                    self.ajouter_transaction_a_soumettre(ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER, transaction_decryptage)
-            else:
-                # Le fichier n'est pas crypte, on transmet une transaction de mise a jour
-                fichier_diminuer_direct.append(fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC])
-
-        if len(fichier_diminuer_direct) > 0:
-            self.controleur.gestionnaire.changer_securite_fichiers(fichier_diminuer_direct, securite_destination)
-            for uuid_fichier in fichier_diminuer_direct:
-                self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
 
 class ProcessusPublierCollection(ProcessusGrosFichiers):
