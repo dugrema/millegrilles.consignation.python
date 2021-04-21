@@ -196,7 +196,7 @@ location /coupdoeil {
             domaine_installeur = self.__service_monitor.nodename
 
         proxypass_installation = """
-set $upstream_installation http://%s:8080;
+set $upstream_installation http://%s:8280;
 proxy_pass $upstream_installation;
         """ % domaine_installeur
         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:

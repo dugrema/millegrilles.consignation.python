@@ -16,7 +16,7 @@ from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.IpUtils import get_ip
 
 hostName = "0.0.0.0"
-serverPort = 8080
+serverPort = 8280
 
 
 class ServerMonitorHttp(SimpleHTTPRequestHandler):

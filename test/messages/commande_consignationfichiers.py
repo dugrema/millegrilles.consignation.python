@@ -15,7 +15,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = 'z8VwcgBdE9xrhpE9UsrzZPHgZEf4WRsn5Y4fkReAB2sYML6L2aY58pS9HqtP7BLWoWLtikkrM69zySYFki3ojCMWEaB'
+        self.__fuuid = 'z8VwJR6hCq6z7TJY2MjsJsfAGTkjEimw9yduR6dDnHnUf4uF7cJFJxCWKmy2tw5kpRJtgvaZCatQKu5dDbCC63fVk6t'
         self.event_termine = Event()
 
     def commande_restaurerGrosFichiers(self):
@@ -36,10 +36,32 @@ class TestConsignationFichiers(DomaineTest):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
 
+    def requete_getclessh(self):
+        # permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
+        requete = dict()
+        domaine = 'requete.fichiers.getPublicKeySsh'
+        self.generateur.transmettre_requete(
+            requete, domaine, reply_to=self.queue_name, correlation_id='requete_getclessh')
+
+    def commande_publier_fichier_ssh(self):
+        params = {
+            'fuuid': self.__fuuid,
+            # 'mimetype': 'video/mp4',
+            'host': '192.168.2.131',
+            'port': 22,
+            'username': 'sftptest',
+            # 'basedir': '/home/sftptest/consignation'
+        }
+        domaine = 'commande.fichiers.publierFichierSftp'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ssh')
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
-        self.commande_transcoderVideo()
+        # self.commande_transcoderVideo()
+        # self.requete_getclessh()
+        self.commande_publier_fichier_ssh()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
