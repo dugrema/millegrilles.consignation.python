@@ -767,6 +767,34 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         return self.contexte.message_dao
 
 
+class GenerateurEd25519:
+
+    def __init__(self):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def generer_keypair(self):
+        self.__logger.debug("Generer keypair")
+        keypair = asymmetric.ed25519.Ed25519PrivateKey.generate()
+        return keypair
+
+    def generer_private_openssh(self) -> bytes:
+        keypair = self.generer_keypair()
+        private_bytes = keypair.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.OpenSSH,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+        # public_key = keypair.public_key()
+        # public_bytes = public_key.public_bytes(
+        #     encoding=serialization.Encoding.OpenSSH,
+        #     format=serialization.PublicFormat.OpenSSH
+        # )
+        # logger.debug("Public Key\n%s mathieu@serveur1" % public_bytes.decode('utf-8'))
+
+        return private_bytes
+
+
 class CertificatInvalide(Exception):
     def __init__(self, message, errors=None, key_subject_identifier=None):
         super().__init__(message, errors)

@@ -21,6 +21,7 @@ from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
+from millegrilles.SecuritePKI import GenerateurEd25519
 
 
 class GestionnaireModulesDocker:
@@ -290,6 +291,7 @@ class GestionnaireModulesDocker:
                 configuration_service_meta = self.charger_config_recente('docker.cfg.' + cle_config_service)
                 config_attrs = configuration_service_meta['config'].attrs
                 configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+
                 certificat_compte_cle = configuration_service_json.get('certificat_compte')
                 if certificat_compte_cle:
                     try:
@@ -303,6 +305,11 @@ class GestionnaireModulesDocker:
                             self.__logger.warning("Application installee sans generer un certificat (noeud prive ou public)")
                         else:
                             self.creer_compte(certificat_compte_cle)
+
+                generateurs = configuration_service_json.get('generer')
+                if generateurs is not None:
+                    # S'assurer que les valeurs sont generees
+                    self.generer_valeurs(generateurs)
 
         nom_image_docker = kwargs.get('nom_image') or service_name
 
@@ -339,6 +346,51 @@ class GestionnaireModulesDocker:
         #    else:
         #        self.__logger.exception("Erreur demarrage service %s" % service_name)
         #        raise apie
+
+    def generer_valeurs(self, generateurs: list):
+        """
+        S'assure que les valeurs dans la liste sont generees
+        :param generateurs:
+        :return:
+        """
+        for generateur in generateurs:
+            self.__logger.info("Verifier si la valeur %s est generee" % str(generateur))
+            config_name = generateur.get('config')
+            secret_name = generateur.get('secret')
+
+            # Verifier si le secret ou config existe
+            doit_generer = False
+            if config_name is not None:
+                try:
+                    config_docker = self.__trouver_config(config_name)
+                except AttributeError:
+                    doit_generer = True
+            if secret_name is not None:
+                try:
+                    self.trouver_secret(secret_name)
+                except PkiCleNonTrouvee:
+                    doit_generer = True
+
+            if doit_generer:
+                type_generateur = generateur['generateur']
+                if type_generateur == 'ed25519':
+                    self.generer_cle_ed25519(generateur)
+
+    def generer_cle_ed25519(self, params: dict):
+        format_cle = params['format']
+        nom_secret = params.get('secret')
+        nom_config = params.get('config')
+
+        if format_cle == 'openssh':
+            generateur = GenerateurEd25519()
+            valeur = generateur.generer_private_openssh()
+        else:
+            raise ValueError('Type cle inconnu : %s', format_cle)
+
+        if nom_secret is not None:
+            self.sauvegarder_secret(nom_secret, valeur, ajouter_date=True)
+        elif nom_config is not None:
+            self.sauvegarder_config(nom_config, valeur, ajouter_date=True)
 
     def reconfigurer_service(self, service_name: str, docker_service=None, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
