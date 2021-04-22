@@ -16,7 +16,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = 'z8VwJR6hCq6z7TJY2MjsJsfAGTkjEimw9yduR6dDnHnUf4uF7cJFJxCWKmy2tw5kpRJtgvaZCatQKu5dDbCC63fVk6t'
+        self.__fuuid = 'z8VwnVd6tHr6pSfbn1NWNLLE8kT3iEr1tpqHLytAgTs2jjv6fTuzZaSysasz8s3Mb7MxHAyV5737dD87sEn4bX3ndkg'
         self.event_termine = Event()
 
         self.__awss3_secret_access_key = os.environ['AWSS3_SECRET']
@@ -49,11 +49,12 @@ class TestConsignationFichiers(DomaineTest):
     def commande_publier_fichier_ssh(self):
         params = {
             'fuuid': self.__fuuid,
-            # 'mimetype': 'video/mp4',
             'host': '192.168.2.131',
             'port': 22,
             'username': 'sftptest',
-            # 'basedir': '/home/sftptest/consignation'
+            # 'basedir': '/home/sftptest/consignation',
+            'mimetype': 'image/gif',
+            'securite': '1.public',
         }
         domaine = 'commande.fichiers.publierFichierSftp'
         self.generateur.transmettre_commande(
@@ -62,7 +63,8 @@ class TestConsignationFichiers(DomaineTest):
     def commande_publier_fichier_ipfs(self):
         params = {
             'fuuid': self.__fuuid,
-            # 'mimetype': 'video/mp4',
+            'mimetype': 'image/gif',
+            'securite': '1.public',
         }
         domaine = 'commande.fichiers.publierFichierIpfs'
         self.generateur.transmettre_commande(
@@ -72,12 +74,13 @@ class TestConsignationFichiers(DomaineTest):
         params = {
             'uuid': str(uuid4()),
             'fuuid': self.__fuuid,
+            'mimetype': 'image/gif',
+            'securite': '1.public',
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
             'secretAccessKey': self.__awss3_secret_access_key,
-            # 'mimetype': 'video/mp4',
             'bucketName': 'millegrilles',
-            'bucketDirfichier': 'mg-dev4',
+            'bucketDirfichier': 'mg-dev4/fichiers',
         }
         domaine = 'commande.fichiers.publierFichierAwsS3'
         self.generateur.transmettre_commande(
@@ -89,8 +92,8 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_transcoderVideo()
         # self.requete_getclessh()
         # self.commande_publier_fichier_ssh()
-        # self.commande_publier_fichier_ipfs()
-        self.commande_publier_fichier_awss3()
+        self.commande_publier_fichier_ipfs()
+        # self.commande_publier_fichier_awss3()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
