@@ -1,5 +1,6 @@
 # Script de test pour transmettre message de transaction
 import logging
+import os
 
 from uuid import uuid4
 from threading import Event
@@ -17,6 +18,8 @@ class TestConsignationFichiers(DomaineTest):
 
         self.__fuuid = 'z8VwJR6hCq6z7TJY2MjsJsfAGTkjEimw9yduR6dDnHnUf4uF7cJFJxCWKmy2tw5kpRJtgvaZCatQKu5dDbCC63fVk6t'
         self.event_termine = Event()
+
+        self.__awss3_secret_access_key = os.environ['AWSS3_SECRET']
 
     def commande_restaurerGrosFichiers(self):
         params = {
@@ -56,12 +59,38 @@ class TestConsignationFichiers(DomaineTest):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ssh')
 
+    def commande_publier_fichier_ipfs(self):
+        params = {
+            'fuuid': self.__fuuid,
+            # 'mimetype': 'video/mp4',
+        }
+        domaine = 'commande.fichiers.publierFichierIpfs'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ipfs')
+
+    def commande_publier_fichier_awss3(self):
+        params = {
+            'uuid': str(uuid4()),
+            'fuuid': self.__fuuid,
+            'bucketRegion': 'us-east-1',
+            'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
+            'secretAccessKey': self.__awss3_secret_access_key,
+            # 'mimetype': 'video/mp4',
+            'bucketName': 'millegrilles',
+            'bucketDirfichier': 'mg-dev4',
+        }
+        domaine = 'commande.fichiers.publierFichierAwsS3'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_awss3')
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
         # self.requete_getclessh()
-        self.commande_publier_fichier_ssh()
+        # self.commande_publier_fichier_ssh()
+        # self.commande_publier_fichier_ipfs()
+        self.commande_publier_fichier_awss3()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
