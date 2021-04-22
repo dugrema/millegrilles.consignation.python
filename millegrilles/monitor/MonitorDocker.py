@@ -22,7 +22,7 @@ from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
 from millegrilles.SecuritePKI import GenerateurEd25519
-
+from millegrilles.util import IpUtils
 
 class GestionnaireModulesDocker:
 
@@ -54,6 +54,11 @@ class GestionnaireModulesDocker:
         fqdn = self.hostname
 
         try:
+            self.__local_ips = GestionnaireModulesDocker.get_local_ips()
+        except:
+            self.__local_ips = dict()
+
+        try:
             acme_config = json.loads(self.charger_config('acme.configuration'))
             hostname_domaine = acme_config.get('domain') or fqdn
         except:
@@ -72,6 +77,8 @@ class GestionnaireModulesDocker:
             'NGINX_DATA_VOLUME': 'nginx-data',
             # 'MQ_HOST': '',  # Ajoute automatiquement
             # 'MQ_PORT': '',  # Ajoute automatiquement
+            'HOST_IPV4': self.__local_ips.get('ipv4') or '127.0.0.1',
+            'HOST_IPV6': self.__local_ips.get('ipv6') or '::1',
         }
 
         if self.__insecure:
@@ -998,6 +1005,14 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['networks'] = networks
 
+            hosts = config_service.get('hosts')
+            if hosts is not None:
+                mapped_hosts = dict()
+                for key, value in hosts.items():
+                    updated_value = self.__mapping(value)
+                    mapped_hosts[key] = updated_value
+                dict_config_docker['hosts'] = mapped_hosts
+
             # Configs
             config_configs = config_service.get('configs')
             dates_configs = dict()
@@ -1303,6 +1318,11 @@ class GestionnaireModulesDocker:
                 # On n'a pas de configuration publique (infrastructure), on retourne le nom local du serveur
                 fqdn = socket.gethostbyaddr(socket.gethostname())[0]
         return fqdn
+
+    @staticmethod
+    def get_local_ips():
+        local_ips = IpUtils.get_local_ips()
+        return local_ips
 
     def get_configuration_services(self):
         return self.__configuration_services
