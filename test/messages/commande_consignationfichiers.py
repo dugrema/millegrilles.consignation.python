@@ -1,6 +1,7 @@
 # Script de test pour transmettre message de transaction
 import logging
 import os
+import requests
 
 from uuid import uuid4
 from threading import Event
@@ -86,14 +87,27 @@ class TestConsignationFichiers(DomaineTest):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_awss3')
 
+    def commande_publier_repertoire_ssh(self):
+        repertoire_test = '/home/mathieu/temp/uploadTest'
+        files = list()
+        files.append(('files', ('/test/think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'), 'application/octet-stream')))
+
+        r = requests.put(
+            'https://fichiers:3021/publier/repertoire',
+            files=files,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+        )
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
         # self.requete_getclessh()
         # self.commande_publier_fichier_ssh()
-        self.commande_publier_fichier_ipfs()
+        # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
+        self.commande_publier_repertoire_ssh()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
