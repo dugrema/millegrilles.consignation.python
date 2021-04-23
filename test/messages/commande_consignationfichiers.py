@@ -2,6 +2,7 @@
 import logging
 import os
 import requests
+import json
 
 from uuid import uuid4
 from threading import Event
@@ -87,14 +88,76 @@ class TestConsignationFichiers(DomaineTest):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_awss3')
 
-    def commande_publier_repertoire_ssh(self):
-        repertoire_test = '/home/mathieu/temp/uploadTest'
+    def put_publier_repertoire_ssh(self):
         files = list()
-        files.append(('files', ('/test/think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'), 'application/octet-stream')))
+        files.append(('files', ('think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'),
+                                'application/octet-stream')))
+        files.append(('files', ('test1/test.json', open('/home/mathieu/temp/uploadTest/test1/test.json', 'rb'),
+                                'application/octet-stream')))
+        files.append(('files', ('test2/test3/mq.log', open('/home/mathieu/temp/uploadTest/test2/test3/mq.log', 'rb'),
+                                'application/octet-stream')))
+
+        publier_ssh = {
+            'host': '192.168.2.131',
+            'port': 22,
+            'username': 'sftptest',
+            'repertoireRemote': '/home/sftptest/pythontest',
+        }
+        publier_ssh = json.dumps(publier_ssh)
 
         r = requests.put(
             'https://fichiers:3021/publier/repertoire',
             files=files,
+            data={'publierSsh': publier_ssh},
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+        )
+
+    def put_publier_repertoire_awss3(self):
+        files = list()
+        files.append(('files', ('think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'),
+                                'application/octet-stream')))
+        files.append(('files', ('test1/test.json', open('/home/mathieu/temp/uploadTest/test1/test.json', 'rb'),
+                                'application/octet-stream')))
+        files.append(
+            ('files', ('test2/test3/mq.log', open('/home/mathieu/temp/uploadTest/test2/test3/mq.log', 'rb'),
+                       'application/octet-stream')))
+
+        publier_ssh = {
+            'bucketRegion': 'us-east-1',
+            'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
+            'secretAccessKey': self.__awss3_secret_access_key,
+            'bucketName': 'millegrilles',
+            'bucketDirfichier': 'mg-dev4/fichiers/testrep',
+        }
+        publier_ssh = json.dumps(publier_ssh)
+
+        r = requests.put(
+            'https://fichiers:3021/publier/repertoire',
+            files=files,
+            data={'publierAwsS3': publier_ssh},
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+        )
+
+    def put_publier_repertoire_ipfs(self):
+        repertoire_test = '/home/mathieu/temp/uploadTest'
+        files = list()
+        files.append(('files', ('think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'),
+                                'application/octet-stream')))
+        files.append(('files', ('test1/test.json', open('/home/mathieu/temp/uploadTest/test1/test.json', 'rb'),
+                                'application/octet-stream')))
+        files.append(('files', ('test2/test3/mq.log', open('/home/mathieu/temp/uploadTest/test2/test3/mq.log', 'rb'),
+                                'application/octet-stream')))
+
+        publier_ipfs = {
+            'ipns_key_name': 'vitrine1',
+        }
+
+        r = requests.put(
+            'https://fichiers:3021/publier/repertoire',
+            files=files,
+            data={'publierIpfs': publier_ipfs},
             verify=self._contexte.configuration.mq_cafile,
             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
         )
@@ -107,7 +170,9 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
-        self.commande_publier_repertoire_ssh()
+        # self.put_publier_repertoire_ipfs()
+        # self.put_publier_repertoire_ssh()
+        self.put_publier_repertoire_awss3()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
