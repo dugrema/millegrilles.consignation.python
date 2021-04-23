@@ -102,6 +102,7 @@ class TestConsignationFichiers(DomaineTest):
             'port': 22,
             'username': 'sftptest',
             'repertoireRemote': '/home/sftptest/pythontest',
+            'correlation': 'upload_ssh',
         }
         publier_ssh = json.dumps(publier_ssh)
 
@@ -123,19 +124,20 @@ class TestConsignationFichiers(DomaineTest):
             ('files', ('test2/test3/mq.log', open('/home/mathieu/temp/uploadTest/test2/test3/mq.log', 'rb'),
                        'application/octet-stream')))
 
-        publier_ssh = {
+        publier_awss3 = {
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
             'secretAccessKey': self.__awss3_secret_access_key,
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers/testrep',
+            'correlation': 'uploda_awss3',
         }
-        publier_ssh = json.dumps(publier_ssh)
+        publier_awss3 = json.dumps(publier_awss3)
 
         r = requests.put(
             'https://fichiers:3021/publier/repertoire',
             files=files,
-            data={'publierAwsS3': publier_ssh},
+            data={'publierAwsS3': publier_awss3},
             verify=self._contexte.configuration.mq_cafile,
             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
         )
@@ -152,7 +154,9 @@ class TestConsignationFichiers(DomaineTest):
 
         publier_ipfs = {
             'ipns_key_name': 'vitrine1',
+            'correlation': 'upload_ipfs',
         }
+        publier_ipfs = json.dumps(publier_ipfs)
 
         r = requests.put(
             'https://fichiers:3021/publier/repertoire',
