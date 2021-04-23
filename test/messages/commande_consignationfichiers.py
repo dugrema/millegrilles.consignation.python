@@ -18,7 +18,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = 'z8VwnVd6tHr6pSfbn1NWNLLE8kT3iEr1tpqHLytAgTs2jjv6fTuzZaSysasz8s3Mb7MxHAyV5737dD87sEn4bX3ndkg'
+        self.__fuuid = 'z8VxkTYUqqHGUUXPncjp96NfnrM9xSQpQDQGBinaGQWS7rrS6uYpJbSRig4UfZwRVHRJwJv54oQkuqD2hY922NG7U1o'
         self.event_termine = Event()
 
         self.__awss3_secret_access_key = os.environ['AWSS3_SECRET']
@@ -54,9 +54,9 @@ class TestConsignationFichiers(DomaineTest):
             'host': '192.168.2.131',
             'port': 22,
             'username': 'sftptest',
-            # 'basedir': '/home/sftptest/consignation',
+            'basedir': '/home/sftptest/consignation',
             'mimetype': 'image/gif',
-            'securite': '1.public',
+            # 'securite': '1.public',
         }
         domaine = 'commande.fichiers.publierFichierSftp'
         self.generateur.transmettre_commande(
@@ -128,9 +128,10 @@ class TestConsignationFichiers(DomaineTest):
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
             'secretAccessKey': self.__awss3_secret_access_key,
+            'permission': '... permission dechiffrage secret access key ...',
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers/testrep',
-            'correlation': 'uploda_awss3',
+            'correlation': 'upload_awss3',
         }
         publier_awss3 = json.dumps(publier_awss3)
 
@@ -166,6 +167,32 @@ class TestConsignationFichiers(DomaineTest):
             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
         )
 
+    def lister_consignation_sftp(self):
+        data = {
+            'host': '192.168.2.131',
+            'port': 22,
+            'username': 'sftptest',
+            'repertoireRemote': '/home/sftptest/consignation',
+        }
+
+        r = requests.post(
+            'https://fichiers:3021/publier/listerConsignationSftp',
+            data=data,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            stream=True
+        )
+
+        self.__logger.debug("Reponse")
+        self.__logger.debug("----")
+        r.raise_for_status()
+        for fuuid in r.iter_lines(chunk_size=8192):
+            self.__logger.debug(fuuid.decode('utf-8').strip())
+        # with open('/tmp/fuuids.txt', 'wb') as fichier:
+        #     for chunk in r.iter_content(chunk_size=32768):
+        #         fichier.write(chunk)
+        self.__logger.debug("----")
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
@@ -176,7 +203,8 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_publier_fichier_awss3()
         # self.put_publier_repertoire_ipfs()
         # self.put_publier_repertoire_ssh()
-        self.put_publier_repertoire_awss3()
+        # self.put_publier_repertoire_awss3()
+        self.lister_consignation_sftp()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
