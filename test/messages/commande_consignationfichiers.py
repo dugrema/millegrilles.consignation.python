@@ -3,13 +3,15 @@ import logging
 import os
 import requests
 import json
+import multibase
 
 from uuid import uuid4
 from threading import Event
 
 from millegrilles.util.BaseTestMessages import DomaineTest
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesGrosFichiers
+from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesMaitreDesCles
+from millegrilles.util.Hachage import hacher
 
 
 class TestConsignationFichiers(DomaineTest):
@@ -80,7 +82,8 @@ class TestConsignationFichiers(DomaineTest):
             # 'securite': '1.public',
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
-            'secretAccessKey': self.__awss3_secret_access_key,
+            # 'secretAccessKey': self.__awss3_secret_access_key,
+            'secretAccessKey_chiffre': 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q',
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers',
         }
@@ -127,7 +130,8 @@ class TestConsignationFichiers(DomaineTest):
         publier_awss3 = {
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
-            'secretAccessKey': self.__awss3_secret_access_key,
+            # 'secretAccessKey': self.__awss3_secret_access_key,
+            'secretAccessKey_chiffre': 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q',
             'permission': '... permission dechiffrage secret access key ...',
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers/testrep',
@@ -219,18 +223,30 @@ class TestConsignationFichiers(DomaineTest):
         self.__logger.debug("----")
 
     def lister_consignation_awss3(self):
+        secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
+        secret_bytes = multibase.decode(secret_chiffre)
+        secret_hachage = hacher(secret_bytes, encoding='base58btc')
+        permission = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [secret_hachage],
+            'duree': 30 * 60 * 60,  # 30 minutes
+            'securite': '3.protege',
+            'roles_permis': ['Publication'],
+        }
+        permission = self.generateur.preparer_enveloppe(permission)
+
         data = {
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
-            'secretAccessKey': self.__awss3_secret_access_key,
-            'permission': '... permission dechiffrage secret access key ...',
+            # 'secretAccessKey': self.__awss3_secret_access_key,
+            'secretAccessKey_chiffre': secret_chiffre,
+            'permission': permission,
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers',
         }
 
         r = requests.post(
             'https://fichiers:3021/publier/listerConsignationAwss3',
-            data=data,
+            data={'data': json.dumps(data)},
             verify=self._contexte.configuration.mq_cafile,
             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
             stream=True
@@ -269,8 +285,8 @@ class TestConsignationFichiers(DomaineTest):
         # self.put_publier_repertoire_awss3()
         # self.lister_consignation_sftp()
         # self.lister_consignation_ipfs()
-        # self.lister_consignation_awss3()
-        self.commande_publier_cle_ipns()
+        self.lister_consignation_awss3()
+        # self.commande_publier_cle_ipns()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
