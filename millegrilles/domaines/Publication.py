@@ -1,10 +1,12 @@
+import logging
+import datetime
+
+from pymongo import ReturnDocument
+
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
-
-import logging
-import datetime
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
@@ -34,6 +36,36 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
                 message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
 
 
+class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        domaine_action = routing_key.split('.').pop()
+
+        if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
+            reponse = self.gestionnaire.get_configuration_site(message_dict)
+        elif domaine_action == ConstantesPublication.REQUETE_POSTS:
+            reponse = self.gestionnaire.get_posts(message_dict)
+            reponse = {'liste_posts': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
+            reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
+            reponse = {'liste_sites': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
+            reponse = self.gestionnaire.get_liste_sites()
+            reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_LISTE_CDN:
+            reponse = self.gestionnaire.get_liste_cdns(message_dict)
+            reponse = {'resultats': reponse}
+        else:
+            reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            raise Exception("Requete publique non supportee " + routing_key)
+
+        if reponse:
+            self.transmettre_reponse(
+                message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
+
+
 class GestionnairePublication(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -42,7 +74,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesPublication(self),
-            Constantes.SECURITE_PROTEGE: TraitementRequetesPubliquesPublication(self)
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesPublication(self)
         }
 
     def configurer(self):
@@ -77,6 +109,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSite"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_POST:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
+        elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_CDN:
+            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajCdn"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -120,6 +154,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             sites.append(site)
 
         return sites
+
+    def get_liste_cdns(self, params: dict):
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre = dict()
+        curseur = collection_cdns.find(filtre)
+
+        cdns = [c for c in curseur]
+
+        return cdns
 
     def get_configuration_site(self, params: dict):
         site_id = params['site_id']
@@ -259,6 +302,40 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         if resultat.upserted_id is None and resultat.matched_count != 1:
             raise Exception("Erreur maj post " + post_id)
 
+    def maj_cdn(self, params: dict):
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        cdn_id = params.get('cdn_id') or entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        configuration = params.get('configuration') or dict()
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            'type_cdn': params['type_cdn'],
+            'cdn_id': cdn_id,
+        }
+        set_ops = {
+            'active': params.get('active') or False,
+        }
+        champs = ['description']
+        for champ in champs:
+            if params.get(champ):
+                set_ops[champ] = params[champ]
+
+        set_ops.update(configuration)
+
+        filtre = {
+            'cdn_id': cdn_id,
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        doc_maj = collection_cdns.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+        return doc_maj
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -365,3 +442,16 @@ class ProcessusTransactionMajPost(MGProcessusTransaction):
             exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
             ajouter_certificats=True
         )
+
+
+class ProcessusTransactionMajCdn(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Verifier si on a _certificat ou si on doit l'ajouter
+        doc_maj = self.controleur.gestionnaire.maj_cdn(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'cdn': doc_maj}

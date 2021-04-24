@@ -1814,6 +1814,7 @@ class ConstantesPublication:
     COLLECTION_SITES_NOM = '%s/sites' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_POSTS_NOM = '%s/posts' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_CDNS = '%s/cdns' % DOMAINE_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     DOCUMENT_DEFAUT = {
@@ -1827,11 +1828,13 @@ class ConstantesPublication:
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
+    REQUETE_LISTE_CDN = 'listeCdn'
     REQUETE_LISTE_SITES = 'listeSites'
     REQUETE_POSTS = 'posts'
 
     TRANSACTION_MAJ_SITE = 'majSite'
     TRANSACTION_MAJ_POST = 'majPost'
+    TRANSACTION_MAJ_CDN = 'majCdn'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'

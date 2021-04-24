@@ -5,9 +5,11 @@
 
 import json
 
+from millegrilles.Constantes import ConstantesMaitreDesCles
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 from threading import Event, Thread
 
@@ -25,6 +27,9 @@ class DomaineTest(BaseCallback):
         self.event_recu = Event()
         self.messages = list()
         self.attendre_apres_recu = False
+
+        self.event_recu_maitrecles = Event()
+        self.cert_maitrecles = None
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -49,6 +54,12 @@ class DomaineTest(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         contenu = json.loads(body.decode('utf-8'))
+
+        if properties.correlation_id == 'cert_maitre_cles':
+            self.cert_maitrecles = contenu
+            self.event_recu_maitrecles.set()
+            return
+
         self.messages.append(contenu)
         print("Message recu, correlationId: %s" % properties.correlation_id)
         print(json.dumps(contenu, indent=4))
@@ -59,6 +70,22 @@ class DomaineTest(BaseCallback):
 
         if self.attendre_apres_recu is False:
             self.event_recu.set()
+
+    def get_cert_maitrecles(self):
+        if self.cert_maitrecles is not None:
+            return self.cert_maitrecles
+
+        domaine_action = 'requete.MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
+        self.generateur.transmettre_requete(dict(), domaine_action, reply_to=self.queue_name, correlation_id='cert_maitre_cles')
+        self.event_recu_maitrecles.wait(2)
+
+        return self.cert_maitrecles
+
+    def get_enveloppe_maitrecles(self):
+        message = self.get_cert_maitrecles()
+        certificat_pem = ''.join(message['certificat'])
+        enveloppe = EnveloppeCertificat(certificat_pem=certificat_pem)
+        return enveloppe
 
     def executer(self):
         raise NotImplementedError()

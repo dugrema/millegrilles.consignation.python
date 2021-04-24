@@ -77,7 +77,7 @@ class TestConsignationFichiers(DomaineTest):
             'uuid': str(uuid4()),
             'fuuid': self.__fuuid,
             'mimetype': 'image/gif',
-            'securite': '1.public',
+            # 'securite': '1.public',
             'bucketRegion': 'us-east-1',
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
             'secretAccessKey': self.__awss3_secret_access_key,
@@ -186,12 +186,75 @@ class TestConsignationFichiers(DomaineTest):
         self.__logger.debug("Reponse")
         self.__logger.debug("----")
         r.raise_for_status()
-        for fuuid in r.iter_lines(chunk_size=8192):
-            self.__logger.debug(fuuid.decode('utf-8').strip())
+        for info_fichier in r.iter_lines(chunk_size=8192):
+            dict_fichier = json.loads(info_fichier)
+            self.__logger.debug(str(dict_fichier))
         # with open('/tmp/fuuids.txt', 'wb') as fichier:
         #     for chunk in r.iter_content(chunk_size=32768):
         #         fichier.write(chunk)
         self.__logger.debug("----")
+
+    def lister_consignation_ipfs(self):
+        data = {}
+
+        r = requests.post(
+            'https://fichiers:3021/publier/listerPinsIpfs',
+            # data=data,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            stream=True
+        )
+
+        self.__logger.debug("Reponse")
+        self.__logger.debug("----")
+        r.raise_for_status()
+        for info_pin_str in r.iter_lines(chunk_size=8192):
+            info_pin = json.loads(info_pin_str)
+            cid = info_pin['Cid']
+            type_pin = info_pin['Type']
+            self.__logger.debug('cid %s (%s)' % (cid, type_pin))
+        # with open('/tmp/fuuids.txt', 'wb') as fichier:
+        #     for chunk in r.iter_content(chunk_size=32768):
+        #         fichier.write(chunk)
+        self.__logger.debug("----")
+
+    def lister_consignation_awss3(self):
+        data = {
+            'bucketRegion': 'us-east-1',
+            'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
+            'secretAccessKey': self.__awss3_secret_access_key,
+            'permission': '... permission dechiffrage secret access key ...',
+            'bucketName': 'millegrilles',
+            'bucketDirfichier': 'mg-dev4/fichiers',
+        }
+
+        r = requests.post(
+            'https://fichiers:3021/publier/listerConsignationAwss3',
+            data=data,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            stream=True
+        )
+
+        self.__logger.debug("Reponse")
+        self.__logger.debug("----")
+        r.raise_for_status()
+        for info_fichier in r.iter_lines(chunk_size=8192):
+            dict_fichier = json.loads(info_fichier)
+            self.__logger.debug(str(dict_fichier))
+        # with open('/tmp/fuuids.txt', 'wb') as fichier:
+        #     for chunk in r.iter_content(chunk_size=32768):
+        #         fichier.write(chunk)
+        self.__logger.debug("----")
+
+    def commande_publier_cle_ipns(self):
+        params = {
+            'cid': 'QmPbUVmHccqr1cTB99XV2K1spqiU9iugQbeTAVKQewxU3V',
+            'keyName': 'vitrine2',
+        }
+        domaine = 'commande.fichiers.publierIpns'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_cle_ipns')
 
     def executer(self):
         self.__logger.debug("Executer")
@@ -204,7 +267,10 @@ class TestConsignationFichiers(DomaineTest):
         # self.put_publier_repertoire_ipfs()
         # self.put_publier_repertoire_ssh()
         # self.put_publier_repertoire_awss3()
-        self.lister_consignation_sftp()
+        # self.lister_consignation_sftp()
+        # self.lister_consignation_ipfs()
+        # self.lister_consignation_awss3()
+        self.commande_publier_cle_ipns()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {

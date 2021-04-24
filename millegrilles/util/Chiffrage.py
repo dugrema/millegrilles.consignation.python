@@ -342,7 +342,7 @@ class ChiffrerChampDict:
 
         valeur_bytes = valeur.encode('utf-8')
 
-        cipher = CipherMsg1Chiffrer()
+        cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
         valeur_chiffree = cipher.start_encrypt() + cipher.update(valeur_bytes) + cipher.finalize()
         cle_secrete = cipher.password
 
@@ -352,29 +352,25 @@ class ChiffrerChampDict:
         cles = dict()
         envs = [env_maitrecles, env_millegrille]
         for env in envs:
-            cles[env.fingerprint_b64] = b64encode(env.chiffrage_asymmetrique(cle_secrete)[0]).decode('utf-8')
+            cles[env.fingerprint] = multibase.encode('base64', env.chiffrage_asymmetrique(cle_secrete)[0]).decode('utf-8')
+
+        meta = cipher.get_meta()
 
         msg_maitredescles = {
             'identificateurs_document': identificateurs_document,
             'domaine': domaine,
-            'version': str(uuid4()),
-            "iv": b64encode(cipher.iv).decode('utf-8'),
+            'format': 'mgs2',
             "cles": cles,
+            'hachage_bytes': cipher.digest,
         }
+        msg_maitredescles.update(meta)
 
         msg_maitrecles_signe = self.__contexte.generateur_transactions.preparer_enveloppe(
-            msg_maitredescles, Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT)
-
-        contenu = {
-            'chiffrement': 'mgs1',
-            'uuid_transaction': msg_maitrecles_signe[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-            'identificateurs_document': identificateurs_document,
-            'secret_chiffre': b64encode(valeur_chiffree).decode('utf-8'),
-        }
+            msg_maitredescles, Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
 
         return {
             'maitrecles': msg_maitrecles_signe,
-            'contenu': contenu,
+            'secret_chiffre': multibase.encode('base64', valeur_chiffree).decode('utf-8'),
         }
 
 

@@ -1,9 +1,11 @@
 import logging
+import os
 
 from uuid import uuid4
 
 from millegrilles.util.BaseTestMessages import DomaineTest
 from millegrilles.Constantes import ConstantesPublication
+from millegrilles.util.Chiffrage import ChiffrerChampDict
 
 
 class TestPublication(DomaineTest):
@@ -43,6 +45,13 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def requete_cdns(self):
+        requete = {}
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_LISTE_CDN
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
     def maj_site(self):
         info_site = {
             ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
@@ -71,17 +80,63 @@ class TestPublication(DomaineTest):
             }
         }
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_POST
-        self.generateur.soumettre_transaction(info_post, domaine_action, reply_to=self.queue_name)
+        self.generateur.soumettre_transaction(info_post, domaine_action, reply_to=self.queue_name, correlation_id='maj_post')
+
+    def maj_cdn(self):
+
+        motdepasse = None
+        # motdepasse = os.environ.get('AWSS3_SECRET')
+        # if motdepasse is not None:
+        #     certificat = self.get_cert_maitrecles()
+        #     cipher = ChiffrerChampDict(self.contexte)
+        #     info_motdepasse = cipher.chiffrer(certificat, 'Publication', {'type': 'cdn', 'champ': 'awss3.secretAccessKey'}, motdepasse)
+        #     motdepasse = info_motdepasse['secret_chiffre']
+        #
+        #     commande_maitrecles = info_motdepasse['maitrecles']
+        #     domaine_maitrecles = "commande.MaitreDesCles." + commande_maitrecles['en-tete']['domaine']
+        #     self.generateur.transmettre_commande(commande_maitrecles, domaine_maitrecles)
+
+        cdn = {
+            'active': True,
+            'description': 'Mon CDN AWS S3',
+
+            # 'cdn_id': '20ce2512-a506-11eb-be86-071692588846',
+            # 'type_cdn': 'sftp',
+            # 'configuration': {
+            #     'host': '192.168.2.131',
+            #     'port': 22,
+            #     'username': 'sftptest',
+            #     'repertoireRemote': '/home/sftptest/consignation',
+            # },
+
+            # 'cdn_id': '157b58dc-a511-11eb-be86-071692588846',
+            # 'type_cdn': 'ipfs',
+
+            'cdn_id': 'ff9bcfab-a522-11eb-be86-071692588846',
+            'type_cdn': 'awss3',
+            'configuration': {
+                # 'bucketRegion': 'us-east-1',
+                # 'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
+                # 'secretAccessKey_chiffre': motdepasse,
+                # 'bucketName': 'millegrilles',
+                'bucketDirfichier': 'mg-dev4/fichiers',
+            },
+
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_CDN
+        self.generateur.soumettre_transaction(cdn, domaine_action, reply_to=self.queue_name, correlation_id='maj_cdn')
 
     def executer(self):
         self.__logger.debug("Executer")
 
-        self.requete_liste_sites()
+        # self.requete_liste_sites()
         # self.requete_liste_posts()
         # self.requete_config_site()
         # self.requete_sites_pour_noeud()
+        # self.requete_cdns()
         # self.maj_site()
         # self.maj_post()
+        self.maj_cdn()
 
 
 # --- MAIN ---
