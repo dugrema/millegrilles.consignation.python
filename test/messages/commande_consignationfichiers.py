@@ -75,6 +75,9 @@ class TestConsignationFichiers(DomaineTest):
             params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ipfs')
 
     def commande_publier_fichier_awss3(self):
+        secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
+        permission = self.preparer_permission_secretawss3(secret_chiffre)
+
         params = {
             'uuid': str(uuid4()),
             'fuuid': self.__fuuid,
@@ -84,6 +87,7 @@ class TestConsignationFichiers(DomaineTest):
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
             # 'secretAccessKey': self.__awss3_secret_access_key,
             'secretAccessKey_chiffre': 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q',
+            'permission': permission,
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers',
         }
@@ -118,6 +122,9 @@ class TestConsignationFichiers(DomaineTest):
         )
 
     def put_publier_repertoire_awss3(self):
+        secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
+        permission = self.preparer_permission_secretawss3(secret_chiffre)
+
         files = list()
         files.append(('files', ('think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'),
                                 'application/octet-stream')))
@@ -132,7 +139,7 @@ class TestConsignationFichiers(DomaineTest):
             'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
             # 'secretAccessKey': self.__awss3_secret_access_key,
             'secretAccessKey_chiffre': 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q',
-            'permission': '... permission dechiffrage secret access key ...',
+            'permission': permission,
             'bucketName': 'millegrilles',
             'bucketDirfichier': 'mg-dev4/fichiers/testrep',
             'correlation': 'upload_awss3',
@@ -224,15 +231,7 @@ class TestConsignationFichiers(DomaineTest):
 
     def lister_consignation_awss3(self):
         secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
-        secret_bytes = multibase.decode(secret_chiffre)
-        secret_hachage = hacher(secret_bytes, encoding='base58btc')
-        permission = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [secret_hachage],
-            'duree': 30 * 60 * 60,  # 30 minutes
-            'securite': '3.protege',
-            'roles_permis': ['Publication'],
-        }
-        permission = self.generateur.preparer_enveloppe(permission)
+        permission = self.preparer_permission_secretawss3(secret_chiffre)
 
         data = {
             'bucketRegion': 'us-east-1',
@@ -263,6 +262,18 @@ class TestConsignationFichiers(DomaineTest):
         #         fichier.write(chunk)
         self.__logger.debug("----")
 
+    def preparer_permission_secretawss3(self, secret_chiffre):
+        secret_bytes = multibase.decode(secret_chiffre)
+        secret_hachage = hacher(secret_bytes, encoding='base58btc')
+        permission = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [secret_hachage],
+            'duree': 30 * 60 * 60,  # 30 minutes
+            'securite': '3.protege',
+            'roles_permis': ['Publication'],
+        }
+        permission = self.generateur.preparer_enveloppe(permission)
+        return permission
+
     def commande_publier_cle_ipns(self):
         params = {
             'cid': 'QmPbUVmHccqr1cTB99XV2K1spqiU9iugQbeTAVKQewxU3V',
@@ -282,10 +293,10 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_publier_fichier_awss3()
         # self.put_publier_repertoire_ipfs()
         # self.put_publier_repertoire_ssh()
-        # self.put_publier_repertoire_awss3()
+        self.put_publier_repertoire_awss3()
         # self.lister_consignation_sftp()
         # self.lister_consignation_ipfs()
-        self.lister_consignation_awss3()
+        # self.lister_consignation_awss3()
         # self.commande_publier_cle_ipns()
 
     # def demander_permission(self, fuuid):
