@@ -126,6 +126,13 @@ class TestPublication(DomaineTest):
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_CDN
         self.generateur.soumettre_transaction(cdn, domaine_action, reply_to=self.queue_name, correlation_id='maj_cdn')
 
+    def supprimer_cdn(self):
+        transaction = {
+            'cdn_id': 'a5b77eea-a510-11eb-be86-071692588846',
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_SUPPRIMER_CDN
+        self.generateur.soumettre_transaction(transaction, domaine_action, reply_to=self.queue_name, correlation_id='supprimer_cdn')
+
     def executer(self):
         self.__logger.debug("Executer")
 
@@ -136,7 +143,8 @@ class TestPublication(DomaineTest):
         # self.requete_cdns()
         # self.maj_site()
         # self.maj_post()
-        self.maj_cdn()
+        # self.maj_cdn()
+        self.supprimer_cdn()
 
 
 # --- MAIN ---

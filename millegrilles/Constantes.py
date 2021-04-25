@@ -1835,6 +1835,7 @@ class ConstantesPublication:
     TRANSACTION_MAJ_SITE = 'majSite'
     TRANSACTION_MAJ_POST = 'majPost'
     TRANSACTION_MAJ_CDN = 'majCdn'
+    TRANSACTION_SUPPRIMER_CDN = 'supprimerCdn'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'

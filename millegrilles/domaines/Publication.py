@@ -111,6 +111,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_CDN:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajCdn"
+        elif domaine_action == ConstantesPublication.TRANSACTION_SUPPRIMER_CDN:
+            processus = "millegrilles_domaines_Publication:ProcessusSupprimerCdn"
+
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -336,6 +339,17 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return doc_maj
 
+    def supprimer_cdn(self, params: dict):
+        cdn_id = params['cdn_id']
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+
+        filtre = {
+            'cdn_id': cdn_id,
+        }
+        resultat = collection_cdns.delete_one(filtre)
+        if resultat.deleted_count != 1:
+            raise ValueError("cdn_id %s ne correspond pas a un document" % cdn_id)
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -455,3 +469,16 @@ class ProcessusTransactionMajCdn(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {'cdn': doc_maj}
+
+
+class ProcessusSupprimerCdn(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Verifier si on a _certificat ou si on doit l'ajouter
+        self.controleur.gestionnaire.supprimer_cdn(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'ok': True}
