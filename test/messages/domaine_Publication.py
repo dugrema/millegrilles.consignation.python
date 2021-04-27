@@ -82,6 +82,22 @@ class TestPublication(DomaineTest):
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_SECTION
         self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='maj_section')
 
+    def maj_partie_page(self):
+        info_site = {
+            # ConstantesPublication.CHAMP_SECTION_ID: '15732780-a777-11eb-822b-afa6e29b1852',
+            ConstantesPublication.CHAMP_PARTIEPAGE_ID: '6b336f28-a77b-11eb-822b-afa6e29b1852',
+
+            ConstantesPublication.CHAMP_TYPE_PARTIE_PAGE: 'texte',
+
+            ConstantesPublication.CHAMP_TITRE: {'fr': 'Titre de ma page 2'},
+            ConstantesPublication.CHAMP_HTML: {'fr': '<p>Ma page mise a jour</p>'},
+            # ConstantesPublication.CHAMP_DATE_POST: '',
+            # ConstantesPublication.CHAMP_CSS_PAGE: '',
+            # ConstantesPublication.CHAMP_MEDIA_UUID: '',
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_PARTIEPAGE
+        self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='maj_section')
+
     def maj_post(self):
         info_post = {
             "post_id": "17b2430e-c6bc-4d0b-8dd1-9787e0b5bf2a",
@@ -156,7 +172,8 @@ class TestPublication(DomaineTest):
         # self.maj_site()
         # self.maj_post()
         # self.maj_cdn()
-        self.maj_section()
+        # self.maj_section()
+        self.maj_partie_page()
         # self.supprimer_cdn()
 
 

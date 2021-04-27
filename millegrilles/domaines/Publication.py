@@ -119,6 +119,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusSupprimerCdn"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_SECTION:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSection"
+        elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_PARTIEPAGE:
+            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPartiepage"
 
         else:
             # Type de transaction inconnue, on lance une exception
@@ -254,13 +256,18 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if page_id == version_id:
             upsert = True
+            # Recuperer site_id a partir de la section
+            collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            section = collection_sections.find_one(
+                {ConstantesPublication.CHAMP_SECTION_ID: params[ConstantesPublication.CHAMP_SECTION_ID]})
+            site_id = section[ConstantesPublication.CHAMP_SECTION_ID]
             ops['$setOnInsert'] = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+                # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
                 ConstantesPublication.CHAMP_PARTIEPAGE_ID: version_id,
-                ConstantesPublication.CHAMP_SITE_ID: params[ConstantesPublication.CHAMP_SITE_ID],
+                ConstantesPublication.CHAMP_SITE_ID: site_id,
                 ConstantesPublication.CHAMP_SECTION_ID: params[ConstantesPublication.CHAMP_SECTION_ID],
-                ConstantesPublication.CHAMP_CSS_PAGE: params[ConstantesPublication.CHAMP_CSS_PAGE],
+                # ConstantesPublication.CHAMP_CSS_PAGE: params[ConstantesPublication.CHAMP_CSS_PAGE],
                 ConstantesPublication.CHAMP_DATE_CREATION: date_transaction,
             }
         else:
@@ -269,7 +276,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             upsert = False  # Eviter de creer des doublons
             filtre[ConstantesPublication.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
-        collection_pages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PAGES)
+        collection_pages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
         page = collection_pages.find_one_and_update(
             filtre, ops, upsert=upsert,
             projection={ConstantesPublication.CHAMP_SECTION_ID: True},
@@ -655,3 +662,16 @@ class ProcessusTransactionMajSection(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {'section': doc_section}
+
+
+class ProcessusTransactionMajPartiepage(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Verifier si on a _certificat ou si on doit l'ajouter
+        partie_page = self.controleur.gestionnaire.maj_partie_page(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'partie_page': partie_page}

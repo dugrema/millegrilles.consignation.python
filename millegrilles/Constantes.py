@@ -1841,6 +1841,7 @@ class ConstantesPublication:
     TRANSACTION_MAJ_POST = 'majPost'
     TRANSACTION_MAJ_CDN = 'majCdn'
     TRANSACTION_MAJ_SECTION = 'majSection'
+    TRANSACTION_MAJ_PARTIEPAGE = 'majPartiePage'
     TRANSACTION_SUPPRIMER_CDN = 'supprimerCdn'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
@@ -1864,6 +1865,7 @@ class ConstantesPublication:
     CHAMP_PARTIEPAGE_ID = 'partiepage_id'
     CHAMP_VERSION_ID = 'version_id'
     CHAMP_DATE_MODIFICATION = 'date_modification'
+    CHAMP_TYPE_PARTIE_PAGE = 'type_partie'
     CHAMP_CSS_PAGE = 'css_page'
     CHAMP_DATE_CREATION = 'date_creation'
     CHAMP_MEDIA_UUID = 'uuid_media'
@@ -1874,7 +1876,7 @@ class ConstantesPublication:
     CHAMP_FORUMS = 'forums'
     CHAMP_PARTIES_PAGES = 'parties_pages'
 
-    CHAMPS_DONNEES_PAGE = [CHAMP_TITRE, CHAMP_HTML, CHAMP_DATE_POST]
+    CHAMPS_DONNEES_PAGE = [CHAMP_TITRE, CHAMP_HTML, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE, CHAMP_MEDIA_UUID]
 
 
 class ConstantesCatalogueApplications:
