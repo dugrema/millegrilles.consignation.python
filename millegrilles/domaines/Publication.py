@@ -5,7 +5,7 @@ import pytz
 from pymongo import ReturnDocument
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesPublication
+from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 
@@ -87,7 +87,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def demarrer(self):
         super().demarrer()
-        self.initialiser_document(Constantes.LIBVAL_CONFIGURATION, ConstantesPublication.DOCUMENT_DEFAUT)
+        # self.initialiser_document(Constantes.LIBVAL_CONFIGURATION, ConstantesPublication.DOCUMENT_DEFAUT)
 
     def creer_index(self):
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
@@ -109,7 +109,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def identifier_processus(self, domaine_transaction):
         domaine_action = domaine_transaction.split('.').pop()
-        if domaine_action == ConstantesPublication.TRANSACTION_MAJ_SITE:
+        if domaine_action == ConstantesPublication.TRANSACTION_CREER_SITE:
+            processus = "millegrilles_domaines_Publication:ProcessusTransactionCreerSite"
+        elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_SITE:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSite"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_POST:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
@@ -132,7 +134,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         return self.__handler_requetes_noeuds
 
     def get_nom_collection(self):
-        return ConstantesPublication.COLLECTION_SITES_NOM
+        return ConstantesPublication.COLLECTION_CONFIGURATION_NOM
 
     def get_nom_queue(self):
         return ConstantesPublication.QUEUE_NOM
@@ -386,6 +388,44 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return docs
 
+    def creer_site(self, params: dict):
+        uuid_transaction = params['en-tete']['uuid_transaction']
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+        site = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+            ConstantesPublication.CHAMP_SITE_ID: uuid_transaction,
+            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+        }
+        collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+
+        resultat = collection_site.insert_one(site)
+        if resultat.acknowledged is not True:
+            return {'ok': False, 'err': 'Echec ajout document de site'}
+
+        # Transmettre transaction pour creer une collection "grosfichiers" pour les fichiers du site
+        domaine_action = ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION
+        transaction_creer_collection = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_transaction,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: uuid_transaction,
+            ConstantesGrosFichiers.DOCUMENT_UUID_PARENT: ConstantesGrosFichiers.LIBVAL_UUID_COLLECTION_SITES,
+            ConstantesGrosFichiers.CHAMP_CREER_PARENT: True,
+        }
+        self.generateur_transactions.soumettre_transaction(transaction_creer_collection, domaine_action)
+
+        # # Trigger creation du forumPosts
+        # commande = {ConstantesForum.CHAMP_FORUM_IDS: [uuid_transaction]}
+        # domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        # self.generateur_transactions.transmettre_commande(commande, domaine_action)
+        #
+        # # Emettre evenement de modification de forums
+        # domaine_action = 'Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUMS
+        # exchanges = ConstantesSecurite.cascade_protege(Constantes.SECURITE_PROTEGE)
+        # self.generateur_transactions.emettre_message(
+        #     site, 'evenement.' + domaine_action, domaine_action=domaine_action, exchanges=exchanges)
+
+        return {'site': site}
+
     def maj_site(self, transaction: dict):
         collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
 
@@ -398,14 +438,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.__logger.debug("Maj site id: %s" % site_id)
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
             ConstantesPublication.CHAMP_SITE_ID: site_id
         }
 
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
         }
-        set_on_insert.update(filtre)
+        # set_on_insert.update(filtre)
 
         # Nettoyer la transaction de champs d'index, copier le reste dans le document
         set_ops = dict()
@@ -415,16 +455,27 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 set_ops[key] = value
 
         ops = {
-            '$setOnInsert': set_on_insert,
+            # '$setOnInsert': set_on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
         if len(set_ops) > 0:
             ops['$set'] = set_ops
 
-        resultat = collection_site.update_one(filtre, ops, upsert=True)
+        doc_site = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
-        if resultat.upserted_id is None and resultat.matched_count != 1:
-            raise Exception("Erreur maj site " + site_id)
+        securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+        # Maj de la collection de fichiers associee (securite et nom)
+        transaction_maj_collection = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: site_id,
+            Constantes.DOCUMENT_INFODOC_SECURITE: securite_site,
+        }
+        nom_site = doc_site.get(ConstantesPublication.CHAMP_NOM_SITE)
+        if nom_site:
+            transaction_maj_collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nom_site
+        self.generateur_transactions.soumettre_transaction(transaction_maj_collection, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
+
+        return doc_site
 
     def maj_post(self, transaction: dict):
         collection_post = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
@@ -527,6 +578,20 @@ class ProcessusPublication(MGProcessusTransaction):
         return ConstantesPublication.COLLECTION_PROCESSUS_NOM
 
 
+class ProcessusTransactionCreerSite(MGProcessusTransaction):
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        doc_site = self.controleur.gestionnaire.creer_site(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'site': doc_site}
+
+
 class ProcessusTransactionMajSite(MGProcessusTransaction):
     """
     Processus pour modifier la configuration d'un site
@@ -541,7 +606,7 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         :return:
         """
         transaction = self.transaction
-        self.controleur.gestionnaire.maj_site(transaction)
+        doc_site = self.controleur.gestionnaire.maj_site(transaction)
 
         try:
             site_id = transaction[ConstantesPublication.CHAMP_SITE_ID]
@@ -551,6 +616,8 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         self._transmettre_maj(site_id)
 
         self.set_etape_suivante()  # Termine
+
+        return {'site': doc_site}
 
     def _transmettre_maj(self, site_id: str):
         # Preparer evenement de confirmation, emission sur exchange 1.public

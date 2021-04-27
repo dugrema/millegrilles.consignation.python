@@ -4,6 +4,7 @@ import os
 from uuid import uuid4
 
 from millegrilles.util.BaseTestMessages import DomaineTest
+from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication
 from millegrilles.util.Chiffrage import ChiffrerChampDict
 
@@ -52,23 +53,25 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def creer_site(self):
+        info_site = {
+            # ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
+            # ConstantesPublication.CHAMP_NOM_SITE: 'Mon site 2',
+            # ConstantesPublication.CHAMP_LANGUAGES: ['fr', 'en'],
+            # Constantes.DOCUMENT_INFODOC_SECURITE: '1.public',
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_CREER_SITE
+        self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='creer_site')
+
     def maj_site(self):
         info_site = {
-            ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
-            ConstantesPublication.CHAMP_NOM_SITE: 'Mon site',
+            ConstantesPublication.CHAMP_SITE_ID: '2cb06aca-a786-11eb-822b-afa6e29b1852',
+            ConstantesPublication.CHAMP_NOM_SITE: 'Mon site public',
             ConstantesPublication.CHAMP_LANGUAGES: ['fr', 'en'],
-            ConstantesPublication.CHAMP_NOEUDS_URLS: {
-                self.site_id: ["mg-dev3.maple.maceroc.com"]
-            },
-            ConstantesPublication.CHAMP_FICHIERS: {
-                ConstantesPublication.CHAMP_TOUTES_COLLECTIONS: True
-            },
-            ConstantesPublication.CHAMP_ALBUMS: {
-                ConstantesPublication.CHAMP_TOUTES_COLLECTIONS: True
-            }
+            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
         }
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_SITE
-        self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name)
+        self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='maj_site')
 
     def maj_section(self):
         info_site = {
@@ -169,11 +172,12 @@ class TestPublication(DomaineTest):
         # self.requete_config_site()
         # self.requete_sites_pour_noeud()
         # self.requete_cdns()
-        # self.maj_site()
+        # self.creer_site()
+        self.maj_site()
         # self.maj_post()
         # self.maj_cdn()
         # self.maj_section()
-        self.maj_partie_page()
+        # self.maj_partie_page()
         # self.supprimer_cdn()
 
 

@@ -2728,7 +2728,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             params['correlation_id'] = correlation_id
 
         uuid_collections = set()
-        liste_collections = params.get(ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS)
+        liste_collections = params.get(ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS) or list()
         uuid_collection = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
         if uuid_collection is not None:
             uuid_collections.add(uuid_collection)
