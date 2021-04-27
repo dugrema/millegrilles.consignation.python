@@ -70,6 +70,18 @@ class TestPublication(DomaineTest):
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_SITE
         self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name)
 
+    def maj_section(self):
+        info_site = {
+            # ConstantesPublication.CHAMP_SITE_ID: '2aba74c9-9273-4ba6-828f-7571149e0633',
+            # ConstantesPublication.CHAMP_TYPE_SECTION: 'fichiers',
+            ConstantesPublication.CHAMP_SECTION_ID: '15732780-a777-11eb-822b-afa6e29b1852',
+
+            ConstantesPublication.CHAMP_ENTETE: {'fr': 'Fichiers'},
+            ConstantesPublication.CHAMP_COLLECTIONS: ['abcd-1234', 'abcd-1235'],
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_SECTION
+        self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='maj_section')
+
     def maj_post(self):
         info_post = {
             "post_id": "17b2430e-c6bc-4d0b-8dd1-9787e0b5bf2a",
@@ -144,7 +156,8 @@ class TestPublication(DomaineTest):
         # self.maj_site()
         # self.maj_post()
         # self.maj_cdn()
-        self.supprimer_cdn()
+        self.maj_section()
+        # self.supprimer_cdn()
 
 
 # --- MAIN ---

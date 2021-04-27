@@ -28,7 +28,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
         elif domaine_action == ConstantesForum.REQUETE_FORUM_POSTS:
             reponse = self.gestionnaire.get_forum_posts(message_dict)
             reponse = {'resultats': reponse}
-        elif domaine_action == ConstantesForum.REQUETE_POSTS:
+        elif domaine_action == ConstantesForum.REQUETE_POST_COMMENTAIRES:
             reponse = self.gestionnaire.get_posts_publics(message_dict)
             reponse = {'resultats': reponse}
         else:

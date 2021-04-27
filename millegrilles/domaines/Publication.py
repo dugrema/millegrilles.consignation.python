@@ -1,5 +1,6 @@
 import logging
 import datetime
+import pytz
 
 from pymongo import ReturnDocument
 
@@ -55,6 +56,9 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_CDN:
             reponse = self.gestionnaire.get_liste_cdns(message_dict)
+            reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_SITE_PAGES:
+            reponse = self.gestionnaire.get_partie_pages(message_dict)
             reponse = {'resultats': reponse}
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
@@ -113,6 +117,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajCdn"
         elif domaine_action == ConstantesPublication.TRANSACTION_SUPPRIMER_CDN:
             processus = "millegrilles_domaines_Publication:ProcessusSupprimerCdn"
+        elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_SECTION:
+            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSection"
 
         else:
             # Type de transaction inconnue, on lance une exception
@@ -166,6 +172,160 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         cdns = [c for c in curseur]
 
         return cdns
+
+    def maj_section(self, params: dict):
+        """
+        Maj (ou cree) une section de site.
+        :param params:
+        :return:
+        """
+        entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        version_id = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        section_id = params.get(ConstantesPublication.CHAMP_SECTION_ID) or version_id
+
+        set_ops = dict()
+
+        champs = ['securite', 'entete', 'collections', 'parties_pages', 'forums']
+        for key, value in params.items():
+            if key in champs:
+                set_ops[key] = value
+
+        ops = {
+            '$set': set_ops
+        }
+
+        if version_id == section_id:
+            ops['$setOnInsert'] = {
+                ConstantesPublication.CHAMP_SECTION_ID: version_id,
+                ConstantesPublication.CHAMP_SITE_ID: params[ConstantesPublication.CHAMP_SITE_ID],
+                ConstantesPublication.CHAMP_TYPE_SECTION: params[ConstantesPublication.CHAMP_TYPE_SECTION]
+            }
+            upsert = True
+        else:
+            upsert = False
+
+        filtre = {
+            ConstantesPublication.CHAMP_SECTION_ID: section_id,
+        }
+
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        doc_section = collection_sections.find_one_and_update(filtre, ops, upsert=upsert, return_document=ReturnDocument.AFTER)
+
+        site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]  # site_id pas inclus dans les updates
+
+        # Transmettre commande mise a jour du site
+        # TODO
+
+        return doc_section
+
+    def maj_partie_page(self, params: dict):
+        """
+        Sauvegarde une partie de page (section, paragraphe, div, etc.)
+        :param params:
+        :return:
+        """
+        version_id = params['en-tete']['uuid_transaction']
+        page_id = params.get(ConstantesPublication.CHAMP_PARTIEPAGE_ID) or version_id
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+
+        entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        date_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        date_transaction = datetime.datetime.fromtimestamp(date_transaction, tz=pytz.utc)
+
+        set_ops = {
+            ConstantesPublication.CHAMP_VERSION_ID: version_id,
+            ConstantesPublication.CHAMP_DATE_MODIFICATION: date_transaction,
+            ConstantesPublication.CHAMP_DIRTY_PARTIEPAGE: True,
+        }
+
+        champs_supportes = ConstantesPublication.CHAMPS_DONNEES_PAGE.copy()
+        for key in params:
+            if key in champs_supportes:
+                set_ops[key] = params[key]
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        filtre = {
+            ConstantesPublication.CHAMP_PARTIEPAGE_ID: page_id,
+        }
+
+        if page_id == version_id:
+            upsert = True
+            ops['$setOnInsert'] = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                ConstantesPublication.CHAMP_PARTIEPAGE_ID: version_id,
+                ConstantesPublication.CHAMP_SITE_ID: params[ConstantesPublication.CHAMP_SITE_ID],
+                ConstantesPublication.CHAMP_SECTION_ID: params[ConstantesPublication.CHAMP_SECTION_ID],
+                ConstantesPublication.CHAMP_CSS_PAGE: params[ConstantesPublication.CHAMP_CSS_PAGE],
+                ConstantesPublication.CHAMP_DATE_CREATION: date_transaction,
+            }
+        else:
+            # Empecher update d'un post si la transaction est plus vieille que la derniere
+            # transaction a modifier le post.
+            upsert = False  # Eviter de creer des doublons
+            filtre[ConstantesPublication.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
+
+        collection_pages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PAGES)
+        page = collection_pages.find_one_and_update(
+            filtre, ops, upsert=upsert,
+            projection={ConstantesPublication.CHAMP_SECTION_ID: True},
+            return_document=ReturnDocument.AFTER
+        )
+
+        if page is None:
+            return {'ok': False, 'err': 'Echec ajout page'}
+
+        # Recuperer la section_id du post - la transaction ne contient pas la section_id sur update de post
+        section_id = page[ConstantesPublication.CHAMP_SECTION_ID]
+
+        # Associer fichier media au post (si applicable)
+        # if params.get(ConstantesPublication.CHAMP_MEDIA_UUID):
+        #     transaction_media_collection = {
+        #         ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: forum_id,
+        #         ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS: [params[ConstantesForum.CHAMP_MEDIA_UUID]],
+        #     }
+        #     self.generateur_transactions.soumettre_transaction(
+        #         transaction_media_collection,
+        #         ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION
+        #     )
+
+        # # Flag dirty sur section
+        # filtre = {ConstantesPublication.CHAMP_SECTION_ID: section_id}
+        # ops = {'$set': {ConstantesPublication.CHAMP_DIRTY_SECTION: True}}
+        # collection_forums = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SEC)
+        # collection_forums.update_one(filtre, ops)
+
+        # Commande mise a jour forum posts et post comments
+        # commande = {ConstantesForum.CHAMP_FORUM_IDS: [forum_id]}
+        # domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        # self.generateur_transactions.transmettre_commande(commande, domaine_action)
+        #
+        # commande = {ConstantesForum.CHAMP_POST_IDS: [post_id]}
+        # domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES
+        # self.generateur_transactions.transmettre_commande(commande, domaine_action)
+
+        return {'ok': True}
+
+    def get_partie_pages(self, params: dict):
+        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        section_id = params.get(ConstantesPublication.CHAMP_SECTION_ID)
+
+        filtre = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        if section_id is not None:
+            filtre[ConstantesPublication.CHAMP_SECTION_ID] = section_id
+
+        collection_sitepages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITE_PAGES)
+        curseur = collection_sitepages.find(filtre)
+
+        site_pages = [c for c in curseur]
+
+        return site_pages
 
     def get_configuration_site(self, params: dict):
         site_id = params['site_id']
@@ -482,3 +642,16 @@ class ProcessusSupprimerCdn(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {'ok': True}
+
+
+class ProcessusTransactionMajSection(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Verifier si on a _certificat ou si on doit l'ajouter
+        doc_section = self.controleur.gestionnaire.maj_section(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'section': doc_section}

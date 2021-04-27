@@ -1815,6 +1815,9 @@ class ConstantesPublication:
     COLLECTION_POSTS_NOM = '%s/posts' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_CDNS = '%s/cdns' % DOMAINE_NOM
+    COLLECTION_SECTIONS = '%s/sections' % DOMAINE_NOM
+    COLLECTION_PARTIES_PAGES = '%s/partiesPages' % DOMAINE_NOM
+    COLLECTION_SITE_PAGES = '%s/sitePages' % DOMAINE_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     DOCUMENT_DEFAUT = {
@@ -1825,16 +1828,19 @@ class ConstantesPublication:
     LIBVAL_SITE_CONFIG = 'siteconfig'
     LIBVAL_ACCUEIL = 'accueil'
     LIBVAL_POST = 'post'
+    LIBVAL_PAGE = 'page'
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
     REQUETE_LISTE_CDN = 'listeCdn'
     REQUETE_LISTE_SITES = 'listeSites'
     REQUETE_POSTS = 'posts'
+    REQUETE_SITE_PAGES = 'sitePages'
 
     TRANSACTION_MAJ_SITE = 'majSite'
     TRANSACTION_MAJ_POST = 'majPost'
     TRANSACTION_MAJ_CDN = 'majCdn'
+    TRANSACTION_MAJ_SECTION = 'majSection'
     TRANSACTION_SUPPRIMER_CDN = 'supprimerCdn'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
@@ -1854,6 +1860,21 @@ class ConstantesPublication:
     CHAMP_POST_IDS = 'post_ids'
     CHAMP_HTML = 'html'
     CHAMP_DATE_POST = 'date_post'
+    CHAMP_SECTION_ID = 'section_id'
+    CHAMP_PARTIEPAGE_ID = 'partiepage_id'
+    CHAMP_VERSION_ID = 'version_id'
+    CHAMP_DATE_MODIFICATION = 'date_modification'
+    CHAMP_CSS_PAGE = 'css_page'
+    CHAMP_DATE_CREATION = 'date_creation'
+    CHAMP_MEDIA_UUID = 'uuid_media'
+    CHAMP_DIRTY_PARTIEPAGE = 'dirty_page'
+    CHAMP_TYPE_SECTION = 'type_section'
+    CHAMP_ENTETE = 'entete'
+    CHAMP_COLLECTIONS = 'collections'
+    CHAMP_FORUMS = 'forums'
+    CHAMP_PARTIES_PAGES = 'parties_pages'
+
+    CHAMPS_DONNEES_PAGE = [CHAMP_TITRE, CHAMP_HTML, CHAMP_DATE_POST]
 
 
 class ConstantesCatalogueApplications:
