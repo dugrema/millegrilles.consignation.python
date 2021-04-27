@@ -150,7 +150,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def get_liste_sites(self):
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG
+            # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG
         }
         projection = [
             ConstantesPublication.CHAMP_SITE_ID,
@@ -424,7 +424,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # self.generateur_transactions.emettre_message(
         #     site, 'evenement.' + domaine_action, domaine_action=domaine_action, exchanges=exchanges)
 
-        return {'site': site}
+        return site
 
     def maj_site(self, transaction: dict):
         collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
