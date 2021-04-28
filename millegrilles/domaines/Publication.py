@@ -208,7 +208,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         set_ops = dict()
 
-        champs = ['securite', 'entete', 'collections', 'parties_pages', 'forums']
+        champs = ['securite', 'entete', 'collections', 'parties_pages', 'forums', 'toutes_collections']
         for key, value in params.items():
             if key in champs:
                 set_ops[key] = value
