@@ -6,7 +6,8 @@ from pymongo import ReturnDocument
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
+    TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
@@ -53,6 +54,9 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = {'liste_sites': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
             reponse = self.gestionnaire.get_liste_sites()
+            reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_LISTE_SECTIONS_SITE:
+            reponse = self.gestionnaire.get_liste_sections_site(message_dict)
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_CDN:
             reponse = self.gestionnaire.get_liste_cdns(message_dict)
@@ -168,6 +172,21 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return sites
 
+    def get_liste_sections_site(self, params: dict):
+        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        filtre = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        curseur = collection_site.find(filtre)
+
+        sections = list()
+        for site in curseur:
+            del site['_id']
+            sections.append(site)
+
+        return sections
+
     def get_liste_cdns(self, params: dict):
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         filtre = dict()
@@ -194,9 +213,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if key in champs:
                 set_ops[key] = value
 
-        ops = {
-            '$set': set_ops
-        }
+        ops = dict()
+        if len(set_ops) > 0:
+            ops['$set'] = set_ops
 
         if version_id == section_id:
             ops['$setOnInsert'] = {
@@ -213,9 +232,32 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
 
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        doc_section = collection_sections.find_one_and_update(filtre, ops, upsert=upsert, return_document=ReturnDocument.AFTER)
+        doc_section = collection_sections.find_one_and_update(filtre, ops, upsert=upsert,
+                                                              return_document=ReturnDocument.AFTER)
 
         site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]  # site_id pas inclus dans les updates
+
+        # Ajouter la nouvelle section au site
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        filtre = {ConstantesPublication.CHAMP_SITE_ID: site_id}
+        ops = {
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
+        }
+
+        if version_id == section_id:
+            # Nouvelle section, on l'active par defaut
+            ops['$push'] = {ConstantesPublication.CHAMP_LISTE_SECTIONS: section_id}
+
+        doc_site = collection_sites.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
+
+        # Retransmettre sur exchange 1.public pour maj live
+        self.generateur_transactions.emettre_message(
+            doc_site,
+            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
+            ajouter_certificats=True
+        )
 
         # Transmettre commande mise a jour du site
         # TODO
@@ -433,7 +475,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             site_id = transaction[ConstantesPublication.CHAMP_SITE_ID]
         except KeyError:
             # Par defaut le site id est l'identificateur unique de la transaction
-            site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
         self.__logger.debug("Maj site id: %s" % site_id)
 
@@ -473,7 +516,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         nom_site = doc_site.get(ConstantesPublication.CHAMP_NOM_SITE)
         if nom_site:
             transaction_maj_collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nom_site
-        self.generateur_transactions.soumettre_transaction(transaction_maj_collection, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
+        self.generateur_transactions.soumettre_transaction(transaction_maj_collection,
+                                                           'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
 
         return doc_site
 
@@ -612,7 +656,8 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
             site_id = transaction[ConstantesPublication.CHAMP_SITE_ID]
         except KeyError:
             # Par defaut le site id est l'identificateur unique de la transaction
-            site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         self._transmettre_maj(site_id)
 
         self.set_etape_suivante()  # Termine

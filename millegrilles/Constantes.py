@@ -1836,6 +1836,7 @@ class ConstantesPublication:
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
     REQUETE_LISTE_CDN = 'listeCdn'
     REQUETE_LISTE_SITES = 'listeSites'
+    REQUETE_LISTE_SECTIONS_SITE = 'listeSectionsSite'
     REQUETE_POSTS = 'posts'
     REQUETE_SITE_PAGES = 'sitePages'
 
@@ -1878,6 +1879,7 @@ class ConstantesPublication:
     CHAMP_COLLECTIONS = 'collections'
     CHAMP_FORUMS = 'forums'
     CHAMP_PARTIES_PAGES = 'parties_pages'
+    CHAMP_LISTE_SECTIONS = 'liste_sections'
 
     CHAMPS_DONNEES_PAGE = [CHAMP_TITRE, CHAMP_HTML, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE, CHAMP_MEDIA_UUID]
 

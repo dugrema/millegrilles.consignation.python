@@ -75,9 +75,9 @@ class TestPublication(DomaineTest):
 
     def maj_section(self):
         info_site = {
-            # ConstantesPublication.CHAMP_SITE_ID: '2aba74c9-9273-4ba6-828f-7571149e0633',
-            # ConstantesPublication.CHAMP_TYPE_SECTION: 'fichiers',
-            ConstantesPublication.CHAMP_SECTION_ID: '15732780-a777-11eb-822b-afa6e29b1852',
+            ConstantesPublication.CHAMP_SITE_ID: '2aba74c9-9273-4ba6-828f-7571149e0633',
+            ConstantesPublication.CHAMP_TYPE_SECTION: 'fichiers',
+            # ConstantesPublication.CHAMP_SECTION_ID: '15732780-a777-11eb-822b-afa6e29b1852',
 
             ConstantesPublication.CHAMP_ENTETE: {'fr': 'Fichiers'},
             ConstantesPublication.CHAMP_COLLECTIONS: ['abcd-1234', 'abcd-1235'],
@@ -173,10 +173,10 @@ class TestPublication(DomaineTest):
         # self.requete_sites_pour_noeud()
         # self.requete_cdns()
         # self.creer_site()
-        self.maj_site()
+        # self.maj_site()
         # self.maj_post()
         # self.maj_cdn()
-        # self.maj_section()
+        self.maj_section()
         # self.maj_partie_page()
         # self.supprimer_cdn()
 
