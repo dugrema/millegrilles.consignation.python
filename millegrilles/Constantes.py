@@ -1838,7 +1838,7 @@ class ConstantesPublication:
     REQUETE_LISTE_SITES = 'listeSites'
     REQUETE_LISTE_SECTIONS_SITE = 'listeSectionsSite'
     REQUETE_POSTS = 'posts'
-    REQUETE_SITE_PAGES = 'sitePages'
+    REQUETE_PARTIES_PAGE = 'partiesPages'
 
     TRANSACTION_CREER_SITE = 'creerSite'
     TRANSACTION_MAJ_SITE = 'majSite'

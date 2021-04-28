@@ -61,7 +61,7 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_CDN:
             reponse = self.gestionnaire.get_liste_cdns(message_dict)
             reponse = {'resultats': reponse}
-        elif domaine_action == ConstantesPublication.REQUETE_SITE_PAGES:
+        elif domaine_action == ConstantesPublication.REQUETE_PARTIES_PAGE:
             reponse = self.gestionnaire.get_partie_pages(message_dict)
             reponse = {'resultats': reponse}
         else:
@@ -304,7 +304,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
             section = collection_sections.find_one(
                 {ConstantesPublication.CHAMP_SECTION_ID: params[ConstantesPublication.CHAMP_SECTION_ID]})
-            site_id = section[ConstantesPublication.CHAMP_SECTION_ID]
+            site_id = section[ConstantesPublication.CHAMP_SITE_ID]
             ops['$setOnInsert'] = {
                 # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
@@ -321,17 +321,17 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             filtre[ConstantesPublication.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
         collection_pages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
-        page = collection_pages.find_one_and_update(
+        doc_page = collection_pages.find_one_and_update(
             filtre, ops, upsert=upsert,
-            projection={ConstantesPublication.CHAMP_SECTION_ID: True},
+            # projection={ConstantesPublication.CHAMP_SECTION_ID: True},
             return_document=ReturnDocument.AFTER
         )
 
-        if page is None:
+        if doc_page is None:
             return {'ok': False, 'err': 'Echec ajout page'}
 
         # Recuperer la section_id du post - la transaction ne contient pas la section_id sur update de post
-        section_id = page[ConstantesPublication.CHAMP_SECTION_ID]
+        section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
 
         # Associer fichier media au post (si applicable)
         # if params.get(ConstantesPublication.CHAMP_MEDIA_UUID):
@@ -359,20 +359,24 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES
         # self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
-        return {'ok': True}
+        return doc_page
 
     def get_partie_pages(self, params: dict):
-        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        site_id = params.get(ConstantesPublication.CHAMP_SITE_ID)
         section_id = params.get(ConstantesPublication.CHAMP_SECTION_ID)
 
         filtre = {
-            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            # ConstantesPublication.CHAMP_SITE_ID: site_id,
         }
         if section_id is not None:
             filtre[ConstantesPublication.CHAMP_SECTION_ID] = section_id
+        elif site_id is not None:
+            filtre[ConstantesPublication.CHAMP_SITE_ID] = site_id
+        else:
+            return {'err': 'Aucun site_id ou section_id fourni'}
 
-        collection_sitepages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITE_PAGES)
-        curseur = collection_sitepages.find(filtre)
+        collection_partiespages = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
+        curseur = collection_partiespages.find(filtre)
 
         site_pages = [c for c in curseur]
 

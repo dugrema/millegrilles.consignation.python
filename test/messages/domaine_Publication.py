@@ -87,8 +87,8 @@ class TestPublication(DomaineTest):
 
     def maj_partie_page(self):
         info_site = {
-            # ConstantesPublication.CHAMP_SECTION_ID: '15732780-a777-11eb-822b-afa6e29b1852',
-            ConstantesPublication.CHAMP_PARTIEPAGE_ID: '6b336f28-a77b-11eb-822b-afa6e29b1852',
+            ConstantesPublication.CHAMP_SECTION_ID: '15732780-a777-11eb-822b-afa6e29b1852',
+            # ConstantesPublication.CHAMP_PARTIEPAGE_ID: '6b336f28-a77b-11eb-822b-afa6e29b1852',
 
             ConstantesPublication.CHAMP_TYPE_PARTIE_PAGE: 'texte',
 
@@ -176,8 +176,8 @@ class TestPublication(DomaineTest):
         # self.maj_site()
         # self.maj_post()
         # self.maj_cdn()
-        self.maj_section()
-        # self.maj_partie_page()
+        # self.maj_section()
+        self.maj_partie_page()
         # self.supprimer_cdn()
 
 
