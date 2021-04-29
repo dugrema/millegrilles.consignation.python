@@ -1820,6 +1820,7 @@ class ConstantesPublication:
     COLLECTION_SECTIONS = '%s/sections' % DOMAINE_NOM
     COLLECTION_PARTIES_PAGES = '%s/partiesPages' % DOMAINE_NOM
     COLLECTION_SITE_PAGES = '%s/sitePages' % DOMAINE_NOM
+    COLLECTION_RESSOURCES = '%s/ressources' % DOMAINE_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     DOCUMENT_DEFAUT = {
@@ -1831,6 +1832,8 @@ class ConstantesPublication:
     LIBVAL_ACCUEIL = 'accueil'
     LIBVAL_POST = 'post'
     LIBVAL_PAGE = 'page'
+    LIBVAL_FICHIERS = 'fichiers'
+    LIBVAL_ALBUM = 'album'
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
@@ -1847,6 +1850,9 @@ class ConstantesPublication:
     TRANSACTION_MAJ_SECTION = 'majSection'
     TRANSACTION_MAJ_PARTIEPAGE = 'majPartiePage'
     TRANSACTION_SUPPRIMER_CDN = 'supprimerCdn'
+
+    COMMANDE_PUBLIER_SITE = 'publierSite'
+    COMMANDE_PUBLIER_PAGE = 'publierPage'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'
@@ -1872,7 +1878,7 @@ class ConstantesPublication:
     CHAMP_TYPE_PARTIE_PAGE = 'type_partie'
     CHAMP_CSS_PAGE = 'css_page'
     CHAMP_DATE_CREATION = 'date_creation'
-    CHAMP_MEDIA_UUID = 'uuid_media'
+    CHAMP_MEDIA = 'media'
     CHAMP_DIRTY_PARTIEPAGE = 'dirty_page'
     CHAMP_TYPE_SECTION = 'type_section'
     CHAMP_ENTETE = 'entete'
@@ -1881,10 +1887,11 @@ class ConstantesPublication:
     CHAMP_PARTIES_PAGES = 'parties_pages'
     CHAMP_LISTE_SECTIONS = 'liste_sections'
     CHAMP_COLONNES = 'colonnes'
+    CHAMP_CAPTION = 'caption'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
-        CHAMP_HTML, CHAMP_COLONNES, CHAMP_MEDIA_UUID,
+        CHAMP_HTML, CHAMP_COLONNES, CHAMP_MEDIA, CHAMP_CAPTION,
     ]
 
 

@@ -7,7 +7,7 @@ from pymongo import ReturnDocument
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
-    TraitementMessageDomaineRequete
+    TraitementMessageDomaineRequete, TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
@@ -74,6 +74,27 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
                 message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
 
 
+class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        domaine_action = routing_key.split('.').pop()
+
+        reponse = None
+        if domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITE:
+            self.gestionnaire.publier_site(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_PAGE:
+            self.gestionnaire.publier_page(message_dict)
+        else:
+            reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+
+        if reponse is not None:
+            replying_to = properties.reply_to
+            correlation_id = properties.correlation_id
+            if replying_to is not None and correlation_id is not None:
+                self.transmettre_reponse(message_dict, reponse, replying_to, correlation_id)
+
+
 class GestionnairePublication(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -83,6 +104,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesPublication(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesPublication(self)
+        }
+
+        self.__handler_commandes = {
+            Constantes.SECURITE_PROTEGE: TraitementCommandesProtegeesPublication(self),
         }
 
     def configurer(self):
@@ -136,6 +161,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
+
+    def get_handler_commandes(self) -> dict:
+        handlers = super().get_handler_commandes()
+        handlers.update(self.__handler_commandes)
+        return handlers
 
     def get_nom_collection(self):
         return ConstantesPublication.COLLECTION_CONFIGURATION_NOM
@@ -616,6 +646,67 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         if resultat.deleted_count != 1:
             raise ValueError("cdn_id %s ne correspond pas a un document" % cdn_id)
 
+    def publier_site(self, params: dict):
+        pass
+
+    def publier_page(self, params: dict):
+        # Charger page
+        section_id = params[ConstantesPublication.CHAMP_SECTION_ID]
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        filtre = {
+            ConstantesPublication.CHAMP_SECTION_ID: section_id
+        }
+        section = collection_sections.find_one(filtre)
+        site_id = section[ConstantesPublication.CHAMP_SITE_ID]
+
+        parties_page_ids = section[ConstantesPublication.CHAMP_PARTIES_PAGES]
+        collection_partiespage = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
+        filtre_partiespage = {
+            ConstantesPublication.CHAMP_PARTIEPAGE_ID: {'$in': parties_page_ids}
+        }
+        curseur_parties = collection_partiespage.find(filtre_partiespage)
+
+        parties_page = list()
+        fuuids = list()
+        for p in curseur_parties:
+            pp = dict()
+            for key, value in p.items():
+                if not key.startswith('_'):
+                    pp[key] = value
+            if p.get('media'):
+                fuuids_media = p['media'].get('fuuids')
+                fuuids.extend(fuuids_media)
+            elif p.get('colonnes'):
+                for c in p['colonnes']:
+                    media = c.get('media')
+                    if media is not None:
+                        fuuids_media = media.get('fuuids')
+                        fuuids.extend(fuuids_media)
+            parties_page.append(pp)
+
+        set_ops = {
+            ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page,
+        }
+        if len(fuuids) > 0:
+            set_ops['fuuids'] = fuuids
+        set_on_insert = {
+            ConstantesPublication.CHAMP_SECTION_ID: section_id,
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {ConstantesPublication.CHAMP_DATE_MODIFICATION: True},
+        }
+        filtre = {
+            ConstantesPublication.CHAMP_SECTION_ID: section_id,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        doc_page = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+        return doc_page
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -775,6 +866,11 @@ class ProcessusTransactionMajSection(MGProcessusTransaction):
         # Verifier si on a _certificat ou si on doit l'ajouter
         doc_section = self.controleur.gestionnaire.maj_section(transaction)
 
+        commande = {
+            ConstantesPublication.CHAMP_SECTION_ID: doc_section[ConstantesPublication.CHAMP_SECTION_ID]
+        }
+        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
+
         self.set_etape_suivante()  # Termine
 
         return {'section': doc_section}
@@ -787,6 +883,11 @@ class ProcessusTransactionMajPartiepage(MGProcessusTransaction):
 
         # Verifier si on a _certificat ou si on doit l'ajouter
         partie_page = self.controleur.gestionnaire.maj_partie_page(transaction)
+
+        commande = {
+            ConstantesPublication.CHAMP_SECTION_ID: partie_page[ConstantesPublication.CHAMP_SECTION_ID]
+        }
+        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
 
         self.set_etape_suivante()  # Termine
 
