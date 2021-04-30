@@ -82,9 +82,9 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
 
         reponse = None
         if domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITE:
-            self.gestionnaire.publier_site(message_dict)
+            self.gestionnaire.maj_ressources_site(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_PAGE:
-            self.gestionnaire.publier_page(message_dict)
+            self.gestionnaire.maj_ressources_page(message_dict)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -553,6 +553,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.generateur_transactions.soumettre_transaction(transaction_maj_collection,
                                                            'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
 
+
+
         return doc_site
 
     def maj_post(self, transaction: dict):
@@ -646,10 +648,110 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         if resultat.deleted_count != 1:
             raise ValueError("cdn_id %s ne correspond pas a un document" % cdn_id)
 
-    def publier_site(self, params: dict):
-        pass
+    def maj_ressources_site(self, params: dict):
+        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        filtre = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        doc_site = collection_sites.find_one(filtre)
 
-    def publier_page(self, params: dict):
+        champs_site = [
+            ConstantesPublication.CHAMP_SITE_ID,
+            ConstantesPublication.CHAMP_LANGUAGES,
+            ConstantesPublication.CHAMP_TITRE,
+            Constantes.DOCUMENT_INFODOC_SECURITE,
+            ConstantesPublication.CHAMP_LISTE_SOCKETIO,
+        ]
+        contenu_signe = dict()
+        for key, value in doc_site.items():
+            if key in champs_site:
+                contenu_signe[key] = value
+
+        # Ajouter tous les CDNs pour ce site
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        liste_cdn_ids = doc_site['listeCdn']
+        filtre_cdns = {'cdn_id': {'$in': liste_cdn_ids}, 'active': True}
+        curseur_cdns = collection_cdns.find(filtre_cdns)
+        mapping_cdns = list()
+        for cdn in curseur_cdns:
+            mapping = {
+                'type_cdn': cdn['type_cdn'],
+            }
+            access_point_url = cdn.get('accesPointUrl')
+            if access_point_url is not None:
+                mapping['access_point_url'] = access_point_url
+
+            mapping_cdns.append(mapping)
+        contenu_signe['cdns'] = mapping_cdns
+
+        # Aller chercher references des sections
+        # Chaque section est un fichier accessible via son uuid
+        liste_sections_id = doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]
+        filtre_sections = {
+            ConstantesPublication.CHAMP_SECTION_ID: {'$in': liste_sections_id}
+        }
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        curseur_sections = collection_sections.find(filtre_sections)
+        sections_dict = dict()
+        for s in curseur_sections:
+            sections_dict[s[ConstantesPublication.CHAMP_SECTION_ID]] = s
+
+        # Ajouter sections en ordre
+        sections_liste = list()
+        contenu_signe[ConstantesPublication.CHAMP_LISTE_SECTIONS] = sections_liste
+        uuid_to_map = set()  # Conserver tous les uuid a mapper
+        for section_id in doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]:
+            doc_section = sections_dict[section_id]
+            type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
+
+            section = {
+                ConstantesPublication.CHAMP_TYPE_SECTION: type_section,
+                ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
+            }
+
+            if type_section in [ConstantesPublication.LIBVAL_FICHIERS, ConstantesPublication.LIBVAL_ALBUM]:
+                uuid_collections = doc_section[ConstantesPublication.CHAMP_COLLECTIONS]
+                section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
+                uuid_to_map.update(uuid_collections)
+            else:
+                section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
+                uuid_to_map.add(section_id)
+
+            sections_liste.append(section)
+
+        # Aller chercher les valeurs ipns pour tous les champs uuid (si applicable)
+        uuid_to_ipns = dict()
+        for uuid_elem in uuid_to_map:
+            uuid_to_ipns[uuid_elem] = 'TODO'
+        contenu_signe['ipns_map'] = uuid_to_ipns
+
+        contenu_signe = self.generateur_transactions.preparer_enveloppe(
+            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG)
+
+        set_ops = {
+            'contenu_signe': contenu_signe,
+            'sites': [site_id],
+        }
+        set_on_insert = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {ConstantesPublication.CHAMP_DATE_MODIFICATION: True},
+        }
+        filtre = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        doc_site = collection_ressources.find_one_and_update(
+            filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+    def maj_ressources_page(self, params: dict):
         # Charger page
         section_id = params[ConstantesPublication.CHAMP_SECTION_ID]
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
@@ -698,10 +800,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         set_ops = {
             'contenu_signe': contenu_signe,
-            'sites': [site_id]
+            'sites': [site_id],
+            'fuuids': fuuids,
         }
-        if len(fuuids) > 0:
-            set_ops['fuuids'] = fuuids
 
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
@@ -726,7 +827,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return doc_page
 
-    def maj_ressources_fuuids(self, fuuids: list, sites: list = None, cdns: list = None):
+    def maj_ressources_fuuids(self, fuuids: list, sites: list = None):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         for fuuid in fuuids:
             set_on_insert = {
@@ -740,10 +841,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if sites is not None:
                 for s in sites:
                     add_to_set_ops['sites'] = s
-            if cdns is not None:
-                for c in cdns:
-                    key_cdn = '.'.join(['cdns', c, 'requis'])
-                    set_ops[key_cdn] = True
 
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
@@ -760,6 +857,18 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if len(add_to_set_ops) > 0:
                 ops['$addToSet'] = add_to_set_ops
             collection_ressources.update_one(filtre, ops, upsert=True)
+
+    def preparer_publication(self):
+
+        # Mettre a jour CDN des ressources par site
+        # Pour chaque site, charger liste CDNs et faire un "update ressources [cdn]requis = True where site_id in sites"
+
+        # Faire un tri des CDNs pour trouver l'ordre de publication (e.g. CDN pour le plus de sites en premier)
+
+        # Parcourir les types de ressources en ordre et demander publication (message fichiers)
+        # Ordre = INSERTS, UPDATES (1. code, 2.contenu, 3.config), DELETES
+
+        pass
 
 
 class ProcessusPublication(MGProcessusTransaction):
@@ -808,6 +917,11 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
             site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         self._transmettre_maj(site_id)
+
+        commande = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id
+        }
+        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SITE, commande)
 
         self.set_etape_suivante()  # Termine
 

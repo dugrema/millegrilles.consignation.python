@@ -1835,6 +1835,7 @@ class ConstantesPublication:
     LIBVAL_FICHIERS = 'fichiers'
     LIBVAL_ALBUM = 'album'
     LIBVAL_FICHIER = 'fichier'
+    LIBVAL_FORUM = 'forum'
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
@@ -1889,6 +1890,7 @@ class ConstantesPublication:
     CHAMP_LISTE_SECTIONS = 'liste_sections'
     CHAMP_COLONNES = 'colonnes'
     CHAMP_CAPTION = 'caption'
+    CHAMP_LISTE_SOCKETIO = 'listeSocketio'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
