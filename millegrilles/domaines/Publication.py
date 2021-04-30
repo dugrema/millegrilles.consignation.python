@@ -8,7 +8,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
     TraitementMessageDomaineRequete, TraitementCommandesProtegees
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
@@ -267,6 +267,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]  # site_id pas inclus dans les updates
 
+        # Declencher publication des collections
+        collections_fichiers = doc_section.get('collections') or list()
+        for c in collections_fichiers:
+            params = {'uuid_collection': c, 'section_id': section_id, 'site_id': site_id}
+            self.demarrer_processus('millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers', params)
+
         # Ajouter la nouvelle section au site
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
         filtre = {ConstantesPublication.CHAMP_SITE_ID: site_id}
@@ -288,9 +294,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
             ajouter_certificats=True
         )
-
-        # Transmettre commande mise a jour du site
-        # TODO
 
         return doc_section
 
@@ -870,6 +873,63 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         pass
 
+    def get_ressource_collection(self, uuid_collection):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+        res_collection = collection_ressources.find_one(filtre)
+        return res_collection
+
+    def ajouter_site_fichiers(self, uuid_collection, site_id):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+        ops = {
+            '$addToSet': {'sites': site_id}
+        }
+        collection_ressources.update_one(filtre, ops)
+
+    def creer_ressource_collection(self, site_id, info_collection: dict, liste_fichiers: list):
+        contenu_signe = {}
+        contenu_signe.update(info_collection)
+        contenu_signe['fichiers'] = liste_fichiers
+
+        contenu_signe = self.generateur_transactions.preparer_enveloppe(contenu_signe, 'Publication.fichiers')
+
+        set_ops = {
+            'contenu_signe': contenu_signe,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        add_to_set = {
+            'sites': site_id,
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$addToSet': add_to_set,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_one(filtre, ops, upsert=True)
+
+        # Creer les entrees manquantes de fichiers
+        fuuids = set()
+        for f in liste_fichiers:
+            fuuids.update(f['fuuids'])
+        self.maj_ressources_fuuids(list(fuuids), [site_id])
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -1060,3 +1120,37 @@ class ProcessusTransactionMajPartiepage(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {'partie_page': partie_page}
+
+
+class ProcessusPublierCollectionGrosFichiers(MGProcessus):
+
+    def initiale(self):
+        params = self.parametres
+
+        # Verifier si la collection existe deja dans ressources
+        uuid_collection = params['uuid_collection']
+        res_collection = self.controleur.gestionnaire.get_ressource_collection(uuid_collection)
+
+        if res_collection is None:
+            # Requete vers grosfichiers pour recuperer le contenu de la collection et initialiser tous les fichiers
+            requete = {'uuid': uuid_collection}
+            domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
+            self.set_requete(domaine_action, requete)
+            self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_nouvelle_collection.__name__)
+        else:
+            # S'assurer que la collection a le site_id
+            site_id = params['site_id']
+            if site_id not in res_collection['sites']:
+                self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, site_id)
+            self.set_etape_suivante()  # Termine
+
+    def traiter_nouvelle_collection(self):
+        contenu_collection = self.parametres['reponse'][0]
+        site_id = self.parametres['site_id']
+
+        info_collection = contenu_collection['collection']
+        liste_documents = contenu_collection['documents']
+
+        self.controleur.gestionnaire.creer_ressource_collection(site_id, info_collection, liste_documents)
+
+        self.set_etape_suivante()  # Termine

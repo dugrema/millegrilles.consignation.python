@@ -563,6 +563,20 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='abcd'
         )
 
+    def requete_get_collections(self):
+        self.generateur.transmettre_requete(
+            dict(),
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_COLLECTIONS,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
+
+    def requete_get_collection(self):
+        self.generateur.transmettre_requete(
+            {'uuid': 'a85b7daf-6e1e-4210-ba84-df0f51af81e3'},
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -611,10 +625,12 @@ class MessagesSample(BaseCallback):
         # sample.requete_transferts_en_cours()
         # sample.commande_clear_fichier_publie()
 
+        # sample.requete_get_collections()
+        sample.requete_get_collection()
         # sample.requete_collection_personnelle()
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()
-        sample.commande_regenerer_collectionfichiers()
+        # sample.commande_regenerer_collectionfichiers()
 
         pass
 
