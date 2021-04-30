@@ -651,6 +651,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         if resultat.deleted_count != 1:
             raise ValueError("cdn_id %s ne correspond pas a un document" % cdn_id)
 
+    def get_site(self, site_id):
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        filtre = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        doc_site = collection_sites.find_one(filtre)
+        return doc_site
+
     def maj_ressources_site(self, params: dict):
         site_id = params[ConstantesPublication.CHAMP_SITE_ID]
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
@@ -826,11 +834,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Ajouter les fichiers requis comme ressource pour le site
-        self.maj_ressources_fuuids(fuuids, sites=[site_id])
+        doc_site = self.get_site(site_id)
+        flag_public = doc_site['securite'] == Constantes.SECURITE_PUBLIC
+        self.maj_ressources_fuuids(fuuids, sites=[site_id], public=flag_public)
 
         return doc_page
 
-    def maj_ressources_fuuids(self, fuuids: list, sites: list = None):
+    def maj_ressources_fuuids(self, fuuids: list, sites: list = None, public=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         for fuuid in fuuids:
             set_on_insert = {
@@ -841,6 +851,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             set_ops = dict()
             push_ops = dict()
             add_to_set_ops = dict()
+
+            if public is True:
+                set_ops['public'] = True
+
             if sites is not None:
                 for s in sites:
                     add_to_set_ops['sites'] = s
@@ -926,9 +940,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Creer les entrees manquantes de fichiers
         fuuids = set()
+        flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
         for f in liste_fichiers:
             fuuids.update(f['fuuids'])
-        self.maj_ressources_fuuids(list(fuuids), [site_id])
+        self.maj_ressources_fuuids(list(fuuids), [site_id], public=flag_public)
 
 
 class ProcessusPublication(MGProcessusTransaction):
