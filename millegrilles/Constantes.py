@@ -1834,6 +1834,7 @@ class ConstantesPublication:
     LIBVAL_PAGE = 'page'
     LIBVAL_FICHIERS = 'fichiers'
     LIBVAL_ALBUM = 'album'
+    LIBVAL_FICHIER = 'fichier'
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'

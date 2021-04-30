@@ -666,7 +666,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         curseur_parties = collection_partiespage.find(filtre_partiespage)
 
-        parties_page = list()
+        parties_page = dict()
         fuuids = list()
         for p in curseur_parties:
             pp = dict()
@@ -682,24 +682,31 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     if media is not None:
                         fuuids_media = media.get('fuuids')
                         fuuids.extend(fuuids_media)
-            parties_page.append(pp)
+
+            pp_id = pp[ConstantesPublication.CHAMP_PARTIEPAGE_ID]
+            parties_page[pp_id] = pp
+
+        parties_page_ordonnees = list()
+        for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
+            parties_page_ordonnees.append(parties_page[pp_id])
 
         contenu_signe = {
-            ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page,
+            ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
         }
         contenu_signe = self.generateur_transactions.preparer_enveloppe(
             contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_PAGE)
 
         set_ops = {
             'contenu_signe': contenu_signe,
-            'sites': {site_id: {'present': True, 'deploye': False}},  # Override site (page appartient a 1 site)
+            'sites': [site_id]
         }
         if len(fuuids) > 0:
             set_ops['fuuids'] = fuuids
 
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
-            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
         ops = {
             '$set': set_ops,
@@ -714,7 +721,45 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_page = collection_ressources.find_one_and_update(
             filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
+        # Ajouter les fichiers requis comme ressource pour le site
+        self.maj_ressources_fuuids(fuuids, sites=[site_id])
+
         return doc_page
+
+    def maj_ressources_fuuids(self, fuuids: list, sites: list = None, cdns: list = None):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        for fuuid in fuuids:
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                'fuuid': fuuid,
+            }
+            set_ops = dict()
+            push_ops = dict()
+            add_to_set_ops = dict()
+            if sites is not None:
+                for s in sites:
+                    add_to_set_ops['sites'] = s
+            if cdns is not None:
+                for c in cdns:
+                    key_cdn = '.'.join(['cdns', c, 'requis'])
+                    set_ops[key_cdn] = True
+
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                'fuuid': fuuid,
+            }
+            ops = {
+                '$setOnInsert': set_on_insert,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            }
+            if len(set_ops) > 0:
+                ops['$set'] = set_ops
+            if len(push_ops) > 0:
+                ops['$push'] = push_ops
+            if len(add_to_set_ops) > 0:
+                ops['$addToSet'] = add_to_set_ops
+            collection_ressources.update_one(filtre, ops, upsert=True)
 
 
 class ProcessusPublication(MGProcessusTransaction):
