@@ -684,11 +684,19 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                         fuuids.extend(fuuids_media)
             parties_page.append(pp)
 
-        set_ops = {
+        contenu_signe = {
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page,
+        }
+        contenu_signe = self.generateur_transactions.preparer_enveloppe(
+            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_PAGE)
+
+        set_ops = {
+            'contenu_signe': contenu_signe,
+            'sites': {site_id: {'present': True, 'deploye': False}},  # Override site (page appartient a 1 site)
         }
         if len(fuuids) > 0:
             set_ops['fuuids'] = fuuids
+
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
             ConstantesPublication.CHAMP_SITE_ID: site_id,
@@ -703,7 +711,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        doc_page = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+        doc_page = collection_ressources.find_one_and_update(
+            filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         return doc_page
 
