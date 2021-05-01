@@ -1,13 +1,14 @@
 import logging
 import datetime
 import pytz
+import math
 
 from pymongo import ReturnDocument
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
-    TraitementMessageDomaineRequete, TraitementCommandesProtegees
+    TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementMessageDomaineEvenement
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 
 
@@ -85,6 +86,8 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             self.gestionnaire.maj_ressources_site(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_PAGE:
             self.gestionnaire.maj_ressources_page(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_FICHIERS:
+            self.gestionnaire.trigger_publication_fichiers(message_dict)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -93,6 +96,16 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             correlation_id = properties.correlation_id
             if replying_to is not None and correlation_id is not None:
                 self.transmettre_reponse(message_dict, reponse, replying_to, correlation_id)
+
+
+class TraitementEvenementsFichiers(TraitementMessageDomaineEvenement):
+
+    def traiter_evenement(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        domaine_action = routing_key.split('.').pop()
+
+        if domaine_action == 'publierFichier':
+            self.gestionnaire.traiter_evenement_publicationfichier(message_dict)
 
 
 class GestionnairePublication(GestionnaireDomaineStandard):
@@ -109,6 +122,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.__handler_commandes = {
             Constantes.SECURITE_PROTEGE: TraitementCommandesProtegeesPublication(self),
         }
+
+        self.__traitement_publication_fichiers = TraitementEvenementsFichiers(self,)
 
     def configurer(self):
         super().configurer()
@@ -166,6 +181,21 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         handlers = super().get_handler_commandes()
         handlers.update(self.__handler_commandes)
         return handlers
+
+    def get_queue_configuration(self):
+        queue_config = super().get_queue_configuration()
+
+        queue_config.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'evenementsPublication'),
+            'routing': [
+                'evenement.fichiers.publierFichier',
+            ],
+            'exchange': self.configuration.exchange_protege,
+            'ttl': 300000,
+            'callback': self.__traitement_publication_fichiers.callbackAvecAck
+        })
+
+        return queue_config
 
     def get_nom_collection(self):
         return ConstantesPublication.COLLECTION_CONFIGURATION_NOM
@@ -945,6 +975,182 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             fuuids.update(f['fuuids'])
         self.maj_ressources_fuuids(list(fuuids), [site_id], public=flag_public)
 
+    def trigger_publication_fichiers(self, params: dict):
+        """
+        Declenche la publication de tous les fichiers de CDN actifs lie a au moins un site.
+        :return:
+        """
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+
+        # Faire la liste de tous les CDNs utilises dans au moins 1 site
+        cdns_associes = set()
+        curseur_sites = collection_sites.find()
+        sites_par_cdn_dict = dict()
+        for s in curseur_sites:
+            cdns = s.get('listeCdn')
+            if cdns is not None:
+                cdns_associes.update(cdns)
+                for cdn in cdns:
+                    try:
+                        liste_sites = sites_par_cdn_dict[cdn]
+                    except KeyError:
+                        liste_sites = list()
+                        sites_par_cdn_dict[cdn] = liste_sites
+                    liste_sites.append(s[ConstantesPublication.CHAMP_SITE_ID])
+        cdns_associes = list(cdns_associes)
+
+        # Recuperer la liste de CDNs actifs
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre = {
+            ConstantesPublication.CHAMP_CDN_ID: {'$in': cdns_associes},
+            'active': True,
+        }
+        curseur_cdns = collection_cdns.find(filtre)
+
+        dict_cdns = dict()
+        for cdn in curseur_cdns:
+            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+            liste_sites = sites_par_cdn_dict[cdn_id]
+            cdn['sites'] = liste_sites
+            dict_cdns[cdn_id] = cdn
+
+            # Recuperer la liste de fichiers qui ne sont pas publies dans tous les CDNs de la liste
+            collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+            filtre_fichiers = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                'sites': {'$in': liste_sites},
+                'distribution_complete': {'$not': {'$all': [cdn_id]}},
+            }
+            curseur_res_fichiers = collection_ressources.find(filtre_fichiers)
+
+            # Creer les commandes de publication (consignation fichiers) pour tous les fichiers/CDN
+            for fichier in curseur_res_fichiers:
+                self.commande_publier_fichier(fichier, cdn)
+
+        pass
+
+    def commande_publier_fichier(self, res_fichier: dict, cdn_info: dict):
+        type_cdn = cdn_info['type_cdn']
+        cdn_id = cdn_info['cdn_id']
+        fuuid = res_fichier['fuuid']
+
+        self.__logger.debug("Publication sur CDN_ID:%s fichier %s" % (cdn_id, str(fuuid)))
+
+        if type_cdn == 'sftp':
+            self.commande_publier_fichier_sftp(res_fichier, cdn_info)
+        else:
+            raise Exception("Type cdn non supporte %s" % type_cdn)
+
+        # Ajouter flag de publication dans la ressource
+        ops = {
+            '$set': {'distribution_progres.' + cdn_id: False},
+            '$currentDate': {'distribution_maj': True}
+        }
+        filtre_fichier_update = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': fuuid,
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_one(filtre_fichier_update, ops)
+
+    def commande_publier_fichier_sftp(self, res_fichier: dict, cdn_info: dict):
+        fuuid = res_fichier['fuuid']
+        cdn_id = cdn_info['cdn_id']
+        flag_public = res_fichier.get('public') or False
+        if flag_public:
+            securite = Constantes.SECURITE_PUBLIC
+        else:
+            securite = Constantes.SECURITE_PRIVE
+
+        params = {
+            'fuuid': fuuid,
+            'cdn_id': cdn_id,
+            'host': cdn_info['host'],
+            'port': cdn_info['port'],
+            'username': cdn_info['username'],
+            'basedir': cdn_info['repertoireRemote'],
+            # 'mimetype': 'image/gif',
+            'securite': securite,
+        }
+        domaine = 'commande.fichiers.publierFichierSftp'
+        self.generateur_transactions.transmettre_commande(params, domaine)
+
+    def commande_publier_fichier_ipfs(self):
+        params = {
+            'fuuid': self.__fuuid,
+            'mimetype': 'image/gif',
+            'securite': '1.public',
+        }
+        domaine = 'commande.fichiers.publierFichierIpfs'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ipfs')
+
+    def commande_publier_fichier_awss3(self):
+        secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
+        permission = self.preparer_permission_secretawss3(secret_chiffre)
+
+        params = {
+            'uuid': str(uuid4()),
+            'fuuid': self.__fuuid,
+            'mimetype': 'image/gif',
+            # 'securite': '1.public',
+            'bucketRegion': 'us-east-1',
+            'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
+            # 'secretAccessKey': self.__awss3_secret_access_key,
+            'secretAccessKey_chiffre': 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q',
+            'permission': permission,
+            'bucketName': 'millegrilles',
+            'bucketDirfichier': 'mg-dev4/fichiers',
+        }
+        domaine = 'commande.fichiers.publierFichierAwsS3'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_awss3')
+
+    def traiter_evenement_publicationfichier(self, params: dict):
+        cdn_id = params['cdn_id']
+        fuuid = params['fuuid']
+        flag_complete = params.get('complete') or False
+        err = params.get('err') or False
+        current_bytes = params.get('current_bytes')
+        total_bytes = params.get('total_bytes')
+
+        # Determiner type evenement
+        set_ops = dict()
+        unset_ops = dict()
+        add_to_set = dict()
+        if flag_complete:
+            # Publication completee
+            unset_ops['distribution_encours.' + cdn_id] = True
+            unset_ops['distribution_progres.' + cdn_id] = True
+            unset_ops['distribution_erreur.' + cdn_id] = True
+            add_to_set['distribution_complete'] = cdn_id
+        elif err is not False:
+            # Erreur
+            unset_ops['distribution_encours.' + cdn_id] = True
+            unset_ops['distribution_progres.' + cdn_id] = True
+            set_ops['distribution_erreur.' + cdn_id] = err
+        elif current_bytes is not None and total_bytes is not None:
+            # Progres
+            progres = math.floor(current_bytes * 100 / total_bytes)
+            set_ops['distribution_progres.' + cdn_id] = progres
+
+        ops = {
+            '$currentDate': {'distribution_maj': True}
+        }
+        if len(set_ops) > 0:
+            ops['$set'] = set_ops
+        if len(unset_ops) > 0:
+            ops['$unset'] = unset_ops
+        if len(add_to_set) > 0:
+            ops['$addToSet'] = add_to_set
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': fuuid,
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_one(filtre, ops)
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -1167,5 +1373,24 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         liste_documents = contenu_collection['documents']
 
         self.controleur.gestionnaire.creer_ressource_collection(site_id, info_collection, liste_documents)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusPublierFichierIpfs(MGProcessus):
+
+    def initiale(self):
+        fuuid = self.parametres['fuuid']
+        securite = self.parametres.get('securite') or Constantes.SECURITE_PRIVE
+        commande = {
+            'securite': securite,
+            'fuuid': fuuid,
+        }
+        domaine_action = 'commande.fichiers.publierFichierIpfs'
+        self.ajouter_commande_a_transmettre(domaine_action, commande, blocking=True)
+        self.set_etape_suivante(ProcessusPublierFichierIpfs.creer_transaction.__name__)
+
+    def creer_transaction(self):
+        reponse = self.parametres['reponse'][0]
 
         self.set_etape_suivante()  # Termine

@@ -164,6 +164,12 @@ class TestPublication(DomaineTest):
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_SUPPRIMER_CDN
         self.generateur.soumettre_transaction(transaction, domaine_action, reply_to=self.queue_name, correlation_id='supprimer_cdn')
 
+    def commande_publier_fichiers(self):
+        commande = dict()
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_FICHIERS
+        self.generateur.transmettre_commande(
+            commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_publier_fichiers')
+
     def executer(self):
         self.__logger.debug("Executer")
 
@@ -177,8 +183,9 @@ class TestPublication(DomaineTest):
         # self.maj_post()
         # self.maj_cdn()
         # self.maj_section()
-        self.maj_partie_page()
+        # self.maj_partie_page()
         # self.supprimer_cdn()
+        self.commande_publier_fichiers()
 
 
 # --- MAIN ---

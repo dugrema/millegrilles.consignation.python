@@ -1855,12 +1855,14 @@ class ConstantesPublication:
 
     COMMANDE_PUBLIER_SITE = 'publierSite'
     COMMANDE_PUBLIER_PAGE = 'publierPage'
+    COMMANDE_PUBLIER_FICHIERS = 'publierFichiers'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'
 
     CHAMP_SITE_ID = 'site_id'
     CHAMP_POST_ID = 'post_id'
+    CHAMP_CDN_ID = 'cdn_id'
     CHAMP_NOM_SITE = 'nom_site'
     CHAMP_LANGUAGES = 'languages'
     CHAMP_TITRE = 'titre'
