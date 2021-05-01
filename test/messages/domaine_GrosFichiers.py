@@ -549,6 +549,15 @@ class MessagesSample(BaseCallback):
             evenement, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER_USAGER,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def commande_associer_fichier_collection(self):
+        commande = {
+            ConstantesGrosFichiers.CHAMP_UUID_COLLECTION: '79fb7fe6-0ca7-4937-a71f-cc6641408565',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: 'z8VxGKXhJk4NLgSL3xfmzKk9gtmZGtLEupgMc49U1WDtBQ5UPSiSWGakLLKHGyns26Kzydy5NmJ6tEyUUCAEgWVd6xR',
+        }
+        self.generateur.transmettre_commande(
+            commande, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION,
+            reply_to=self.queue_name, correlation_id='abcd')
+
     def requete_transferts_en_cours(self):
         self.generateur.transmettre_requete(
             dict(),
@@ -624,9 +633,10 @@ class MessagesSample(BaseCallback):
         # sample.commande_reset_fichiers_publies()
         # sample.requete_transferts_en_cours()
         # sample.commande_clear_fichier_publie()
+        sample.commande_associer_fichier_collection()
 
         # sample.requete_get_collections()
-        sample.requete_get_collection()
+        # sample.requete_get_collection()
         # sample.requete_collection_personnelle()
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()

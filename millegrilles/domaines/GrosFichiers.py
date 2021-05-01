@@ -119,6 +119,8 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
             return {'ok': True}
         elif action == ConstantesGrosFichiers.COMMANDE_REGENERER_COLLECTIONFICHIERS:
             self.gestionnaire.creer_trigger_collectionfichiers(message_dict)
+        elif action == ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION:
+            self.gestionnaire.associer_fichier_collection(message_dict)
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -2753,6 +2755,33 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         for uuid_collection in liste_collections:
             params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_collection
             self.demarrer_processus('millegrilles_domaines_GrosFichiers:ProcessusGenererCollectionFichiers', params)
+
+    def associer_fichier_collection(self, params: dict):
+        """
+        Verifier si le fichier est deja dans la collection - creer une transaction au besoin.
+        :param params:
+        :return:
+        """
+        fuuid = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        uuid_collection = params[ConstantesGrosFichiers.CHAMP_UUID_COLLECTION]
+
+        collection_fichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$all': [fuuid]},
+        }
+        doc_fichier = collection_fichiers.find_one(filtre)
+
+        collections_fichier = doc_fichier.get(ConstantesGrosFichiers.DOCUMENT_COLLECTIONS)
+        if collections_fichier is None or uuid_collection not in collections_fichier:
+            # Collection manquante. Creer la transaction d'ajout pour le fichier.
+            uuid_fichier = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+            transaction = {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+                ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS: [uuid_fichier],
+            }
+            domaine_action = ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION
+            self.generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
     def generer_collectionfichiers(self, params: dict, enveloppes_rechiffrage: dict = None):
         collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
