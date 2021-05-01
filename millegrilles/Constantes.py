@@ -1132,6 +1132,7 @@ class ConstantesGrosFichiers:
     CHAMP_CREER_PARENT = 'creerParent'
     CHAMP_DATE_CREATION = 'dateCreation'
     CHAMP_DATE_MODIFICATION = 'dateModification'
+    CHAMP_FUUID_MIMETYPES = 'fuuidMimetypes'
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion' % DOMAINE_NOM
     TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE = '%s.demandeThumbnailProtege' % DOMAINE_NOM

@@ -844,6 +844,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             if key in masque_transaction:
                 info_version[key] = transaction[key]
 
+        mimetype = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
+        if mimetype is not None:
+            set_operations[ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES + '.' + fuuid] = mimetype
+
         # Extraire l'extension originale
         extension_fichier = os.path.splitext(nom_fichier)[1].lower().replace('.', '')
         if extension_fichier != '':
@@ -1541,6 +1545,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         set_ops = {
             'versions.%s.video.%s' % (fuuid_fichier, cle_video): info_video,
+            ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES + '.' + fuuid_video: mimetype,
         }
 
         addtoset_ops = {
@@ -1970,6 +1975,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def associer_preview(self, transaction: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         fuuid = transaction['fuuid']
+        mimetype_preview = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW) or 'image/jpg'
         uuid_document = transaction['uuid']
 
         # Sauvegarder preview
@@ -1983,6 +1989,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         set_ops_fichier = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: True,
+            # ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES + '.' + fuuid: mimetype_preview,
         }
         for key in [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
@@ -2001,6 +2008,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     key,
                 ])
                 set_ops_fichier[key_version] = value
+
+        fuuid_preview = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW)
+        if fuuid_preview is not None:
+            set_ops_fichier[ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES + '.' + fuuid_preview] = mimetype_preview
+
         ops_fichier = {
             '$set': set_ops_fichier,
             '$addToSet': {
