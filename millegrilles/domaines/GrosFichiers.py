@@ -1577,7 +1577,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
         fichier_maj = collection_domaine.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
-        self.emettre_evenement_fichier_maj(fuuid_fichier, fichier_maj)
+        try:
+            self.emettre_evenement_fichier_maj(fuuid_fichier)
+        except Exception as e:
+            self._logger.error("Erreur tranmission evenement maj fichier: %s" % str(e))
 
         return document_fichier
 
