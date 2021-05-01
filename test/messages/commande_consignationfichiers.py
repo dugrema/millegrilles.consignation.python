@@ -283,11 +283,19 @@ class TestConsignationFichiers(DomaineTest):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_cle_ipns')
 
+    def commande_creer_cle_ipns(self):
+        domaine = 'commande.fichiers.creerCleIpns'
+        commande = {
+            'nom': '0-cle-1.2.3-4'
+        }
+        self.generateur.transmettre_commande(
+            commande, domaine, reply_to=self.queue_name, correlation_id='commande_creer_cle_ipns')
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
-        self.requete_getclessh()
+        # self.requete_getclessh()
         # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
@@ -298,6 +306,7 @@ class TestConsignationFichiers(DomaineTest):
         # self.lister_consignation_ipfs()
         # self.lister_consignation_awss3()
         # self.commande_publier_cle_ipns()
+        self.commande_creer_cle_ipns()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
