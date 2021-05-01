@@ -2,14 +2,16 @@ import logging
 import datetime
 import pytz
 import math
+import multibase
 
 from pymongo import ReturnDocument
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers
+from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
     TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementMessageDomaineEvenement
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
+from millegrilles.util.Hachage import hacher
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
@@ -1050,6 +1052,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.commande_publier_fichier_sftp(res_fichier, cdn_info)
         elif type_cdn == 'ipfs':
             self.commande_publier_fichier_ipfs(res_fichier, cdn_info)
+        elif type_cdn == 'awss3':
+            self.commande_publier_fichier_awss3(res_fichier, cdn_info)
         else:
             raise Exception("Type cdn non supporte %s" % type_cdn)
 
@@ -1105,26 +1109,44 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         domaine = 'commande.fichiers.publierFichierIpfs'
         self.generateur_transactions.transmettre_commande(params, domaine)
 
-    def commande_publier_fichier_awss3(self):
-        secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
-        permission = self.preparer_permission_secretawss3(secret_chiffre)
+    def commande_publier_fichier_awss3(self, res_fichier: dict, cdn_info: dict):
+        fuuid = res_fichier['fuuid']
+        cdn_id = cdn_info['cdn_id']
+
+        mimetype = res_fichier.get('mimetype')
+        uuid_fichier = res_fichier.get('uuid_fichier')
+
+        bucketName = cdn_info['bucketName']
+        bucketDirfichier = cdn_info['bucketDirfichier']
+        bucketRegion = cdn_info['bucketRegion']
+        credentialsAccessKeyId = cdn_info['credentialsAccessKeyId']
+
+        secretAccessKey_chiffre = cdn_info['secretAccessKey_chiffre']
+        permission = self.preparer_permission_secretawss3(secretAccessKey_chiffre)
+
+        flag_public = res_fichier.get('public') or False
+        if flag_public:
+            securite = Constantes.SECURITE_PUBLIC
+        else:
+            securite = Constantes.SECURITE_PRIVE
 
         params = {
-            'uuid': str(uuid4()),
-            'fuuid': self.__fuuid,
-            'mimetype': 'image/gif',
-            # 'securite': '1.public',
-            'bucketRegion': 'us-east-1',
-            'credentialsAccessKeyId': 'AKIA2JHYIVE5E3HWIH7K',
-            # 'secretAccessKey': self.__awss3_secret_access_key,
-            'secretAccessKey_chiffre': 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q',
+            'fuuid': fuuid,
+            'cdn_id': cdn_id,
+            'securite': securite,
+            'bucketRegion': bucketRegion,
+            'credentialsAccessKeyId': credentialsAccessKeyId,
+            'secretAccessKey_chiffre': secretAccessKey_chiffre,
             'permission': permission,
-            'bucketName': 'millegrilles',
-            'bucketDirfichier': 'mg-dev4/fichiers',
+            'bucketName': bucketName,
+            'bucketDirfichier': bucketDirfichier,
         }
+        if mimetype is not None:
+            params['mimetype'] = mimetype
+        if uuid_fichier is not None:
+            params['uuid'] = uuid_fichier
         domaine = 'commande.fichiers.publierFichierAwsS3'
-        self.generateur.transmettre_commande(
-            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_awss3')
+        self.generateur_transactions.transmettre_commande(params, domaine)
 
     def traiter_evenement_publicationfichier(self, params: dict):
         cdn_id = params['cdn_id']
@@ -1182,6 +1204,18 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_one(filtre, ops)
+
+    def preparer_permission_secretawss3(self, secret_chiffre):
+        secret_bytes = multibase.decode(secret_chiffre)
+        secret_hachage = hacher(secret_bytes, encoding='base58btc')
+        permission = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [secret_hachage],
+            'duree': 30 * 60 * 60,  # 30 minutes
+            'securite': '3.protege',
+            'roles_permis': ['Publication'],
+        }
+        permission = self.generateur_transactions.preparer_enveloppe(permission)
+        return permission
 
 
 class ProcessusPublication(MGProcessusTransaction):
