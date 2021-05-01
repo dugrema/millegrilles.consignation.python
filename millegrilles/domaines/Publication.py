@@ -1019,7 +1019,17 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             filtre_fichiers = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
                 'sites': {'$in': liste_sites},
-                'distribution_complete': {'$not': {'$all': [cdn_id]}},
+                '$or': [
+                    {
+                        'public': False,
+                        'distribution_complete': {'$not': {'$all': [cdn_id]}},
+                    },
+                    {
+                        'public': True,
+                        'distribution_public_complete': {'$not': {'$all': [cdn_id]}},
+                    },
+                ],
+
             }
             curseur_res_fichiers = collection_ressources.find(filtre_fichiers)
 
@@ -1038,6 +1048,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if type_cdn == 'sftp':
             self.commande_publier_fichier_sftp(res_fichier, cdn_info)
+        elif type_cdn == 'ipfs':
+            self.commande_publier_fichier_ipfs(res_fichier, cdn_info)
         else:
             raise Exception("Type cdn non supporte %s" % type_cdn)
 
@@ -1075,15 +1087,23 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         domaine = 'commande.fichiers.publierFichierSftp'
         self.generateur_transactions.transmettre_commande(params, domaine)
 
-    def commande_publier_fichier_ipfs(self):
+    def commande_publier_fichier_ipfs(self, res_fichier: dict, cdn_info: dict):
+        fuuid = res_fichier['fuuid']
+        cdn_id = cdn_info['cdn_id']
+
+        flag_public = res_fichier.get('public') or False
+        if flag_public:
+            securite = Constantes.SECURITE_PUBLIC
+        else:
+            securite = Constantes.SECURITE_PRIVE
+
         params = {
-            'fuuid': self.__fuuid,
-            'mimetype': 'image/gif',
-            'securite': '1.public',
+            'fuuid': fuuid,
+            'cdn_id': cdn_id,
+            'securite': securite,
         }
         domaine = 'commande.fichiers.publierFichierIpfs'
-        self.generateur.transmettre_commande(
-            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ipfs')
+        self.generateur_transactions.transmettre_commande(params, domaine)
 
     def commande_publier_fichier_awss3(self):
         secret_chiffre = 'm0M2DADXJBB4wF/4n1rNum71zBH5f3E/dDpRjUof8pqMXvDG8SzvD5Q'
@@ -1109,10 +1129,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     def traiter_evenement_publicationfichier(self, params: dict):
         cdn_id = params['cdn_id']
         fuuid = params['fuuid']
+        securite = params.get('securite') or Constantes.SECURITE_PRIVE
         flag_complete = params.get('complete') or False
         err = params.get('err') or False
         current_bytes = params.get('current_bytes')
         total_bytes = params.get('total_bytes')
+
+        cid = params.get('cid')  # Identificateur IPFS
 
         # Determiner type evenement
         set_ops = dict()
@@ -1123,7 +1146,16 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             unset_ops['distribution_encours.' + cdn_id] = True
             unset_ops['distribution_progres.' + cdn_id] = True
             unset_ops['distribution_erreur.' + cdn_id] = True
-            add_to_set['distribution_complete'] = cdn_id
+
+            if securite == Constantes.SECURITE_PUBLIC:
+                add_to_set['distribution_public_complete'] = cdn_id
+                if cid is not None:
+                    set_ops['cid_public'] = cid
+            else:
+                add_to_set['distribution_complete'] = cdn_id
+                if cid is not None:
+                    set_ops['cid'] = cid
+
         elif err is not False:
             # Erreur
             unset_ops['distribution_encours.' + cdn_id] = True
