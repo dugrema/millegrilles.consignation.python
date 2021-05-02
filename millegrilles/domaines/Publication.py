@@ -1098,7 +1098,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             liste_sites = cdn['sites']
 
             # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
-            self.trigger_commande_publier_uploadfichiers(cdn_id, liste_sites)
+            self.trigger_commande_publier_uploadfichiers(cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC)
 
             # Publier pages
             # repertoire: data/pages
@@ -1108,7 +1108,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # Publier forums
             # repertoire: data/forums
 
-    def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites):
+    def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PRIVE):
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
         :param cdn_id:
@@ -1153,6 +1153,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'mimetype': 'application/json',
                 'content_encoding': 'gzip',  # Header Content-Encoding
                 'max_age': 0,
+                'securite': securite,
             }
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
             self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
@@ -1198,6 +1199,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'type_section': ConstantesPublication.LIBVAL_PAGE,
                 ConstantesPublication.CHAMP_SECTION_ID: section_id,
                 'cdn_id': cdn_id,
+                'securite': securite_site,
                 'remote_path': path.join('data/pages', section_id + '.json.gz'),
                 'mimetype': 'application/json',
                 'content_encoding': 'gzip',  # Header Content-Encoding
@@ -1235,6 +1237,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         cdn_id = params['cdn_id']
         remote_path = params['remote_path']
         mimetype = params.get('mimetype')
+        securite = params.get('securite')
 
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre = {
@@ -1273,7 +1276,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             type_cdn = cdn['type_cdn']
             if type_cdn in ['ipfs', 'ipfs_gateway']:
                 # Publier avec le IPNS associe a la section
-                self.put_publier_fichier_ipns(cdn, res_data)
+                self.put_publier_fichier_ipns(cdn, res_data, securite)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
@@ -1286,7 +1289,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def put_publier_fichier_ipns(self, cdn: dict, res_data: dict):
+    def put_publier_fichier_ipns(self, cdn: dict, res_data: dict, securite: str):
         ipns_id = res_data.get('ipns_id')
         type_section = res_data[Constantes.DOCUMENT_INFODOC_LIBELLE]
         identificateur_document = {
@@ -1306,6 +1309,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             params = {
                 'identificateur_document': identificateur_document,
                 'nom_cle': nom_cle,
+                'securite': securite,
             }
             self.demarrer_processus(processus, params)
         else:
@@ -1326,9 +1330,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
             data = {
                 'cdns': cdn_filtre,
+                'identificateur_document': json.dumps(identificateur_document),
                 'ipns_key': cle_chiffree,
                 'ipns_key_name': nom_cle,
                 'permission': permission,
+                'securite': securite,
             }
 
             r = requests.put(
@@ -1458,8 +1464,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.generateur_transactions.transmettre_commande(params, domaine)
 
     def traiter_evenement_publicationfichier(self, params: dict):
-        cdn_id = params['cdn_id']
-        fuuid = params['fuuid']
+        identificateur_document = params['identificateur_document']
+        cdn_ids = params.get('cdn_ids') or list()
+        cdn_id_unique = params.get('cdn_id')
+        if cdn_id_unique:
+            cdn_ids.append(cdn_id_unique)
+
+        # fuuid = params.get('fuuid')
         securite = params.get('securite') or Constantes.SECURITE_PRIVE
         flag_complete = params.get('complete') or False
         err = params.get('err') or False
@@ -1472,30 +1483,31 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         set_ops = dict()
         unset_ops = dict()
         add_to_set = dict()
-        if flag_complete:
-            # Publication completee
-            unset_ops['distribution_encours.' + cdn_id] = True
-            unset_ops['distribution_progres.' + cdn_id] = True
-            unset_ops['distribution_erreur.' + cdn_id] = True
+        for cdn_id in cdn_ids:
+            if flag_complete:
+                # Publication completee
+                unset_ops['distribution_encours.' + cdn_id] = True
+                unset_ops['distribution_progres.' + cdn_id] = True
+                unset_ops['distribution_erreur.' + cdn_id] = True
 
-            if securite == Constantes.SECURITE_PUBLIC:
-                add_to_set['distribution_public_complete'] = cdn_id
-                if cid is not None:
-                    set_ops['cid_public'] = cid
-            else:
-                add_to_set['distribution_complete'] = cdn_id
-                if cid is not None:
-                    set_ops['cid'] = cid
+                if securite == Constantes.SECURITE_PUBLIC:
+                    add_to_set['distribution_public_complete'] = cdn_id
+                    if cid is not None:
+                        set_ops['cid_public'] = cid
+                else:
+                    add_to_set['distribution_complete'] = cdn_id
+                    if cid is not None:
+                        set_ops['cid'] = cid
 
-        elif err is not False:
-            # Erreur
-            unset_ops['distribution_encours.' + cdn_id] = True
-            unset_ops['distribution_progres.' + cdn_id] = True
-            set_ops['distribution_erreur.' + cdn_id] = err
-        elif current_bytes is not None and total_bytes is not None:
-            # Progres
-            progres = math.floor(current_bytes * 100 / total_bytes)
-            set_ops['distribution_progres.' + cdn_id] = progres
+            elif err is not False:
+                # Erreur
+                unset_ops['distribution_encours.' + cdn_id] = True
+                unset_ops['distribution_progres.' + cdn_id] = True
+                set_ops['distribution_erreur.' + cdn_id] = err
+            elif current_bytes is not None and total_bytes is not None:
+                # Progres
+                progres = math.floor(current_bytes * 100 / total_bytes)
+                set_ops['distribution_progres.' + cdn_id] = progres
 
         ops = {
             '$currentDate': {'distribution_maj': True}
@@ -1509,8 +1521,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-            'fuuid': fuuid,
+            # 'fuuid': fuuid,
         }
+        filtre.update(identificateur_document)
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_one(filtre, ops)
 
@@ -1536,6 +1549,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         max_age = params.get('max_age')
         content_encoding = params.get('content_encoding')
+        securite = params.get('securite') or Constantes.SECURITE_PRIVE
 
         files = list()
         for fichier in fichiers:
@@ -1563,6 +1577,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         data_publier = {
             'cdns': json.dumps(cdn_filtres),
+            'securite': securite,
         }
         if max_age is not None:
             data_publier['max_age'] = max_age
