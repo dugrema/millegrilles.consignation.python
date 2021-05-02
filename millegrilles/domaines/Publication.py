@@ -3,8 +3,13 @@ import datetime
 import pytz
 import math
 import multibase
+import gzip
+import json
+import requests
 
 from pymongo import ReturnDocument
+from os import path
+from io import BytesIO
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
@@ -12,6 +17,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequete
     TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementMessageDomaineEvenement
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.util.Hachage import hacher
+from millegrilles.util.JSONMessageEncoders import JSONHelper
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
@@ -90,6 +96,10 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             self.gestionnaire.maj_ressources_page(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_FICHIERS:
             self.gestionnaire.trigger_publication_fichiers(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SECTIONS:
+            self.gestionnaire.trigger_publication_sections(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION:
+            self.gestionnaire.commande_publier_upload_datasection(message_dict)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -1008,39 +1018,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         Declenche la publication de tous les fichiers de CDN actifs lie a au moins un site.
         :return:
         """
-        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        liste_cdns = self.preparer_sitesparcdn()
 
-        # Faire la liste de tous les CDNs utilises dans au moins 1 site
-        cdns_associes = set()
-        curseur_sites = collection_sites.find()
-        sites_par_cdn_dict = dict()
-        for s in curseur_sites:
-            cdns = s.get('listeCdn')
-            if cdns is not None:
-                cdns_associes.update(cdns)
-                for cdn in cdns:
-                    try:
-                        liste_sites = sites_par_cdn_dict[cdn]
-                    except KeyError:
-                        liste_sites = list()
-                        sites_par_cdn_dict[cdn] = liste_sites
-                    liste_sites.append(s[ConstantesPublication.CHAMP_SITE_ID])
-        cdns_associes = list(cdns_associes)
-
-        # Recuperer la liste de CDNs actifs
-        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-        filtre = {
-            ConstantesPublication.CHAMP_CDN_ID: {'$in': cdns_associes},
-            'active': True,
-        }
-        curseur_cdns = collection_cdns.find(filtre)
-
-        dict_cdns = dict()
-        for cdn in curseur_cdns:
+        for cdn in liste_cdns:
             cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
-            liste_sites = sites_par_cdn_dict[cdn_id]
-            cdn['sites'] = liste_sites
-            dict_cdns[cdn_id] = cdn
+            liste_sites = cdn['sites']
 
             # Recuperer la liste de fichiers qui ne sont pas publies dans tous les CDNs de la liste
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1065,7 +1047,185 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             for fichier in curseur_res_fichiers:
                 self.commande_publier_fichier(fichier, cdn)
 
-        pass
+    def preparer_sitesparcdn(self):
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        # Faire la liste de tous les CDNs utilises dans au moins 1 site
+        cdns_associes = set()
+        curseur_sites = collection_sites.find()
+        sites_par_cdn_dict = dict()
+        for s in curseur_sites:
+            cdns = s.get('listeCdn')
+            if cdns is not None:
+                cdns_associes.update(cdns)
+                for cdn in cdns:
+                    try:
+                        liste_sites = sites_par_cdn_dict[cdn]
+                    except KeyError:
+                        liste_sites = list()
+                        sites_par_cdn_dict[cdn] = liste_sites
+                    liste_sites.append(s[ConstantesPublication.CHAMP_SITE_ID])
+        cdns_associes = list(cdns_associes)
+        # Recuperer la liste de CDNs actifs
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre = {
+            ConstantesPublication.CHAMP_CDN_ID: {'$in': cdns_associes},
+            'active': True,
+        }
+        curseur_cdns = collection_cdns.find(filtre)
+
+        # Preparer la liste des CDN, ajouter tous les sites associes a ce CDN (facilite la preparation des ressources)
+        liste_cdns = list()
+        for cdn in curseur_cdns:
+            cdn_id = cdn['cdn_id']
+            cdn['sites'] = sites_par_cdn_dict[cdn_id]
+            liste_cdns.append(cdn)
+
+        return liste_cdns
+
+    def trigger_publication_sections(self, params: dict):
+        """
+        Publie les donnes du site (repertoire data/ avec les sections pages et collections de fichiers).
+        :param params:
+        :return:
+        """
+        liste_cdns = self.preparer_sitesparcdn()
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        # Publier collections de fichiers
+        # repertoire: data/fichiers
+        for cdn in liste_cdns:
+            cdn_id = cdn['cdn_id']
+            liste_sites = cdn['sites']
+
+            # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
+            self.trigger_commande_publier_uploadfichiers(cdn_id, collection_ressources, liste_sites)
+
+            # Publier pages
+            # repertoire: data/pages
+
+            # Publier forums
+            # repertoire: data/forums
+
+    def trigger_commande_publier_uploadfichiers(self, cdn_id, collection_ressources, liste_sites):
+        """
+        Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
+        :param cdn_id:
+        :param collection_ressources:
+        :param liste_sites:
+        :return:
+        """
+        filtre_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            'sites': {'$in': liste_sites},
+            '$or': [
+                {
+                    'contenu_signe.securite': Constantes.SECURITE_PRIVE,
+                    'distribution_complete': {'$not': {'$all': [cdn_id]}},
+                },
+                {
+                    'contenu_signe.securite': Constantes.SECURITE_PUBLIC,
+                    'distribution_public_complete': {'$not': {'$all': [cdn_id]}},
+                },
+            ],
+        }
+
+        curseur_fichiers = collection_ressources.find(filtre_fichiers)
+        for col_fichiers in curseur_fichiers:
+            uuid_col_fichiers = col_fichiers['uuid']
+            contenu_gzippe = col_fichiers.get('contenu_gzip')
+            if contenu_gzippe is None:
+                # Creer contenu .json.gz
+                filtre_fichiers_maj = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+                    'uuid': uuid_col_fichiers,
+                }
+                self.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
+
+            # Publier le contenu sur le CDN
+            # Upload avec requests via https://fichiers
+            commande_publier_section = {
+                'type_section': ConstantesPublication.LIBVAL_FICHIERS,
+                'uuid_collection': uuid_col_fichiers,
+                'cdn_id': cdn_id,
+                'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
+                'mimetype': 'application/json'
+            }
+            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
+            self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+
+    def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        contenu_dict = col_fichiers['contenu_signe']
+        contenu_gzippe = self.preparer_json_gzip(contenu_dict, chiffrer)
+
+        # Conserver contenu pour la ressource
+        ops = {
+            '$set': {'contenu_gzip': contenu_gzippe},
+            '$unset': {'distribution_public_complete': True, 'distribution_complete': True},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_ressources.update_one(filtre_res, ops)
+
+        return contenu_gzippe
+
+    def preparer_json_gzip(self, contenu_dict: dict, chiffrer=False) -> bytes:
+        if chiffrer is True:
+            raise NotImplementedError("Chiffrage pas implemente, TODO")
+        json_helper = JSONHelper()
+        contenu = json_helper.dict_vers_json(contenu_dict)
+        contenu_gzip = gzip.compress(contenu)
+        return contenu_gzip
+
+    def commande_publier_upload_datasection(self, params: dict):
+        type_section = params['type_section']
+        cdn_id = params['cdn_id']
+        remote_path = params['remote_path']
+        mimetype = params.get('mimetype')
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: type_section
+        }
+        if type_section == ConstantesPublication.LIBVAL_FICHIERS:
+            filtre['uuid'] = params['uuid_collection']
+        else:
+            msg = 'Type section inconnue: %s' % type_section
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        res_data = collection_ressources.find_one(filtre)
+        if res_data is None:
+            msg = 'Aucune section ne correspond a %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        contenu_gzip = res_data.get('contenu_gzip')
+        if contenu_gzip is None:
+            msg = 'Le contenu gzip de la section n\'est pas pret. Section : %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdn = {'cdn_id': cdn_id}
+        cdn = collection_cdns.find_one(filtre_cdn)
+        if cdn is None:
+            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        fp_bytesio = BytesIO(contenu_gzip)
+        fichiers = [
+            {'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}
+        ]
+        try:
+            self.put_publier_repertoire([cdn], fichiers)
+        except Exception as e:
+            msg = "Erreur publication fichiers %s" % str(fichiers)
+            self.__logger.exception(msg)
+            return {'err': str(e), 'msg': msg}
+
+        return {'ok': True}
 
     def commande_publier_fichier(self, res_fichier: dict, cdn_info: dict):
         type_cdn = cdn_info['type_cdn']
@@ -1251,6 +1411,53 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         permission = self.generateur_transactions.preparer_enveloppe(permission)
         return permission
+
+    def put_publier_repertoire(self, cdns: list, fichiers: list):
+        """
+        Upload vers les CDN une liste de fichiers (supporte structure de repertoires)
+        :param cdns: Liste des CDNs ou on deploie les fichiers
+        :param fichiers: LIste de fichiers {remote_path, fp, mimetype}
+        :return:
+        """
+        files = list()
+        for fichier in fichiers:
+            remote_path_fichier = fichier['remote_path']
+            file_pointer = fichier['fp']
+            mimetype_fichier = fichier.get('mimetype') or 'application/octet-stream'
+            files.append(('files', (remote_path_fichier, file_pointer, mimetype_fichier)))
+
+            # files.append(
+            #     ('files', ('test2/test3/mq.log', open('/home/mathieu/temp/uploadTest/test2/test3/mq.log', 'rb'),
+            #                'application/octet-stream')))
+
+        cdn_filtres = list()
+        for cdn in cdns:
+            cdn_filtre = dict()
+            for key, value in cdn.items():
+                if not key.startswith('_'):
+                    cdn_filtre[key] = value
+            cdn_filtres.append(cdn_filtre)
+
+        # publier_ssh = {
+        #     'host': '192.168.2.131',
+        #     'port': 22,
+        #     'username': 'sftptest',
+        #     'repertoireRemote': '/home/sftptest/pythontest',
+        #     'correlation': 'upload_ssh',
+        # }
+        # publier_ssh = json.dumps(publier_ssh)
+
+        data_publier = {
+            'cdns': json.dumps(cdn_filtres),
+        }
+
+        r = requests.put(
+            'https://fichiers:3021/publier/repertoire',
+            files=files,
+            data=data_publier,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+        )
 
 
 class ProcessusPublication(MGProcessusTransaction):
