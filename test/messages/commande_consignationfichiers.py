@@ -286,10 +286,32 @@ class TestConsignationFichiers(DomaineTest):
     def commande_creer_cle_ipns(self):
         domaine = 'commande.fichiers.creerCleIpns'
         commande = {
-            'nom': '0-cle-1.2.3-4'
+            'nom': '0-cle-1.2.3-5'
         }
         self.generateur.transmettre_commande(
             commande, domaine, reply_to=self.queue_name, correlation_id='commande_creer_cle_ipns')
+
+    def put_publier_fichier_ipns(self):
+        files = list()
+        files.append(('files', ('think002ca.json', open('/home/mathieu/temp/uploadTest/think002ca.pub', 'rb'),
+                                'application/octet-stream')))
+
+        data = {
+            'cdns': 'JSON str',
+            'ipns_key': 'ABCD-1234...PEM',
+            'ipns_key_name': '60c12a04-de97-4693-a14b-5010cfd6dc10',
+            'permission': 'JSON str',
+        }
+
+        r = requests.put(
+            'https://fichiers:3021/publier/fichierIpns',
+            files=files,
+            data=data,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            timeout=120000,  # 2 minutes max
+        )
+        r.raise_for_status()
 
     def executer(self):
         self.__logger.debug("Executer")
@@ -306,7 +328,8 @@ class TestConsignationFichiers(DomaineTest):
         # self.lister_consignation_ipfs()
         # self.lister_consignation_awss3()
         # self.commande_publier_cle_ipns()
-        self.commande_creer_cle_ipns()
+        # self.commande_creer_cle_ipns()
+        self.put_publier_fichier_ipns()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {

@@ -1269,18 +1269,77 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.__logger.error(msg)
             return {'err': msg}
 
-        fp_bytesio = BytesIO(contenu_gzip)
-        fichiers = [
-            {'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}
-        ]
         try:
-            self.put_publier_repertoire([cdn], fichiers, params)
+            type_cdn = cdn['type_cdn']
+            if type_cdn in ['ipfs', 'ipfs_gateway']:
+                # Publier avec le IPNS associe a la section
+                self.put_publier_fichier_ipns(cdn, res_data)
+            else:
+                # Methode simple d'upload de fichier avec structure de repertoire
+                fp_bytesio = BytesIO(contenu_gzip)
+                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+                self.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
-            msg = "Erreur publication fichiers %s" % str(fichiers)
+            msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
             return {'err': str(e), 'msg': msg}
 
         return {'ok': True}
+
+    def put_publier_fichier_ipns(self, cdn: dict, res_data: dict):
+        ipns_id = res_data.get('ipns_id')
+        type_section = res_data[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        identificateur_document = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
+        }
+
+        if type_section == 'fichiers':
+            nom_cle = res_data['uuid']
+            identificateur_document['uuid'] = nom_cle
+        else:
+            nom_cle = res_data['section_id']
+            identificateur_document['section_id'] = nom_cle
+
+        if ipns_id is None:
+            # Utiliser un processus pour creer la cle et deployer la ressource
+            processus = "millegrilles_domaines_Publication:ProcessusPublierCleEtFichierIpns"
+            params = {
+                'identificateur_document': identificateur_document,
+                'nom_cle': nom_cle,
+            }
+            self.demarrer_processus(processus, params)
+        else:
+            # La cle existe deja. Faire un PUT directement.
+            fp_bytesio = BytesIO(res_data['contenu_gzip'])
+            files = list()
+            files.append(('files', (nom_cle + '.json.gz', fp_bytesio, 'application/json')))
+
+            # Preparer CDN (json str de liste de CDNs)
+            cdn_filtre = dict()
+            for key, value in cdn.items():
+                if not key.startswith('_'):
+                    cdn_filtre[key] = value
+            cdn_filtre = json.dumps([cdn_filtre])
+
+            cle_chiffree = res_data['ipns_cle_chiffree']
+            permission = json.dumps(self.preparer_permission_secretawss3(cle_chiffree))
+
+            data = {
+                'cdns': cdn_filtre,
+                'ipns_key': cle_chiffree,
+                'ipns_key_name': nom_cle,
+                'permission': permission,
+            }
+
+            r = requests.put(
+                'https://fichiers:3021/publier/fichierIpns',
+                files=files,
+                data=data,
+                verify=self._contexte.configuration.mq_cafile,
+                cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+                timeout=120000,  # 2 minutes max
+            )
+            r.raise_for_status()
 
     def commande_publier_fichier(self, res_fichier: dict, cdn_info: dict):
         type_cdn = cdn_info['type_cdn']
@@ -1472,6 +1531,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         Upload vers les CDN une liste de fichiers (supporte structure de repertoires)
         :param cdns: Liste des CDNs ou on deploie les fichiers
         :param fichiers: LIste de fichiers {remote_path, fp, mimetype}
+        :param params:
         :return:
         """
         max_age = params.get('max_age')
@@ -1517,6 +1577,22 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
         )
         r.raise_for_status()
+
+    def sauvegarder_cle_ipns(self, identificateur_document, params):
+        cle_id = params['cleId']
+        cle_chiffree = params['cle_chiffree']
+
+        ops = {
+            '$set': {
+                'ipns_id': cle_id,
+                'ipns_cle_chiffree': cle_chiffree,
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection_res = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        resultat = collection_res.update_one(identificateur_document, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur mise a jour cle IPNS doc %s" % identificateur_document)
 
 
 class ProcessusPublication(MGProcessusTransaction):
@@ -1759,5 +1835,33 @@ class ProcessusPublierFichierIpfs(MGProcessus):
 
     def creer_transaction(self):
         reponse = self.parametres['reponse'][0]
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusPublierCleEtFichierIpns(MGProcessus):
+
+    def initiale(self):
+        # Publier la cle ipns
+        nom_cle = self.parametres['nom_cle']
+
+        commande_creer_cle = {
+            'nom': nom_cle
+        }
+        domaine_action = 'commande.fichiers.creerCleIpns'
+        self.ajouter_commande_a_transmettre(domaine_action, commande_creer_cle, blocking=True)
+
+        self.set_etape_suivante(ProcessusPublierCleEtFichierIpns.publier_fichier.__name__)
+
+    def publier_fichier(self):
+        # Sauvegarder la nouvelle cle IPNS
+        # "cleId": "k51qzi5uqu5dio45qeftnomadnnezz2w3ni2rjl9h0q4k2eh8up17gzeylip3c",
+        # "cle_chiffree": "mdiXefgNip2bHL9TA0mTF2wFge5cYY6G+flglfvphroPNpKNf5Y9linAO20ht1KbA6KGppgW1Xo47QpFguqf5WxEy8tZ3Dkh/88I5Zd6f0C79K7dTsEm9GNmBHAp0/ciwIF1llc+ONdngsjv0UQo9oosaUwBgvWZtP0I/lh9DAT4ereqt0d/2mT/7gUHmZ/vVf1sSn5AGP4xKHjn8a4LWmAcvKTdR4qnx0q87+GECp3l6e+X8+8I2V+23/DkXPnuI9j3RGc5SqGP/9oZPnzUexpi50qexHznW9xvGmW8wAzaafg",
+        identificateur_document = self.parametres['identificateur_document']
+        reponse_cle = self.parametres['reponse'][0]
+        self.controleur.gestionnaire.sauvegarder_cle_ipns(identificateur_document, reponse_cle)
+
+        # Publier fichier
+        pass
 
         self.set_etape_suivante()  # Termine
