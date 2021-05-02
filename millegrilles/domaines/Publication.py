@@ -1098,19 +1098,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             liste_sites = cdn['sites']
 
             # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
-            self.trigger_commande_publier_uploadfichiers(cdn_id, collection_ressources, liste_sites)
+            self.trigger_commande_publier_uploadfichiers(cdn_id, liste_sites)
 
             # Publier pages
             # repertoire: data/pages
+            for site_id in liste_sites:
+                self.trigger_commande_publier_uploadpages(cdn_id, site_id)
 
             # Publier forums
             # repertoire: data/forums
 
-    def trigger_commande_publier_uploadfichiers(self, cdn_id, collection_ressources, liste_sites):
+    def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites):
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
         :param cdn_id:
-        :param collection_ressources:
         :param liste_sites:
         :return:
         """
@@ -1129,6 +1130,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             ],
         }
 
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_fichiers = collection_ressources.find(filtre_fichiers)
         for col_fichiers in curseur_fichiers:
             uuid_col_fichiers = col_fichiers['uuid']
@@ -1148,7 +1150,58 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'uuid_collection': uuid_col_fichiers,
                 'cdn_id': cdn_id,
                 'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
-                'mimetype': 'application/json'
+                'mimetype': 'application/json',
+                'content_encoding': 'gzip',  # Header Content-Encoding
+                'max_age': 0,
+            }
+            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
+            self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+
+    def trigger_commande_publier_uploadpages(self, cdn_id: str, site_id: str):
+        """
+        Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
+        :param cdn_id:
+        :param site_id:
+        :return:
+        """
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
+        doc_site = collection_sites.find_one(filtre_site)
+        securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
+        if securite_site == Constantes.SECURITE_PUBLIC:
+            champ_distribution = 'distribution_public_complete'
+        else:
+            champ_distribution = 'distribution_complete'
+
+        filtre_pages = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            'sites': {'$all': [site_id]},
+            champ_distribution: {'$not': {'$all': [cdn_id]}},
+        }
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        curseur_pages = collection_ressources.find(filtre_pages)
+        for doc_page in curseur_pages:
+            section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
+            contenu_gzippe = doc_page.get('contenu_gzip')
+            if contenu_gzippe is None:
+                # Creer contenu .json.gz
+                filtre_fichiers_maj = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+                    ConstantesPublication.CHAMP_SECTION_ID: section_id,
+                }
+                self.sauvegarder_contenu_gzip(doc_page, filtre_fichiers_maj)
+
+            # Publier le contenu sur le CDN
+            # Upload avec requests via https://fichiers
+            commande_publier_section = {
+                'type_section': ConstantesPublication.LIBVAL_PAGE,
+                ConstantesPublication.CHAMP_SECTION_ID: section_id,
+                'cdn_id': cdn_id,
+                'remote_path': path.join('data/pages', section_id + '.json.gz'),
+                'mimetype': 'application/json',
+                'content_encoding': 'gzip',  # Header Content-Encoding
+                'max_age': 0,
             }
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
             self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
@@ -1189,6 +1242,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         if type_section == ConstantesPublication.LIBVAL_FICHIERS:
             filtre['uuid'] = params['uuid_collection']
+        elif type_section == ConstantesPublication.LIBVAL_PAGE:
+            filtre[ConstantesPublication.CHAMP_SECTION_ID] = params[ConstantesPublication.CHAMP_SECTION_ID]
         else:
             msg = 'Type section inconnue: %s' % type_section
             self.__logger.error(msg)
@@ -1219,7 +1274,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             {'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}
         ]
         try:
-            self.put_publier_repertoire([cdn], fichiers)
+            self.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(fichiers)
             self.__logger.exception(msg)
@@ -1236,7 +1291,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if type_cdn == 'sftp':
             self.commande_publier_fichier_sftp(res_fichier, cdn_info)
-        elif type_cdn == 'ipfs':
+        elif type_cdn in ['ipfs', 'ipfs_gateway']:
             self.commande_publier_fichier_ipfs(res_fichier, cdn_info)
         elif type_cdn == 'awss3':
             self.commande_publier_fichier_awss3(res_fichier, cdn_info)
@@ -1412,13 +1467,16 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         permission = self.generateur_transactions.preparer_enveloppe(permission)
         return permission
 
-    def put_publier_repertoire(self, cdns: list, fichiers: list):
+    def put_publier_repertoire(self, cdns: list, fichiers: list, params: dict = None):
         """
         Upload vers les CDN une liste de fichiers (supporte structure de repertoires)
         :param cdns: Liste des CDNs ou on deploie les fichiers
         :param fichiers: LIste de fichiers {remote_path, fp, mimetype}
         :return:
         """
+        max_age = params.get('max_age')
+        content_encoding = params.get('content_encoding')
+
         files = list()
         for fichier in fichiers:
             remote_path_fichier = fichier['remote_path']
@@ -1436,20 +1494,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             for key, value in cdn.items():
                 if not key.startswith('_'):
                     cdn_filtre[key] = value
-            cdn_filtres.append(cdn_filtre)
 
-        # publier_ssh = {
-        #     'host': '192.168.2.131',
-        #     'port': 22,
-        #     'username': 'sftptest',
-        #     'repertoireRemote': '/home/sftptest/pythontest',
-        #     'correlation': 'upload_ssh',
-        # }
-        # publier_ssh = json.dumps(publier_ssh)
+            type_cdn = cdn['type_cdn']
+            if type_cdn == 'awss3':
+                secret_chiffre = cdn['secretAccessKey_chiffre']
+                cdn_filtre['permission'] = self.preparer_permission_secretawss3(secret_chiffre)
+            cdn_filtres.append(cdn_filtre)
 
         data_publier = {
             'cdns': json.dumps(cdn_filtres),
         }
+        if max_age is not None:
+            data_publier['max_age'] = max_age
+        if content_encoding is not None:
+            data_publier['content_encoding'] = content_encoding
 
         r = requests.put(
             'https://fichiers:3021/publier/repertoire',
@@ -1458,6 +1516,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             verify=self._contexte.configuration.mq_cafile,
             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
         )
+        r.raise_for_status()
 
 
 class ProcessusPublication(MGProcessusTransaction):
