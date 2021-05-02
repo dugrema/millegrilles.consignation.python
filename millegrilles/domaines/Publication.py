@@ -812,7 +812,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         curseur_parties = collection_partiespage.find(filtre_partiespage)
 
         parties_page = dict()
-        fuuids = list()
+        fuuids_info = dict()
         for p in curseur_parties:
             pp = dict()
             for key, value in p.items():
@@ -820,13 +820,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     pp[key] = value
             if p.get('media'):
                 fuuids_media = p['media'].get('fuuids')
-                fuuids.extend(fuuids_media)
+                for fm in fuuids_media:
+                    fuuids_info[fm] = p['media']
             elif p.get('colonnes'):
                 for c in p['colonnes']:
                     media = c.get('media')
                     if media is not None:
                         fuuids_media = media.get('fuuids')
-                        fuuids.extend(fuuids_media)
+                        for fm in fuuids_media:
+                            fuuids_info[fm] = media
 
             pp_id = pp[ConstantesPublication.CHAMP_PARTIEPAGE_ID]
             parties_page[pp_id] = pp
@@ -841,10 +843,17 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         contenu_signe = self.generateur_transactions.preparer_enveloppe(
             contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_PAGE)
 
+        fuuid_mimetypes = dict()
+        for finfo in fuuids_info.values():
+            fm = finfo.get(ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES)
+            if fm is not None:
+                fuuid_mimetypes.update(fm)
+
         set_ops = {
             'contenu_signe': contenu_signe,
             'sites': [site_id],
-            'fuuids': fuuids,
+            'fuuids': list(fuuids_info.keys()),
+            ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: fuuid_mimetypes,
         }
 
         set_on_insert = {
@@ -868,13 +877,23 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Ajouter les fichiers requis comme ressource pour le site
         doc_site = self.get_site(site_id)
         flag_public = doc_site['securite'] == Constantes.SECURITE_PUBLIC
-        self.maj_ressources_fuuids(fuuids, sites=[site_id], public=flag_public)
+        self.maj_ressources_fuuids(fuuids_info, sites=[site_id], public=flag_public)
+
+        # Transmettre commande pour s'assurer que les fuuid sont inseres dans la collection du site
+        uuid_collection = site_id  # Meme ID par definition
+        domaine_action_associer_collection = 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION
+        for fuuid in fuuids_info.keys():
+            commande_inserer = {
+                ConstantesGrosFichiers.CHAMP_UUID_COLLECTION: uuid_collection,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
+            }
+            self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
 
         return doc_page
 
-    def maj_ressources_fuuids(self, fuuids: list, sites: list = None, public=False):
+    def maj_ressources_fuuids(self, fuuids_info: dict, sites: list = None, public=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        for fuuid in fuuids:
+        for fuuid, info in fuuids_info.items():
             set_on_insert = {
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
@@ -890,6 +909,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if sites is not None:
                 for s in sites:
                     add_to_set_ops['sites'] = s
+
+            fuuid_mimetypes = info.get(ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES)
+            if fuuid_mimetypes is not None:
+                mimetype_fichier = fuuid_mimetypes[fuuid]
+                if mimetype_fichier is not None:
+                    set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype_fichier
 
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
@@ -971,11 +996,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources.update_one(filtre, ops, upsert=True)
 
         # Creer les entrees manquantes de fichiers
-        fuuids = set()
+        fuuids_dict = dict()
         flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
         for f in liste_fichiers:
-            fuuids.update(f['fuuids'])
-        self.maj_ressources_fuuids(list(fuuids), [site_id], public=flag_public)
+            for fuuid in f['fuuids']:
+                fuuids_dict[fuuid] = f
+        self.maj_ressources_fuuids(fuuids_dict, [site_id], public=flag_public)
 
     def trigger_publication_fichiers(self, params: dict):
         """
@@ -1073,6 +1099,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         fuuid = res_fichier['fuuid']
         cdn_id = cdn_info['cdn_id']
         flag_public = res_fichier.get('public') or False
+        mimetype = res_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
+
         if flag_public:
             securite = Constantes.SECURITE_PUBLIC
         else:
@@ -1085,15 +1113,19 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'port': cdn_info['port'],
             'username': cdn_info['username'],
             'basedir': cdn_info['repertoireRemote'],
-            # 'mimetype': 'image/gif',
             'securite': securite,
         }
+
+        if mimetype is not None:
+            params[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
+
         domaine = 'commande.fichiers.publierFichierSftp'
         self.generateur_transactions.transmettre_commande(params, domaine)
 
     def commande_publier_fichier_ipfs(self, res_fichier: dict, cdn_info: dict):
         fuuid = res_fichier['fuuid']
         cdn_id = cdn_info['cdn_id']
+        mimetype = res_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
 
         flag_public = res_fichier.get('public') or False
         if flag_public:
@@ -1106,14 +1138,17 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'cdn_id': cdn_id,
             'securite': securite,
         }
+
+        if mimetype is not None:
+            params[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
+
         domaine = 'commande.fichiers.publierFichierIpfs'
         self.generateur_transactions.transmettre_commande(params, domaine)
 
     def commande_publier_fichier_awss3(self, res_fichier: dict, cdn_info: dict):
         fuuid = res_fichier['fuuid']
         cdn_id = cdn_info['cdn_id']
-
-        mimetype = res_fichier.get('mimetype')
+        mimetype = res_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
         uuid_fichier = res_fichier.get('uuid_fichier')
 
         bucketName = cdn_info['bucketName']
@@ -1142,7 +1177,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'bucketDirfichier': bucketDirfichier,
         }
         if mimetype is not None:
-            params['mimetype'] = mimetype
+            params[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
         if uuid_fichier is not None:
             params['uuid'] = uuid_fichier
         domaine = 'commande.fichiers.publierFichierAwsS3'
