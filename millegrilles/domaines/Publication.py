@@ -1233,6 +1233,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         return contenu_gzip
 
     def commande_publier_upload_datasection(self, params: dict):
+        params = params.copy()
         type_section = params['type_section']
         cdn_id = params['cdn_id']
         remote_path = params['remote_path']
@@ -1251,6 +1252,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             msg = 'Type section inconnue: %s' % type_section
             self.__logger.error(msg)
             return {'err': msg}
+
+        params['identificateur_document'] = filtre
 
         res_data = collection_ressources.find_one(filtre)
         if res_data is None:
@@ -1310,42 +1313,42 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'identificateur_document': identificateur_document,
                 'nom_cle': nom_cle,
                 'securite': securite,
+                'cdn_id': cdn['cdn_id'],
             }
             self.demarrer_processus(processus, params)
         else:
-            # La cle existe deja. Faire un PUT directement.
-            fp_bytesio = BytesIO(res_data['contenu_gzip'])
-            files = list()
-            files.append(('files', (nom_cle + '.json.gz', fp_bytesio, 'application/json')))
+            self.put_fichier_ipns(cdn, identificateur_document, nom_cle, res_data, securite)
 
-            # Preparer CDN (json str de liste de CDNs)
-            cdn_filtre = dict()
-            for key, value in cdn.items():
-                if not key.startswith('_'):
-                    cdn_filtre[key] = value
-            cdn_filtre = json.dumps([cdn_filtre])
-
-            cle_chiffree = res_data['ipns_cle_chiffree']
-            permission = json.dumps(self.preparer_permission_secretawss3(cle_chiffree))
-
-            data = {
-                'cdns': cdn_filtre,
-                'identificateur_document': json.dumps(identificateur_document),
-                'ipns_key': cle_chiffree,
-                'ipns_key_name': nom_cle,
-                'permission': permission,
-                'securite': securite,
-            }
-
-            r = requests.put(
-                'https://fichiers:3021/publier/fichierIpns',
-                files=files,
-                data=data,
-                verify=self._contexte.configuration.mq_cafile,
-                cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
-                timeout=120000,  # 2 minutes max
-            )
-            r.raise_for_status()
+    def put_fichier_ipns(self, cdn, identificateur_document, nom_cle, res_data, securite):
+        # La cle existe deja. Faire un PUT directement.
+        fp_bytesio = BytesIO(res_data['contenu_gzip'])
+        files = list()
+        files.append(('files', (nom_cle + '.json.gz', fp_bytesio, 'application/json')))
+        # Preparer CDN (json str de liste de CDNs)
+        cdn_filtre = dict()
+        for key, value in cdn.items():
+            if not key.startswith('_'):
+                cdn_filtre[key] = value
+        cdn_filtre = json.dumps([cdn_filtre])
+        cle_chiffree = res_data['ipns_cle_chiffree']
+        permission = json.dumps(self.preparer_permission_secretawss3(cle_chiffree))
+        data = {
+            'cdns': cdn_filtre,
+            'identificateur_document': json.dumps(identificateur_document),
+            'ipns_key': cle_chiffree,
+            'ipns_key_name': nom_cle,
+            'permission': permission,
+            'securite': securite,
+        }
+        r = requests.put(
+            'https://fichiers:3021/publier/fichierIpns',
+            files=files,
+            data=data,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            timeout=120000,  # 2 minutes max
+        )
+        r.raise_for_status()
 
     def commande_publier_fichier(self, res_fichier: dict, cdn_info: dict):
         type_cdn = cdn_info['type_cdn']
@@ -1550,6 +1553,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         max_age = params.get('max_age')
         content_encoding = params.get('content_encoding')
         securite = params.get('securite') or Constantes.SECURITE_PRIVE
+        identificateur_document = params.get('identificateur_document')
 
         files = list()
         for fichier in fichiers:
@@ -1583,6 +1587,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             data_publier['max_age'] = max_age
         if content_encoding is not None:
             data_publier['content_encoding'] = content_encoding
+        if identificateur_document is not None:
+            data_publier['identificateur_document'] = json.dumps(identificateur_document)
 
         r = requests.put(
             'https://fichiers:3021/publier/repertoire',
@@ -1877,6 +1883,13 @@ class ProcessusPublierCleEtFichierIpns(MGProcessus):
         self.controleur.gestionnaire.sauvegarder_cle_ipns(identificateur_document, reponse_cle)
 
         # Publier fichier
-        pass
+        nom_cle = self.parametres['nom_cle']
+        securite = self.parametres['securite']
+        cdn_id = self.parametres['cdn_id']
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        res_data = collection_ressources.find_one(identificateur_document)
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        doc_cdn = collection_cdns.find_one({'cdn_id': cdn_id})
+        self.controleur.gestionnaire.put_fichier_ipns(doc_cdn, identificateur_document, nom_cle, res_data, securite)
 
         self.set_etape_suivante()  # Termine
