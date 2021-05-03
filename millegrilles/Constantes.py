@@ -1863,6 +1863,7 @@ class ConstantesPublication:
     COMMANDE_PUBLIER_SECTIONS = 'publierSections'
     COMMANDE_PUBLIER_SITECONFIGURATION = 'publierSiteConfiguration'
     COMMANDE_PUBLIER_UPLOAD_DATASECTION = 'publierUploadDataSection'
+    COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION = 'publierUploadSiteConfiguration'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'

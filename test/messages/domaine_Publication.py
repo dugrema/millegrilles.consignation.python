@@ -176,6 +176,12 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_commande(
             commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_publier_sections')
 
+    def commande_publier_configuration(self):
+        commande = dict()
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SITECONFIGURATION
+        self.generateur.transmettre_commande(
+            commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_publier_configuration')
+
     def executer(self):
         self.__logger.debug("Executer")
 
@@ -193,7 +199,8 @@ class TestPublication(DomaineTest):
         # self.supprimer_cdn()
 
         # self.commande_publier_fichiers()
-        self.commande_publier_sections()
+        # self.commande_publier_sections()
+        self.commande_publier_configuration()
 
 
 # --- MAIN ---

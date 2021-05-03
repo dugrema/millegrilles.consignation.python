@@ -100,6 +100,10 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             self.gestionnaire.trigger_publication_sections(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION:
             self.gestionnaire.commande_publier_upload_datasection(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITECONFIGURATION:
+            self.gestionnaire.commande_publication_configuration(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION:
+            self.gestionnaire.commande_publier_upload_siteconfiguration(message_dict)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -482,7 +486,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         sites = list()
         for site in curseur:
             del site['_id']
-            enveloppe = self.generateur_transactions.preparer_enveloppe(site)
+            enveloppe = self.generateur_transactions.preparer_enveloppe(site, ajouter_certificats=True)
             sites.append(enveloppe)
 
         return sites
@@ -504,7 +508,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         docs = list()
         for d in curseur:
-            doc_signe = self.generateur_transactions.preparer_enveloppe(d)
+            doc_signe = self.generateur_transactions.preparer_enveloppe(d, ajouter_certificats=True)
             docs.append(doc_signe)
 
         return docs
@@ -726,7 +730,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         liste_cdn_ids = doc_site['listeCdn']
         filtre_cdns = {'cdn_id': {'$in': liste_cdn_ids}, 'active': True}
         curseur_cdns = collection_cdns.find(filtre_cdns)
-        mapping_cdns = list()
+        mapping_cdns = dict()
         for cdn in curseur_cdns:
             mapping = {
                 'type_cdn': cdn['type_cdn'],
@@ -735,8 +739,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if access_point_url is not None:
                 mapping['access_point_url'] = access_point_url
 
-            mapping_cdns.append(mapping)
-        contenu_signe['cdns'] = mapping_cdns
+            mapping_cdns[cdn['cdn_id']] = mapping
+
+        # Creer une liste ordonnee des CDNs
+        contenu_signe['cdns'] = [mapping_cdns[cdn_id] for cdn_id in liste_cdn_ids]
 
         # Aller chercher references des sections
         # Chaque section est un fichier accessible via son uuid
@@ -780,7 +786,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         contenu_signe['ipns_map'] = uuid_to_ipns
 
         contenu_signe = self.generateur_transactions.preparer_enveloppe(
-            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG)
+            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG, ajouter_certificats=True)
 
         set_ops = {
             'contenu_signe': contenu_signe,
@@ -851,7 +857,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
         }
         contenu_signe = self.generateur_transactions.preparer_enveloppe(
-            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_PAGE)
+            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_PAGE, ajouter_certificats=True)
 
         fuuid_mimetypes = dict()
         for finfo in fuuids_info.values():
@@ -979,7 +985,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         contenu_signe.update(info_collection)
         contenu_signe['fichiers'] = liste_fichiers
 
-        contenu_signe = self.generateur_transactions.preparer_enveloppe(contenu_signe, 'Publication.fichiers')
+        contenu_signe = self.generateur_transactions.preparer_enveloppe(
+            contenu_signe, 'Publication.fichiers', ajouter_certificats=True)
 
         set_ops = {
             'contenu_signe': contenu_signe,
@@ -1108,6 +1115,22 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # Publier forums
             # repertoire: data/forums
 
+    def commande_publication_configuration(self, params: dict):
+        """
+        Publie la configuration d'un site
+        :param params:
+        :return:
+        """
+        liste_cdns = self.preparer_sitesparcdn()
+        for cdn in liste_cdns:
+            cdn_id = cdn['cdn_id']
+            liste_sites = cdn['sites']
+
+            # Publier les fichiers de configuration de site et le certificat
+            # fichiers: /index.json et /certificat.pem
+            for site_id in liste_sites:
+                self.trigger_commande_publier_configuration(cdn_id, site_id)
+
     def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PRIVE):
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
@@ -1208,6 +1231,45 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
             self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
 
+    def trigger_commande_publier_configuration(self, cdn_id: str, site_id: str):
+        # collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        # filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
+        # doc_site = collection_sites.find_one(filtre_site)
+        # securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+        # Trouver tous les sites qui n'ont pas ete publies pour le CDN
+        filtre_siteconfig = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            'sites': {'$all': [site_id]},
+            'distribution_complete': {'$not': {'$all': [cdn_id]}},
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        curseur_siteconfig = collection_ressources.find(filtre_siteconfig)
+        for doc_siteconfig in curseur_siteconfig:
+            site_id = doc_siteconfig[ConstantesPublication.CHAMP_SITE_ID]
+            contenu_gzippe = doc_siteconfig.get('contenu_gzip')
+            if contenu_gzippe is None:
+                # Creer contenu .json.gz
+                filtre_fichiers_maj = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+                    ConstantesPublication.CHAMP_SITE_ID: site_id,
+                }
+                self.sauvegarder_contenu_gzip(doc_siteconfig, filtre_fichiers_maj)
+
+            # Publier le contenu sur le CDN
+            # Upload avec requests via https://fichiers
+            commande_publier_siteconfig = {
+                ConstantesPublication.CHAMP_SITE_ID: site_id,
+                'cdn_id': cdn_id,
+                # 'securite': securite_site,
+                'remote_path': path.join('index.json.gz'),
+                'mimetype': 'application/json',
+                'content_encoding': 'gzip',  # Header Content-Encoding
+                'max_age': 0,
+            }
+            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION
+            self.generateur_transactions.transmettre_commande(commande_publier_siteconfig, domaine_action)
+
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         contenu_dict = col_fichiers['contenu_signe']
@@ -1292,16 +1354,72 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
+    def commande_publier_upload_siteconfiguration(self, params: dict):
+        params = params.copy()
+        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        cdn_id = params['cdn_id']
+        remote_path = params['remote_path']
+        mimetype = params.get('mimetype')
+        # securite = params.get('securite')
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        params['identificateur_document'] = filtre
+
+        res_data = collection_ressources.find_one(filtre)
+        if res_data is None:
+            msg = 'Aucune section ne correspond a %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        contenu_gzip = res_data.get('contenu_gzip')
+        if contenu_gzip is None:
+            msg = 'Le contenu gzip de la section n\'est pas pret. Section : %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdn = {'cdn_id': cdn_id}
+        cdn = collection_cdns.find_one(filtre_cdn)
+        if cdn is None:
+            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        try:
+            type_cdn = cdn['type_cdn']
+            if type_cdn in ['ipfs', 'ipfs_gateway']:
+                # Publier avec le IPNS associe a la section
+                self.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
+            else:
+                # Methode simple d'upload de fichier avec structure de repertoire
+                fp_bytesio = BytesIO(contenu_gzip)
+                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+                self.put_publier_repertoire([cdn], fichiers, params)
+        except Exception as e:
+            msg = "Erreur publication fichiers %s" % str(params)
+            self.__logger.exception(msg)
+            return {'err': str(e), 'msg': msg}
+
+        return {'ok': True}
+
     def put_publier_fichier_ipns(self, cdn: dict, res_data: dict, securite: str):
         ipns_id = res_data.get('ipns_id')
         type_section = res_data[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        site_id = res_data.get(ConstantesPublication.CHAMP_SITE_ID)
         identificateur_document = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
         }
 
-        if type_section == 'fichiers':
+        if type_section == ConstantesPublication.LIBVAL_FICHIERS:
             nom_cle = res_data['uuid']
             identificateur_document['uuid'] = nom_cle
+        elif type_section == ConstantesPublication.LIBVAL_SITE_CONFIG:
+            nom_cle = site_id
+            identificateur_document[ConstantesPublication.CHAMP_SITE_ID] = nom_cle
         else:
             nom_cle = res_data['section_id']
             identificateur_document['section_id'] = nom_cle
