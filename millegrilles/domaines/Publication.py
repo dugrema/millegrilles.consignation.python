@@ -1604,6 +1604,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         set_ops = dict()
         unset_ops = dict()
         add_to_set = dict()
+        date_ops = {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+        }
         for cdn_id in cdn_ids:
             if flag_complete:
                 # Publication completee
@@ -1620,6 +1623,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     if cid is not None:
                         set_ops['cid'] = cid
 
+                if cid is not None:
+                    date_ops['ipns_publication'] = True
+
             elif err is not False:
                 # Erreur
                 unset_ops['distribution_encours.' + cdn_id] = True
@@ -1631,7 +1637,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 set_ops['distribution_progres.' + cdn_id] = progres
 
         ops = {
-            '$currentDate': {'distribution_maj': True}
+            '$currentDate': date_ops
         }
         if len(set_ops) > 0:
             ops['$set'] = set_ops
