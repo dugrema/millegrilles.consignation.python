@@ -794,6 +794,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
             sections_liste.append(section)
 
+        set_ops = {
+            'contenu': contenu,
+            'sites': [site_id],
+        }
+
         # Aller chercher les valeurs ipns pour tous les champs uuid (si applicable)
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre_res_ipns = {
@@ -806,21 +811,23 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'sites': {'$all': [site_id]},
             'ipns_id': {'$exists': True},
         }
-        projection = {'ipns_id': True, 'uuid': True, 'section_id': True}
+        projection = {'ipns_id': True, 'uuid': True, 'section_id': True, Constantes.DOCUMENT_INFODOC_LIBELLE: True}
         curseur_res_ipns = collection_ressources.find(filtre_res_ipns, projection=projection)
         uuid_to_ipns = dict()
         for elem in curseur_res_ipns:
-            id_elem = elem.get('uuid') or elem.get('section_id')
-            uuid_to_ipns[id_elem] = elem['ipns_id']
+            type_res = elem[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            ipns_id = elem['ipns_id']
+            if type_res == ConstantesPublication.LIBVAL_SITE_CONFIG:
+                # Le site est conserve separement (meme uuid que sa collection de fichiers)
+                contenu['ipns_id'] = ipns_id
+            else:
+                id_elem = elem.get('uuid') or elem.get('section_id')
+                uuid_to_ipns[id_elem] = ipns_id
         contenu['ipns_map'] = uuid_to_ipns
 
         # contenu = self.generateur_transactions.preparer_enveloppe(
         #     contenu, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG, ajouter_certificats=True)
 
-        set_ops = {
-            'contenu': contenu,
-            'sites': [site_id],
-        }
         set_on_insert = {
             ConstantesPublication.CHAMP_SITE_ID: site_id,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
