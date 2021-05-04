@@ -1295,14 +1295,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         curseur_siteconfig = collection_ressources.find(filtre_siteconfig)
         for doc_siteconfig in curseur_siteconfig:
             site_id = doc_siteconfig[ConstantesPublication.CHAMP_SITE_ID]
-            contenu_gzippe = doc_siteconfig.get('contenu_gzip')
-            if contenu_gzippe is None:
-                # Creer contenu .json.gz
-                filtre_fichiers_maj = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-                    ConstantesPublication.CHAMP_SITE_ID: site_id,
-                }
-                self.sauvegarder_contenu_gzip(doc_siteconfig, filtre_fichiers_maj)
 
             # Publier le contenu sur le CDN
             # Upload avec requests via https://fichiers
@@ -1423,11 +1415,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.__logger.error(msg)
             return {'err': msg}
 
-        contenu_gzip = res_data.get('contenu_gzip')
-        if contenu_gzip is None:
-            msg = 'Le contenu gzip de la section n\'est pas pret. Section : %s' % str(filtre)
-            self.__logger.error(msg)
-            return {'err': msg}
+        contenu_gzip = self.preparer_siteconfig_publication(cdn_id, res_data)
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         filtre_cdn = {'cdn_id': cdn_id}
@@ -1453,6 +1441,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             return {'err': str(e), 'msg': msg}
 
         return {'ok': True}
+
+    def preparer_siteconfig_publication(self, cdn_id, res_data):
+        contenu_siteconfig = res_data['contenu']
+        # Ajouter info de configuraiton du cdn et signer
+        contenu_siteconfig['cdn_id_local'] = cdn_id
+        contenu_siteconfig = self.generateur_transactions.preparer_enveloppe(
+            contenu_siteconfig, 'Publication.siteconfig', ajouter_certificats=True)
+        contenu_gzip = self.preparer_json_gzip(contenu_siteconfig)
+        return contenu_gzip
 
     def put_publier_fichier_ipns(self, cdn: dict, res_data: dict, securite: str):
         ipns_id = res_data.get('ipns_id')
@@ -1487,7 +1484,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def put_fichier_ipns(self, cdn, identificateur_document, nom_cle, res_data, securite):
         # La cle existe deja. Faire un PUT directement.
-        fp_bytesio = BytesIO(res_data['contenu_gzip'])
+        type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        if type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+            # Mettre a jour et signer la configuration du site. Ajouter CDN
+            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+            contenu_gzip = self.preparer_siteconfig_publication(cdn_id, res_data)
+            fp_bytesio = BytesIO(contenu_gzip)
+        else:
+            fp_bytesio = BytesIO(res_data['contenu_gzip'])
+
         files = list()
         files.append(('files', (nom_cle + '.json.gz', fp_bytesio, 'application/json')))
         # Preparer CDN (json str de liste de CDNs)
