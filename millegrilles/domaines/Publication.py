@@ -895,23 +895,61 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
             parties_page_ordonnees.append(parties_page[pp_id])
 
-        contenu_signe = {
+        contenu = {
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
         }
-        contenu_signe = self.generateur_transactions.preparer_enveloppe(
-            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_PAGE, ajouter_certificats=True)
+        # contenu = self.generateur_transactions.preparer_enveloppe(
+        #     contenu, 'Publication.' + ConstantesPublication.LIBVAL_PAGE, ajouter_certificats=True)
 
-        fuuid_mimetypes = dict()
+        fuuids = dict()
         for finfo in fuuids_info.values():
             fm = finfo.get(ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES)
             if fm is not None:
-                fuuid_mimetypes.update(fm)
+                for fuuid, mimetype in fm.items():
+                    try:
+                        fuuid_info = fuuids[fuuid]
+                    except KeyError:
+                        fuuid_info = dict()
+                        fuuids[fuuid] = fuuid_info
+                    fuuid_info['mimetype'] = mimetype
+
+        # Associer tous les CID (fichiers) aux ressources dans la liste
+        filtre_res_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': {'$in': list(fuuids.keys())},
+            # '$or': {
+            #     'cid_public': {'$exists': True},
+            #     'cid': {'$exists': True},
+            # }
+        }
+        projection_res_fichiers = {'fuuid': True, 'public': True, 'cid_public': True, 'cid': True}
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        curseur_res_fichiers = collection_ressources.find(filtre_res_fichiers, projection=projection_res_fichiers)
+        for info_fichier in curseur_res_fichiers:
+            fuuid = info_fichier['fuuid']
+            flag_public = info_fichier.get('public') or False
+            cid_public = info_fichier.get('cid_public')
+            cid = info_fichier.get('cid')
+
+            try:
+                fuuid_info = fuuids[fuuid]
+            except KeyError:
+                fuuid_info = dict()
+                fuuids[fuuid] = fuuid_info
+
+            if flag_public is True and cid_public is not None:
+                fuuid_info['cid'] = cid_public
+                fuuid_info['public'] = True
+            elif cid is not None:
+                fuuid_info['cid'] = cid
+
+        contenu['fuuids'] = fuuids
 
         set_ops = {
-            'contenu_signe': contenu_signe,
+            'contenu': contenu,
             'sites': [site_id],
-            'fuuids': list(fuuids_info.keys()),
-            ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: fuuid_mimetypes,
+            # 'fuuids': list(fuuids_info.keys()),
+            # ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: fuuid_mimetypes,
         }
         unset_ops = {
             'contenu_gzip': True,
@@ -1312,8 +1350,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        contenu_dict = col_fichiers['contenu_signe']
-        contenu_gzippe = self.preparer_json_gzip(contenu_dict, chiffrer)
+        contenu = col_fichiers['contenu']
+        contenu = self.generateur_transactions.preparer_enveloppe(contenu, 'Publication', ajouter_certificats=True)
+        contenu_gzippe = self.preparer_json_gzip(contenu, chiffrer)
 
         # Conserver contenu pour la ressource
         ops = {
