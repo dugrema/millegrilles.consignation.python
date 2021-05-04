@@ -589,6 +589,22 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         doc_site = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
+        # Retirer champs de contenu publie du site
+        filtre_site_ressources = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_SITE_ID: site_id
+        }
+        ops_ressources = {
+            '$unset': {
+                ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
+                ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
+                ConstantesPublication.CHAMP_CONTENU_GZIP: True,
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_one(filtre_site_ressources, ops_ressources)
+
         securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
 
         # Maj de la collection de fichiers associee (securite et nom)
@@ -601,8 +617,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             transaction_maj_collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nom_site
         self.generateur_transactions.soumettre_transaction(transaction_maj_collection,
                                                            'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
-
-
 
         return doc_site
 
@@ -720,10 +734,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE,
             ConstantesPublication.CHAMP_LISTE_SOCKETIO,
         ]
-        contenu_signe = dict()
+        contenu = dict()
         for key, value in doc_site.items():
             if key in champs_site:
-                contenu_signe[key] = value
+                contenu[key] = value
 
         # Ajouter tous les CDNs pour ce site
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -734,6 +748,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         for cdn in curseur_cdns:
             mapping = {
                 'type_cdn': cdn['type_cdn'],
+                'cdn_id': cdn['cdn_id'],
             }
             access_point_url = cdn.get('accesPointUrl')
             if access_point_url is not None:
@@ -742,7 +757,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             mapping_cdns[cdn['cdn_id']] = mapping
 
         # Creer une liste ordonnee des CDNs
-        contenu_signe['cdns'] = [mapping_cdns[cdn_id] for cdn_id in liste_cdn_ids]
+        contenu['cdns'] = [mapping_cdns[cdn_id] for cdn_id in liste_cdn_ids if cdn_id in mapping_cdns.keys()]
 
         # Aller chercher references des sections
         # Chaque section est un fichier accessible via son uuid
@@ -758,7 +773,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Ajouter sections en ordre
         sections_liste = list()
-        contenu_signe[ConstantesPublication.CHAMP_LISTE_SECTIONS] = sections_liste
+        contenu[ConstantesPublication.CHAMP_LISTE_SECTIONS] = sections_liste
         uuid_to_map = set()  # Conserver tous les uuid a mapper
         for section_id in doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]:
             doc_section = sections_dict[section_id]
@@ -780,16 +795,30 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             sections_liste.append(section)
 
         # Aller chercher les valeurs ipns pour tous les champs uuid (si applicable)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_res_ipns = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPublication.LIBVAL_FICHIERS,
+                ConstantesPublication.LIBVAL_PAGE,
+                ConstantesPublication.LIBVAL_FORUM,
+                ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ]},
+            'sites': {'$all': [site_id]},
+            'ipns_id': {'$exists': True},
+        }
+        projection = {'ipns_id': True, 'uuid': True, 'section_id': True}
+        curseur_res_ipns = collection_ressources.find(filtre_res_ipns, projection=projection)
         uuid_to_ipns = dict()
-        for uuid_elem in uuid_to_map:
-            uuid_to_ipns[uuid_elem] = 'TODO'
-        contenu_signe['ipns_map'] = uuid_to_ipns
+        for elem in curseur_res_ipns:
+            id_elem = elem.get('uuid') or elem.get('section_id')
+            uuid_to_ipns[id_elem] = elem['ipns_id']
+        contenu['ipns_map'] = uuid_to_ipns
 
-        contenu_signe = self.generateur_transactions.preparer_enveloppe(
-            contenu_signe, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG, ajouter_certificats=True)
+        # contenu = self.generateur_transactions.preparer_enveloppe(
+        #     contenu, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG, ajouter_certificats=True)
 
         set_ops = {
-            'contenu_signe': contenu_signe,
+            'contenu': contenu,
             'sites': [site_id],
         }
         set_on_insert = {
@@ -797,8 +826,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
+        unset_ops = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
+            ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
+            ConstantesPublication.CHAMP_CONTENU_GZIP: True,
+        }
         ops = {
             '$set': set_ops,
+            '$unset': unset_ops,
             '$setOnInsert': set_on_insert,
             '$currentDate': {ConstantesPublication.CHAMP_DATE_MODIFICATION: True},
         }
@@ -871,6 +906,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'fuuids': list(fuuids_info.keys()),
             ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: fuuid_mimetypes,
         }
+        unset_ops = {
+            'contenu_gzip': True,
+            'distribution_public_complete': True,
+            'distribution_complete': True,
+        }
 
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
@@ -879,6 +919,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         ops = {
             '$set': set_ops,
+            '$unset': unset_ops,
             '$setOnInsert': set_on_insert,
             '$currentDate': {ConstantesPublication.CHAMP_DATE_MODIFICATION: True},
         }

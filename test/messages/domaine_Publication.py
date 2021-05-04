@@ -199,8 +199,8 @@ class TestPublication(DomaineTest):
         # self.supprimer_cdn()
 
         # self.commande_publier_fichiers()
-        # self.commande_publier_sections()
-        self.commande_publier_configuration()
+        self.commande_publier_sections()
+        # self.commande_publier_configuration()
 
 
 # --- MAIN ---

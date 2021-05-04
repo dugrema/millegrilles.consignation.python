@@ -1901,6 +1901,9 @@ class ConstantesPublication:
     CHAMP_COLONNES = 'colonnes'
     CHAMP_CAPTION = 'caption'
     CHAMP_LISTE_SOCKETIO = 'listeSocketio'
+    CHAMP_DISTRIBUTION_COMPLETE = 'distribution_complete'
+    CHAMP_DISTRIBUTION_PUBLIC_COMPLETE = 'distribution_public_complete'
+    CHAMP_CONTENU_GZIP = 'contenu_gzip'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
