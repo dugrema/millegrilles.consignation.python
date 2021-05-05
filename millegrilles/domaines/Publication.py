@@ -1607,6 +1607,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'username': cdn_info['username'],
             'basedir': cdn_info['repertoireRemote'],
             'securite': securite,
+            'keyType': cdn_info.get('keyType') or 'ed25519',
         }
 
         if mimetype is not None:
