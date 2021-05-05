@@ -21,7 +21,7 @@ from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
-from millegrilles.SecuritePKI import GenerateurEd25519
+from millegrilles.SecuritePKI import GenerateurEd25519, GenerateurRsa
 from millegrilles.util import IpUtils
 
 class GestionnaireModulesDocker:
@@ -369,7 +369,7 @@ class GestionnaireModulesDocker:
             doit_generer = False
             if config_name is not None:
                 try:
-                    config_docker = self.__trouver_config(config_name)
+                    self.__trouver_config(config_name)
                 except AttributeError:
                     doit_generer = True
             if secret_name is not None:
@@ -382,6 +382,8 @@ class GestionnaireModulesDocker:
                 type_generateur = generateur['generateur']
                 if type_generateur == 'ed25519':
                     self.generer_cle_ed25519(generateur)
+                elif type_generateur == 'rsa':
+                    self.generer_cle_rsa(generateur)
 
     def generer_cle_ed25519(self, params: dict):
         format_cle = params['format']
@@ -397,7 +399,23 @@ class GestionnaireModulesDocker:
         if nom_secret is not None:
             self.sauvegarder_secret(nom_secret, valeur, ajouter_date=True)
         elif nom_config is not None:
-            self.sauvegarder_config(nom_config, valeur, ajouter_date=True)
+            self.sauvegarder_config(nom_config, valeur)
+
+    def generer_cle_rsa(self, params: dict):
+        format_cle = params['format']
+        nom_secret = params.get('secret')
+        nom_config = params.get('config')
+
+        if format_cle == 'openssh':
+            generateur = GenerateurRsa()
+            valeur = generateur.generer_private_openssh()
+        else:
+            raise ValueError('Type cle inconnu : %s', format_cle)
+
+        if nom_secret is not None:
+            self.sauvegarder_secret(nom_secret, valeur, ajouter_date=True)
+        elif nom_config is not None:
+            self.sauvegarder_config(nom_config, valeur)
 
     def reconfigurer_service(self, service_name: str, docker_service=None, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)

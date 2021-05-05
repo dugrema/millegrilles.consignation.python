@@ -317,7 +317,7 @@ class TestConsignationFichiers(DomaineTest):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
-        # self.requete_getclessh()
+        self.requete_getclessh()
         # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
@@ -329,7 +329,7 @@ class TestConsignationFichiers(DomaineTest):
         # self.lister_consignation_awss3()
         # self.commande_publier_cle_ipns()
         # self.commande_creer_cle_ipns()
-        self.put_publier_fichier_ipns()
+        # self.put_publier_fichier_ipns()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
