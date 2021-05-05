@@ -609,7 +609,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Maj de la collection de fichiers associee (securite et nom)
         transaction_maj_collection = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: site_id,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: site_id + '/fichiers',
             Constantes.DOCUMENT_INFODOC_SECURITE: securite_site,
         }
         nom_site = doc_site.get(ConstantesPublication.CHAMP_NOM_SITE)
