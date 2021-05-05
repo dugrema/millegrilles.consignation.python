@@ -58,6 +58,7 @@ class TestConsignationFichiers(DomaineTest):
             'username': 'sftptest',
             'basedir': '/home/sftptest/consignation',
             'mimetype': 'image/gif',
+            'keyType': 'rsa',
             # 'securite': '1.public',
         }
         domaine = 'commande.fichiers.publierFichierSftp'
@@ -317,8 +318,8 @@ class TestConsignationFichiers(DomaineTest):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
-        self.requete_getclessh()
-        # self.commande_publier_fichier_ssh()
+        # self.requete_getclessh()
+        self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
         # self.put_publier_repertoire_ipfs()
