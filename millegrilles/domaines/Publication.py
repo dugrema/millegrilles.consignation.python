@@ -284,7 +284,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         set_ops = dict()
 
-        champs = ['securite', 'entete', 'collections', 'parties_pages', 'liste_forums', 'toutes_collections', 'tous_forums']
+        champs = ['securite', 'entete', 'collections', 'parties_pages', 'liste_forums']
         for key, value in params.items():
             if key in champs:
                 set_ops[key] = value
@@ -1067,15 +1067,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources.update_one(filtre, ops)
 
     def creer_ressource_collection(self, site_id, info_collection: dict, liste_fichiers: list):
-        contenu_signe = {}
-        contenu_signe.update(info_collection)
-        contenu_signe['fichiers'] = liste_fichiers
+        contenu = {}
+        contenu.update(info_collection)
+        contenu['fichiers'] = liste_fichiers
 
-        contenu_signe = self.generateur_transactions.preparer_enveloppe(
-            contenu_signe, 'Publication.fichiers', ajouter_certificats=True)
+        # contenu = self.generateur_transactions.preparer_enveloppe(
+        #     contenu, 'Publication.fichiers', ajouter_certificats=True)
 
         set_ops = {
-            'contenu_signe': contenu_signe,
+            'contenu': contenu,
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
@@ -1114,6 +1114,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         liste_cdns = self.preparer_sitesparcdn()
 
         for cdn in liste_cdns:
+            type_cdn = cdn[ConstantesPublication.CHAMP_TYPE_CDN]
+            if type_cdn in ['hiddenService', 'manuel']:
+                continue  # rien a faire pour ces CDNs
+
             cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
             liste_sites = cdn['sites']
 
@@ -1229,11 +1233,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'sites': {'$in': liste_sites},
             '$or': [
                 {
-                    'contenu_signe.securite': Constantes.SECURITE_PRIVE,
+                    'contenu.securite': Constantes.SECURITE_PRIVE,
                     'distribution_complete': {'$not': {'$all': [cdn_id]}},
                 },
                 {
-                    'contenu_signe.securite': Constantes.SECURITE_PUBLIC,
+                    'contenu.securite': Constantes.SECURITE_PUBLIC,
                     'distribution_public_complete': {'$not': {'$all': [cdn_id]}},
                 },
             ],
@@ -1573,6 +1577,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.commande_publier_fichier_ipfs(res_fichier, cdn_info)
         elif type_cdn == 'awss3':
             self.commande_publier_fichier_awss3(res_fichier, cdn_info)
+        elif type_cdn in ['hiddenService', 'manuel']:
+            return  # Rien a faire
         else:
             raise Exception("Type cdn non supporte %s" % type_cdn)
 
@@ -1746,6 +1752,29 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         filtre.update(identificateur_document)
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_one(filtre, ops)
+
+        # Voir si on lance un trigger de publication de sections
+        self.trigger_conditionnel_fichiers_completes()
+
+    def trigger_conditionnel_fichiers_completes(self):
+        """
+        Verifie si la publication de tous les fichiers est completee
+        Soumet un trigger de publication de sections au besoin
+        :return:
+        """
+        aggregation_pipeline = [
+            {'$match': {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'$exists': False}
+            }},
+            {'$count': 'en_cours'},
+        ]
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        resultat = collection_ressources.aggregate(aggregation_pipeline)
+        for r in resultat:
+            compte = r['en_cours']
+            if compte == 0:
+                self.__logger.debug("Tous les fichiers sont publies, declencher publication sections")
 
     def preparer_permission_secretawss3(self, secret_chiffre):
         secret_bytes = multibase.decode(secret_chiffre)
@@ -1999,7 +2028,7 @@ class ProcessusTransactionMajSection(MGProcessusTransaction):
         commande = {
             ConstantesPublication.CHAMP_SECTION_ID: doc_section[ConstantesPublication.CHAMP_SECTION_ID]
         }
-        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
+        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SECTIONS, commande)
 
         self.set_etape_suivante()  # Termine
 

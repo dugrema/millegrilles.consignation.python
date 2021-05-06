@@ -1871,6 +1871,7 @@ class ConstantesPublication:
     CHAMP_SITE_ID = 'site_id'
     CHAMP_POST_ID = 'post_id'
     CHAMP_CDN_ID = 'cdn_id'
+    CHAMP_TYPE_CDN = 'type_cdn'
     CHAMP_NOM_SITE = 'nom_site'
     CHAMP_LANGUAGES = 'languages'
     CHAMP_TITRE = 'titre'
@@ -1904,6 +1905,7 @@ class ConstantesPublication:
     CHAMP_DISTRIBUTION_COMPLETE = 'distribution_complete'
     CHAMP_DISTRIBUTION_PUBLIC_COMPLETE = 'distribution_public_complete'
     CHAMP_CONTENU_GZIP = 'contenu_gzip'
+    CHAMP_DISTRIBUTION_PROGRES = 'distribution_progres'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
