@@ -198,8 +198,8 @@ class TestPublication(DomaineTest):
         # self.maj_partie_page()
         # self.supprimer_cdn()
 
-        self.commande_publier_fichiers()
-        # self.commande_publier_sections()
+        # self.commande_publier_fichiers()
+        self.commande_publier_sections()
         # self.commande_publier_configuration()
 
 

@@ -1963,6 +1963,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         fuuid = identificateur_document.get('fuuid')
         section_id = identificateur_document.get('section_id')
+        type_section = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
 
         prochain_trigger = None
         if fuuid is not None:
@@ -1970,7 +1971,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
             }
             prochain_trigger = self.trigger_publication_sections
-        elif section_id is not None:
+        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_FICHIERS, ConstantesPublication.LIBVAL_FORUM]:
             # C'est une section, on verifie si toutes les sections sont completees
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
