@@ -114,9 +114,9 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
             return self.gestionnaire.reset_fichiers_publies(message_dict)
         elif action == ConstantesGrosFichiers.COMMANDE_CLEAR_FICHIER_PUBLIE:
             return self.gestionnaire.clear_fichier_publie(message_dict)
-        elif action == ConstantesGrosFichiers.COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES:
-            self.gestionnaire.maj_collection_publique(message_dict)
-            return {'ok': True}
+        # elif action == ConstantesGrosFichiers.COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES:
+        #     self.gestionnaire.maj_collection_publique(message_dict)
+        #     return {'ok': True}
         elif action == ConstantesGrosFichiers.COMMANDE_REGENERER_COLLECTIONFICHIERS:
             self.gestionnaire.creer_trigger_collectionfichiers(message_dict)
         elif action == ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION:
@@ -431,6 +431,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
     def creer_regenerateur_documents(self):
         return RegenerateurGrosFichiers(self)
+
+    def get_fichier_par_uuid(self, uuid_fichier):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+        }
+        self._logger.info("Fichier par uuid: %s" % filtre)
+
+        fichier = collection_domaine.find_one(filtre)
+
+        return fichier
 
     def get_fichier_par_fuuid(self, fuuid):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1018,18 +1030,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         else:
             self._logger.error('renommer_deplacer_fichier aucun document trouve pour uuid : %s' % uuid_doc)
 
-    def maj_collection_publique(self, evenement: dict):
-        """
-        Met a jour une collection publique - s'assure que les fichiers sont deployes au besoin
-        :param evenement:
-        :return:
-        """
-
-        # Declencher processus d'entretien - va publier fichiers sur noeuds publics
-        nom_module = 'millegrilles_domaines_GrosFichiers'
-        nom_classe = 'ProcessusEntretienCollectionPublique'
-        processus = "%s:%s" % (nom_module, nom_classe)
-        self.demarrer_processus(processus, evenement)
+    # def maj_collection_publique(self, evenement: dict):
+    #     """
+    #     Met a jour une collection publique - s'assure que les fichiers sont deployes au besoin
+    #     :param evenement:
+    #     :return:
+    #     """
+    #
+    #     # Declencher processus d'entretien - va publier fichiers sur noeuds publics
+    #     nom_module = 'millegrilles_domaines_GrosFichiers'
+    #     nom_classe = 'ProcessusEntretienCollectionPublique'
+    #     processus = "%s:%s" % (nom_module, nom_classe)
+    #     self.demarrer_processus(processus, evenement)
 
     def maj_description_fichier(self, uuid_fichier, transaction: dict):
         """
@@ -2948,44 +2960,44 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
     def get_collection_processus_nom(self):
         return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
 
-    def evenement_maj_fichier_public(self, uuid_fichier: str):
+    def evenement_maj_fichier(self, uuid_fichier: str):
         """
         Verifie si le changement a un impact sur les collections publiques et transmet un evenement
         pour chaque collection publique affectee.
         :param uuid_fichier: fichier qui a ete mis a jour
         :return:
         """
-        detail_collections_publiques = self.controleur.gestionnaire.get_info_collections_fichier(uuid_fichier)
+        doc_fichier = self.controleur.gestionnaire.get_fichier_par_uuid(uuid_fichier)
         # Emettre un evenement pour chaque collection publique
         try:
-            for c in detail_collections_publiques:
-                domaine_action = 'evenements.GrosFichiers.' + ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE
-                self.generateur_transactions.emettre_message(
-                    c,
-                    domaine_action,
-                    exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
-                    ajouter_certificats=True
-                )
-        except TypeError:
-            pass  # None, pas de collections publiques
-
-    def evenement_maj_collection_publique(self, uuid_collection: str):
-        """
-        Verifie si le changement a un impact sur la collection. Si la colleciton est publique, emet les maj.
-        :param uuid_collection: collection modifiee
-        :return:
-        """
-        params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [uuid_collection]}
-        detail_collections_publiques = self.controleur.gestionnaire.get_detail_collections_publiques(params)
-
-        for c in detail_collections_publiques:
-            domaine_action = 'evenements.GrosFichiers.' + ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE
+            doc_fichier['version_courante'] = doc_fichier['versions'][doc_fichier['fuuid_v_courante']]
+            domaine_action = 'evenement.grosfichiers.' + ConstantesGrosFichiers.EVENEMENT_MAJ_FICHIER
             self.generateur_transactions.emettre_message(
-                c,
+                doc_fichier,
                 domaine_action,
                 exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
                 ajouter_certificats=True
             )
+        except TypeError:
+            pass  # None, pas de collections publiques
+
+    # def evenement_maj_collection_publique(self, uuid_collection: str):
+    #     """
+    #     Verifie si le changement a un impact sur la collection. Si la colleciton est publique, emet les maj.
+    #     :param uuid_collection: collection modifiee
+    #     :return:
+    #     """
+    #     params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [uuid_collection]}
+    #     detail_collections_publiques = self.controleur.gestionnaire.get_detail_collections_publiques(params)
+    #
+    #     for c in detail_collections_publiques:
+    #         domaine_action = 'evenements.GrosFichiers.' + ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE
+    #         self.generateur_transactions.emettre_message(
+    #             c,
+    #             domaine_action,
+    #             exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
+    #             ajouter_certificats=True
+    #         )
 
 
 class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
@@ -3041,7 +3053,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         elif document_uuid is not None:
             # Le fichier pourrait avoir ete ajoute dans une collection publique
             try:
-                self.evenement_maj_fichier_public(resultat['uuid'])
+                self.evenement_maj_fichier(resultat['uuid'])
             except Exception:
                 self.__logger.exception("Erreur verification collection publique")
 
@@ -3197,7 +3209,7 @@ class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
         self._controleur.gestionnaire.renommer_document(uuid_doc, {'nom': nouveau_nom})
 
         # Tenter de mettre a jour fichier et document
-        self.evenement_maj_fichier_public(uuid_doc)
+        self.evenement_maj_fichier(uuid_doc)
         self.evenement_maj_collection_publique(uuid_doc)
 
         self.set_etape_suivante()  # Termine
@@ -3216,7 +3228,7 @@ class ProcessusTransactionDecricreFichier(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
 
-        self.evenement_maj_fichier_public(uuid_fichier)
+        self.evenement_maj_fichier(uuid_fichier)
 
         return {'uuid_fichier': uuid_fichier}
 
@@ -3273,7 +3285,7 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersActivite):
         self.set_etape_suivante()  # Termine
 
         for d in uuids_documents:
-            self.evenement_maj_fichier_public(d)
+            self.evenement_maj_fichier(d)
 
         return {'uuids_documents': uuids_documents}
 
@@ -3550,7 +3562,8 @@ class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
         self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, documents_uuids)
         self.set_etape_suivante()
 
-        self.evenement_maj_collection_publique(collection_uuid)
+        for uuid_fichier in documents_uuids:
+            self.evenement_maj_fichier(uuid_fichier)
 
 
 class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
@@ -3565,7 +3578,8 @@ class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
         self._controleur.gestionnaire.retirer_fichiers_collection(collectionuuid, documents_uuids)
         self.set_etape_suivante()
 
-        self.evenement_maj_collection_publique(collectionuuid)
+        for uuid_fichier in documents_uuids:
+            self.evenement_maj_fichier(uuid_fichier)
 
 
 class ProcessusTransactionChangerFavoris(ProcessusGrosFichiers):
@@ -3613,7 +3627,7 @@ class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
         self.controleur.gestionnaire.associer_preview(transaction)
 
         try:
-            self.evenement_maj_fichier_public(transaction['uuid'])
+            self.evenement_maj_fichier(transaction['uuid'])
         except Exception:
             self.__logger.exception("Erreur verification collection publique")
 
@@ -3811,50 +3825,50 @@ class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
         document_fichier = self.controleur.gestionnaire.associer_video_transcode(transaction)
         uuid_document = document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         try:
-            self.evenement_maj_fichier_public(uuid_document)
+            self.evenement_maj_fichier(uuid_document)
         except Exception:
             self.__logger.exception("Erreur verification collection publique")
 
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusEntretienCollectionPublique(ProcessusGrosFichiers):
-    """
-    Effectue l'entretien d'une colleciton publique incluant la publication des fichiers manquants (sync)
-    """
-
-    def initiale(self):
-        # Faire la liste des noeuds Amazon Web Services S3
-        domaine_requete = 'Topologie.listerNoeudsAWSS3'
-        self.set_requete(domaine_requete, dict())
-        self.set_etape_suivante(ProcessusEntretienCollectionPublique.publier_fichiers_awss3.__name__)
-
-    def publier_fichiers_awss3(self):
-        parametres = self.parametres
-        try:
-            uuid_collection = parametres['uuid']
-        except KeyError:
-            domaine_requete = 'GrosFichiers.' + Constantes.ConstantesMaitreDesCles.REQUETE_COLLECTIONS_PUBLIQUES
-            self.set_requete(domaine_requete, dict())
-            self.set_etape_suivante(ProcessusEntretienCollectionPublique.publier_toutes_collections.__name__)
-        else:
-            self._uploader_collection(uuid_collection)
-            self.set_etape_suivante()  # Termine
-
-    def publier_toutes_collections(self):
-        reponse_noeuds_awss3 = self.parametres['reponse'][1]
-        collections_publiques = reponse_noeuds_awss3['resultat']
-
-        for collection_publique in collections_publiques:
-            uuid_collection = collection_publique['uuid']
-            self._uploader_collection(uuid_collection)
-
-    def _uploader_collection(self, uuid_collection):
-        reponse_noeuds_awss3 = self.parametres['reponse'][0]
-        noeud_ids = reponse_noeuds_awss3['noeud_ids']
-
-        # Pour chaque noeud, verifier s'il y a des fichiers qui n'ont pas encore ete telecharge vers AWS S3
-        self.controleur.gestionnaire.uploader_fichiers_manquants_awss3(uuid_collection, noeud_ids)
+# class ProcessusEntretienCollectionPublique(ProcessusGrosFichiers):
+#     """
+#     Effectue l'entretien d'une colleciton publique incluant la publication des fichiers manquants (sync)
+#     """
+#
+#     def initiale(self):
+#         # Faire la liste des noeuds Amazon Web Services S3
+#         domaine_requete = 'Topologie.listerNoeudsAWSS3'
+#         self.set_requete(domaine_requete, dict())
+#         self.set_etape_suivante(ProcessusEntretienCollectionPublique.publier_fichiers_awss3.__name__)
+#
+#     def publier_fichiers_awss3(self):
+#         parametres = self.parametres
+#         try:
+#             uuid_collection = parametres['uuid']
+#         except KeyError:
+#             domaine_requete = 'GrosFichiers.' + Constantes.ConstantesMaitreDesCles.REQUETE_COLLECTIONS_PUBLIQUES
+#             self.set_requete(domaine_requete, dict())
+#             self.set_etape_suivante(ProcessusEntretienCollectionPublique.publier_toutes_collections.__name__)
+#         else:
+#             self._uploader_collection(uuid_collection)
+#             self.set_etape_suivante()  # Termine
+#
+#     def publier_toutes_collections(self):
+#         reponse_noeuds_awss3 = self.parametres['reponse'][1]
+#         collections_publiques = reponse_noeuds_awss3['resultat']
+#
+#         for collection_publique in collections_publiques:
+#             uuid_collection = collection_publique['uuid']
+#             self._uploader_collection(uuid_collection)
+#
+#     def _uploader_collection(self, uuid_collection):
+#         reponse_noeuds_awss3 = self.parametres['reponse'][0]
+#         noeud_ids = reponse_noeuds_awss3['noeud_ids']
+#
+#         # Pour chaque noeud, verifier s'il y a des fichiers qui n'ont pas encore ete telecharge vers AWS S3
+#         self.controleur.gestionnaire.uploader_fichiers_manquants_awss3(uuid_collection, noeud_ids)
 
 
 class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):

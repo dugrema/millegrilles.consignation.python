@@ -122,6 +122,8 @@ class TraitementEvenementsFichiers(TraitementMessageDomaineEvenement):
 
         if domaine_action == 'publierFichier':
             self.gestionnaire.traiter_evenement_publicationfichier(message_dict)
+        elif domaine_action in ['majFichier', 'associationPoster']:
+            self.gestionnaire.traiter_evenement_maj_fichier(message_dict, routing_key)
 
 
 class GestionnairePublication(GestionnaireDomaineStandard):
@@ -205,6 +207,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'nom': '%s.%s' % (self.get_nom_queue(), 'evenementsPublication'),
             'routing': [
                 'evenement.fichiers.publierFichier',
+                'evenement.grosfichiers.majFichier',
+                'evenement.grosfichiers.associationPoster',
             ],
             'exchange': self.configuration.exchange_protege,
             'ttl': 300000,
@@ -1902,6 +1906,45 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Voir si on lance un trigger de publication de sections
         self.trigger_conditionnel_fichiers_completes(params)
+
+    def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
+        # Verifier si on a une reference au fichier ou une collection avec le fichier
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        fuuids = params.get('fuuids')
+
+        collection_uuids = params.get('collections') or list()
+        collection_uuids = set(collection_uuids)
+
+        if fuuids is not None:
+            filtre_fuuids = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                'fuuid': {'$in': fuuids},
+            }
+            curseur_fichiers = collection_ressources.find(filtre_fuuids)
+            for fichier in curseur_fichiers:
+                collections_fichier = fichier.get('collections')
+                if collections_fichier is not None:
+                    collection_uuids.update(collections_fichier)
+
+        # Verifier les collections presentes (deja dans ressources)
+        filtre_collections_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            'uuid': {'$in': list(collection_uuids)}
+        }
+        projection_collections_fichiers = {'uuid': True, 'sites': True}
+        curseur_collections_fichiers = collection_ressources.find(filtre_collections_fichiers, projection=projection_collections_fichiers)
+
+        for collection_fichiers in curseur_collections_fichiers:
+            # Declencher processus de maj de la collection
+            uuid_collection = collection_fichiers['uuid']
+            sites = collection_fichiers['sites']
+            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            for site_id in sites:
+                params = {
+                    'uuid_collection': uuid_collection,
+                    'site_id': site_id,
+                }
+                self.demarrer_processus(processus, params)
 
     def trigger_conditionnel_fichiers_completes(self, params: dict):
         """
