@@ -2280,6 +2280,8 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
 
         self.controleur.gestionnaire.creer_ressource_collection(site_id, info_collection, liste_documents)
 
+        self.controleur.gestionnaire.trigger_publication_complete()
+
         self.set_etape_suivante()  # Termine
 
     def traiter_maj_collection(self):
@@ -2291,6 +2293,8 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         liste_documents = contenu_collection['documents']
 
         self.controleur.gestionnaire.maj_ressource_collection(site_id, info_collection, liste_documents)
+
+        self.controleur.gestionnaire.trigger_publication_complete()
 
         self.set_etape_suivante()
 
