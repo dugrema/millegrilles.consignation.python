@@ -419,6 +419,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Recuperer la section_id du post - la transaction ne contient pas la section_id sur update de post
         section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
 
+        self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+
         # Associer fichier media au post (si applicable)
         # if params.get(ConstantesPublication.CHAMP_MEDIA_UUID):
         #     transaction_media_collection = {
@@ -1002,6 +1004,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             }
             self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
 
+        # Trigger pour upload de tout le site (commencer par les fichiers)
+        self.trigger_publication_complete()
+
         return doc_page
 
     def maj_ressources_fuuids(self, fuuids_info: dict, sites: list = None, public=False):
@@ -1116,6 +1121,16 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             for fuuid in f['fuuids']:
                 fuuids_dict[fuuid] = f
         self.maj_ressources_fuuids(fuuids_dict, [site_id], public=flag_public)
+
+    def trigger_publication_complete(self, params: dict = None):
+        """
+        Declenche une publication complete
+        :param params:
+        :return:
+        """
+        if params is None:
+            params = dict()
+        self.trigger_publication_fichiers(params)
 
     def trigger_publication_fichiers(self, params: dict):
         """
@@ -2114,7 +2129,15 @@ class ProcessusTransactionMajSection(MGProcessusTransaction):
         commande = {
             ConstantesPublication.CHAMP_SECTION_ID: doc_section[ConstantesPublication.CHAMP_SECTION_ID]
         }
-        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SECTIONS, commande)
+        type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
+
+        if type_section == 'pages':  # Fix label section => ConstantesPublication.LIBVAL_PAGE:
+            # Traitement special pour publier une section de type page
+            self.ajouter_commande_a_transmettre(
+                'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
+        else:
+            self.ajouter_commande_a_transmettre(
+                'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SECTIONS, commande)
 
         self.set_etape_suivante()  # Termine
 
