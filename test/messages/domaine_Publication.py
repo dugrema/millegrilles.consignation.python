@@ -53,6 +53,13 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def requete_etat_publication(self):
+        requete = {}
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_ETAT_PUBLICATION
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
     def creer_site(self):
         info_site = {
             # ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
@@ -220,8 +227,9 @@ class TestPublication(DomaineTest):
         # self.commande_publier_sections()
         # self.commande_publier_configuration()
         # self.commande_reset_ressources()
-        # self.commande_publier_complet()
-        self.commande_continuer_publication()
+        self.commande_publier_complet()
+        # self.commande_continuer_publication()
+        # self.requete_etat_publication()
 
 
 # --- MAIN ---

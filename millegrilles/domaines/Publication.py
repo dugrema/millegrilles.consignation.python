@@ -40,9 +40,6 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
 
         if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
             reponse = self.gestionnaire.get_configuration_site(message_dict)
-        elif domaine_action == ConstantesPublication.REQUETE_POSTS:
-            reponse = self.gestionnaire.get_posts(message_dict)
-            reponse = {'liste_posts': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
             reponse = {'liste_sites': reponse}
@@ -67,9 +64,6 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
 
         if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
             reponse = self.gestionnaire.get_configuration_site(message_dict)
-        elif domaine_action == ConstantesPublication.REQUETE_POSTS:
-            reponse = self.gestionnaire.get_posts(message_dict)
-            reponse = {'liste_posts': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
             reponse = {'liste_sites': reponse}
@@ -84,6 +78,9 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_PARTIES_PAGE:
             reponse = self.gestionnaire.get_partie_pages(message_dict)
+            reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_ETAT_PUBLICATION:
+            reponse = self.gestionnaire.get_etat_publication(message_dict)
             reponse = {'resultats': reponse}
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
@@ -117,7 +114,7 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION:
             self.gestionnaire.commande_publier_upload_siteconfiguration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_COMPLET:
-            self.gestionnaire.demarrer_publication_complete()
+            self.gestionnaire.demarrer_publication_complete(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION:
             self.gestionnaire.continuer_publication(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_RESET_RESSOURCES:
@@ -171,12 +168,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def creer_index(self):
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
 
         # Index _mg-libelle
         collection_sites.create_index([(ConstantesPublication.CHAMP_SITE_ID, 1)], name='site_id')
-        collection_posts.create_index([(Constantes.DOCUMENT_INFODOC_LIBELLE, 1)], name='mglibelle')
-
         collection_sites.create_index([(ConstantesPublication.CHAMP_NOEUDS_URLS, 1)], name='noeuds_urls')
 
     def identifier_processus(self, domaine_transaction):
@@ -426,7 +420,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Recuperer la section_id du post - la transaction ne contient pas la section_id sur update de post
         section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
 
-        self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+        # self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+        self.invalider_ressources_pages([section_id])
 
         # Associer fichier media au post (si applicable)
         # if params.get(ConstantesPublication.CHAMP_MEDIA_UUID):
@@ -507,27 +502,23 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return sites
 
-    def get_posts(self, params: dict):
-        post_ids = params[ConstantesPublication.CHAMP_POST_IDS]
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_POST,
-            ConstantesPublication.CHAMP_POST_ID: {'$in': post_ids}
-        }
-
-        collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
-        projection = [
-            ConstantesPublication.CHAMP_POST_ID,
-            ConstantesPublication.CHAMP_HTML,
-            ConstantesPublication.CHAMP_DATE_POST,
+    def get_etat_publication(self, params: dict):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        aggregation_pipe = [
+            {'$match': {
+                ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {
+                    '$exists': True,
+                    '$ne': dict()
+                }
+            }},
+            {'$group': {
+                '_id': '$_mg-libelle',
+                'count': {'$sum': 1},
+            }}
         ]
-        curseur = collection_posts.find(filtre, projection=projection)
-
-        docs = list()
-        for d in curseur:
-            doc_signe = self.generateur_transactions.preparer_enveloppe(d, ajouter_certificats=True)
-            docs.append(doc_signe)
-
-        return docs
+        curseur = collection_ressources.aggregate(aggregation_pipe)
+        for resultat in curseur:
+            self.__logger.debug("Resultat : %s" % str(resultat))
 
     def creer_site(self, params: dict):
         uuid_transaction = params['en-tete']['uuid_transaction']
@@ -605,13 +596,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         doc_site = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
+        self.invalider_ressources_siteconfig(site_id)
+
         # Retirer champs de contenu publie du site
         filtre_site_ressources = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
             ConstantesPublication.CHAMP_SITE_ID: site_id
         }
         # self.reset_publication_ressource(filtre_site_ressources)
-        self.maj_ressources_site(filtre_site_ressources)
+        # self.maj_ressources_site(filtre_site_ressources)
 
         securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
 
@@ -628,52 +621,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             transaction_maj_collection, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
 
         return doc_site
-
-    def maj_post(self, transaction: dict):
-        collection_post = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
-
-        post_id = transaction[ConstantesPublication.CHAMP_POST_ID]
-
-        self.__logger.debug("Maj post id: %s" % post_id)
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_POST,
-            ConstantesPublication.CHAMP_POST_ID: post_id
-        }
-
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
-        }
-        set_on_insert.update(filtre)
-
-        # Nettoyer la transaction de champs d'index, copier le reste dans le document
-        set_ops = dict()
-        for key, value in transaction.items():
-            if key not in [ConstantesPublication.CHAMP_POST_ID] and \
-                    key.startswith('_') is False:
-                set_ops[key] = value
-
-        # Ajouter signature, derniere_modification, certificat
-        estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
-        derniere_modification = datetime.datetime.fromtimestamp(estampille)
-        set_ops[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = transaction[
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
-        set_ops[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = transaction[
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
-
-        set_ops[ConstantesPublication.CHAMP_DATE_POST] = estampille
-
-        ops = {
-            '$set': set_ops,
-            '$setOnInsert': set_on_insert,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        }
-
-        resultat = collection_post.update_one(filtre, ops, upsert=True)
-
-        if resultat.upserted_id is None and resultat.matched_count != 1:
-            raise Exception("Erreur maj post " + post_id)
 
     def maj_cdn(self, params: dict):
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -762,8 +709,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
 
+        unset_ops = UNSET_PUBLICATION_RESOURCES.copy()
+        unset_ops[ConstantesPublication.CHAMP_CONTENU] = True
         ops = {
-            '$unset': UNSET_PUBLICATION_RESOURCES,
+            '$unset': unset_ops,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
@@ -830,38 +779,39 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Aller chercher references des sections
         # Chaque section est un fichier accessible via son uuid
-        liste_sections_id = doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]
-        filtre_sections = {
-            ConstantesPublication.CHAMP_SECTION_ID: {'$in': liste_sections_id}
-        }
-        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        curseur_sections = collection_sections.find(filtre_sections)
-        sections_dict = dict()
-        for s in curseur_sections:
-            sections_dict[s[ConstantesPublication.CHAMP_SECTION_ID]] = s
-
-        # Ajouter sections en ordre
-        sections_liste = list()
-        contenu[ConstantesPublication.CHAMP_LISTE_SECTIONS] = sections_liste
-        uuid_to_map = set()  # Conserver tous les uuid a mapper
-        for section_id in doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]:
-            doc_section = sections_dict[section_id]
-            type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
-
-            section = {
-                ConstantesPublication.CHAMP_TYPE_SECTION: type_section,
-                ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
+        liste_sections_id = doc_site.get(ConstantesPublication.CHAMP_LISTE_SECTIONS)
+        if liste_sections_id is not None:
+            filtre_sections = {
+                ConstantesPublication.CHAMP_SECTION_ID: {'$in': liste_sections_id}
             }
+            collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            curseur_sections = collection_sections.find(filtre_sections)
+            sections_dict = dict()
+            for s in curseur_sections:
+                sections_dict[s[ConstantesPublication.CHAMP_SECTION_ID]] = s
 
-            if type_section in [ConstantesPublication.LIBVAL_FICHIERS, ConstantesPublication.LIBVAL_ALBUM]:
-                uuid_collections = doc_section[ConstantesPublication.CHAMP_COLLECTIONS]
-                section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
-                uuid_to_map.update(uuid_collections)
-            else:
-                section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
-                uuid_to_map.add(section_id)
+            # Ajouter sections en ordre
+            sections_liste = list()
+            contenu[ConstantesPublication.CHAMP_LISTE_SECTIONS] = sections_liste
+            uuid_to_map = set()  # Conserver tous les uuid a mapper
+            for section_id in doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]:
+                doc_section = sections_dict[section_id]
+                type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
 
-            sections_liste.append(section)
+                section = {
+                    ConstantesPublication.CHAMP_TYPE_SECTION: type_section,
+                    ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
+                }
+
+                if type_section in [ConstantesPublication.LIBVAL_FICHIERS, ConstantesPublication.LIBVAL_ALBUM]:
+                    uuid_collections = doc_section[ConstantesPublication.CHAMP_COLLECTIONS]
+                    section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
+                    uuid_to_map.update(uuid_collections)
+                else:
+                    section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
+                    uuid_to_map.add(section_id)
+
+                sections_liste.append(section)
 
         set_ops = {
             'contenu': contenu,
@@ -928,38 +878,39 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         section = collection_sections.find_one(filtre)
         site_id = section[ConstantesPublication.CHAMP_SITE_ID]
 
-        parties_page_ids = section[ConstantesPublication.CHAMP_PARTIES_PAGES]
-        collection_partiespage = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
-        filtre_partiespage = {
-            ConstantesPublication.CHAMP_PARTIEPAGE_ID: {'$in': parties_page_ids}
-        }
-        curseur_parties = collection_partiespage.find(filtre_partiespage)
-
-        parties_page = dict()
-        fuuids_info = dict()
-        for p in curseur_parties:
-            pp = dict()
-            for key, value in p.items():
-                if not key.startswith('_'):
-                    pp[key] = value
-            if p.get('media'):
-                fuuids_media = p['media'].get('fuuids')
-                for fm in fuuids_media:
-                    fuuids_info[fm] = p['media']
-            elif p.get('colonnes'):
-                for c in p['colonnes']:
-                    media = c.get('media')
-                    if media is not None:
-                        fuuids_media = media.get('fuuids')
-                        for fm in fuuids_media:
-                            fuuids_info[fm] = media
-
-            pp_id = pp[ConstantesPublication.CHAMP_PARTIEPAGE_ID]
-            parties_page[pp_id] = pp
-
+        parties_page_ids = section.get(ConstantesPublication.CHAMP_PARTIES_PAGES)
         parties_page_ordonnees = list()
-        for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
-            parties_page_ordonnees.append(parties_page[pp_id])
+        fuuids_info = dict()
+        if parties_page_ids is not None:
+            collection_partiespage = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
+            filtre_partiespage = {
+                ConstantesPublication.CHAMP_PARTIEPAGE_ID: {'$in': parties_page_ids}
+            }
+            curseur_parties = collection_partiespage.find(filtre_partiespage)
+
+            parties_page = dict()
+            for p in curseur_parties:
+                pp = dict()
+                for key, value in p.items():
+                    if not key.startswith('_'):
+                        pp[key] = value
+                if p.get('media'):
+                    fuuids_media = p['media'].get('fuuids')
+                    for fm in fuuids_media:
+                        fuuids_info[fm] = p['media']
+                elif p.get('colonnes'):
+                    for c in p['colonnes']:
+                        media = c.get('media')
+                        if media is not None:
+                            fuuids_media = media.get('fuuids')
+                            for fm in fuuids_media:
+                                fuuids_info[fm] = media
+
+                pp_id = pp[ConstantesPublication.CHAMP_PARTIEPAGE_ID]
+                parties_page[pp_id] = pp
+
+            for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
+                parties_page_ordonnees.append(parties_page[pp_id])
 
         contenu = {
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
@@ -1051,7 +1002,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
 
         # Trigger pour upload de tout le site (commencer par les fichiers)
-        self.continuer_publication()
+        # self.continuer_publication()
 
         return doc_page
 
@@ -1302,9 +1253,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return resultat.matched_count
 
-    def demarrer_publication_complete(self):
+    def demarrer_publication_complete(self, params: dict):
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
+        self.trouver_ressources_manquantes()
+
         liste_cdns = self.preparer_sitesparcdn()
         compteur_commandes = 0
 
@@ -1319,7 +1272,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # Recuperer la liste de fichiers qui ne sont pas publies dans tous les CDNs de la liste
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             filtre = {
-                'sites': {'$in': liste_sites},
+                '$or': [
+                    {'sites': {'$in': liste_sites}},
+                    {'site_id': {'$in': liste_sites}},
+                ],
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
             ops = {
@@ -1329,7 +1285,74 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             resultat = collection_ressources.update_many(filtre, ops)
             compteur_commandes = compteur_commandes + resultat.matched_count
 
+        if params.get('nopublish') is not True:
+            self.continuer_publication()
+
         return compteur_commandes
+
+    def trouver_ressources_manquantes(self):
+        """
+        Identifie et ajoute toutes les ressources manquantes
+        :return:
+        """
+        date_courante = datetime.datetime.utcnow()
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        # Verifier s'il manque des sites
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        projection_sites = {ConstantesPublication.CHAMP_SITE_ID: True}
+        curseur_sites = collection_sites.find(dict(), projection=projection_sites)
+        site_ids = [s[ConstantesPublication.CHAMP_SITE_ID] for s in curseur_sites]
+        for site_id in site_ids:
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+                ConstantesPublication.CHAMP_SITE_ID: site_id,
+            }
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+                ConstantesPublication.CHAMP_SITE_ID: site_id,
+            }
+            ops = {
+                '$setOnInsert': set_on_insert
+            }
+            collection_ressources.update_one(filtre, ops, upsert=True)
+
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        projection_sections = {
+            ConstantesPublication.CHAMP_TYPE_SECTION: True,
+            ConstantesPublication.CHAMP_SITE_ID: True,
+            ConstantesPublication.CHAMP_SECTION_ID: True,
+            'uuid': True,
+            'forum_id': True,
+        }
+        curseur_sections = collection_sections.find(dict(), projection=projection_sections)
+        for section in curseur_sections:
+            type_section = section[ConstantesPublication.CHAMP_TYPE_SECTION]
+
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+                ConstantesPublication.CHAMP_SITE_ID: section[ConstantesPublication.CHAMP_SITE_ID],
+            }
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            }
+
+            if type_section == ConstantesPublication.LIBVAL_FICHIERS:
+                set_on_insert['uuid'] = section['uuid']
+                filtre['uuid'] = section['uuid']
+            else:
+                set_on_insert[Constantes.DOCUMENT_INFODOC_LIBELLE] = type_section
+                set_on_insert[ConstantesPublication.CHAMP_SECTION_ID] = section[ConstantesPublication.CHAMP_SECTION_ID]
+                filtre[Constantes.DOCUMENT_INFODOC_LIBELLE] = type_section
+                filtre[ConstantesPublication.CHAMP_SECTION_ID] = section[ConstantesPublication.CHAMP_SECTION_ID]
+
+            ops = {
+                '$setOnInsert': set_on_insert
+            }
+            collection_ressources.update_one(filtre, ops, upsert=True)
 
     def continuer_publication(self, params: dict = None):
         """
@@ -1580,7 +1603,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         filtre_pages = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
-            'sites': {'$in': [site_id]},
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
             label_champ_distribution: {'$exists': True},
         }
 
@@ -1641,7 +1664,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Trouver tous les sites qui n'ont pas ete publies pour le CDN
         filtre_siteconfig = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-            'sites': {'$all': [site_id]},
+            '$or': [
+                {'sites': {'$all': [site_id]}},
+                {'site_id': site_id},
+            ],
             'distribution_complete': {'$not': {'$all': [cdn_id]}},
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -2324,12 +2350,13 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
             # Par defaut le site id est l'identificateur unique de la transaction
             site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
         self._transmettre_maj(site_id)
 
-        commande = {
-            ConstantesPublication.CHAMP_SITE_ID: site_id
-        }
-        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SITE, commande)
+        # commande = {
+        #     ConstantesPublication.CHAMP_SITE_ID: site_id
+        # }
+        # self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SITE, commande)
 
         self.set_etape_suivante()  # Termine
 
@@ -2343,66 +2370,6 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         self.generateur_transactions.emettre_message(
             site_config,
             'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
-            exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
-            ajouter_certificats=True
-        )
-
-
-class ProcessusTransactionMajPost(MGProcessusTransaction):
-    """
-    Processus pour modifier la configuration d'un site
-    """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def initiale(self):
-        """
-        :return:
-        """
-        transaction = self.transaction
-
-        # Verifier si on a _certificat ou si on doit l'ajouter
-        try:
-            transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
-        except KeyError:
-            domaine_requete = 'requete.Pki.' + Constantes.ConstantesPki.REQUETE_CERTIFICAT
-
-            fingerprint_certificat = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
-
-            params = {'fingerprint': fingerprint_certificat}
-            self.set_requete(domaine_requete, params)
-            self.set_etape_suivante(ProcessusTransactionMajPost.recevoir_certificat.__name__)  # Recevoir certificat
-        else:
-            self.controleur.gestionnaire.maj_post(transaction)
-            self._transmettre_maj(transaction[ConstantesPublication.CHAMP_POST_ID])
-            self.set_etape_suivante()  # Termine
-
-    def recevoir_certificat(self):
-        transaction = self.transaction
-
-        # Injecter certificat
-        certificat_info = self.parametres['reponse'][0]
-        certs_list = [certificat_info['certificats_pem'][c] for c in certificat_info['chaine']]
-        transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = certs_list
-
-        self.controleur.gestionnaire.maj_post(transaction)
-        self._transmettre_maj(transaction[ConstantesPublication.CHAMP_POST_ID])
-        self.set_etape_suivante()  # Termine
-
-    def _transmettre_maj(self, post_id: str):
-        # Preparer evenement de confirmation, emission sur exchange 1.public
-        post = self.controleur.gestionnaire.get_posts(
-            {ConstantesPublication.CHAMP_POST_IDS: [post_id]})
-
-        message_posts = {'liste_posts': post}
-
-        # Retransmettre sur exchange 1.public pour maj live
-        self.generateur_transactions.emettre_message(
-            message_posts,
-            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_POST,
             exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
             ajouter_certificats=True
         )
@@ -2468,10 +2435,10 @@ class ProcessusTransactionMajPartiepage(MGProcessusTransaction):
         # Verifier si on a _certificat ou si on doit l'ajouter
         partie_page = self.controleur.gestionnaire.maj_partie_page(transaction)
 
-        commande = {
-            ConstantesPublication.CHAMP_SECTION_ID: partie_page[ConstantesPublication.CHAMP_SECTION_ID]
-        }
-        self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
+        # commande = {
+        #     ConstantesPublication.CHAMP_SECTION_ID: partie_page[ConstantesPublication.CHAMP_SECTION_ID]
+        # }
+        # self.ajouter_commande_a_transmettre('commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
 
         self.set_etape_suivante()  # Termine
 

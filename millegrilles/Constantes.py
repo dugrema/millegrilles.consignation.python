@@ -1817,7 +1817,6 @@ class ConstantesPublication:
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_CONFIGURATION_NOM = '%s/configuration' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_SITES_NOM = '%s/sites' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_POSTS_NOM = '%s/posts' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_CDNS = '%s/cdns' % DOMAINE_NOM
     COLLECTION_SECTIONS = '%s/sections' % DOMAINE_NOM
@@ -1847,6 +1846,7 @@ class ConstantesPublication:
     REQUETE_LISTE_SECTIONS_SITE = 'listeSectionsSite'
     REQUETE_POSTS = 'posts'
     REQUETE_PARTIES_PAGE = 'partiesPages'
+    REQUETE_ETAT_PUBLICATION = 'etatPublication'
 
     TRANSACTION_CREER_SITE = 'creerSite'
     TRANSACTION_MAJ_SITE = 'majSite'
@@ -1909,6 +1909,7 @@ class ConstantesPublication:
     CHAMP_DISTRIBUTION_PUBLIC_COMPLETE = 'distribution_public_complete'
     CHAMP_DISTRIBUTION_ERREUR = 'distribution_erreur'
     CHAMP_DISTRIBUTION_MAJ = 'distribution_maj'
+    CHAMP_CONTENU = 'contenu'
     CHAMP_CONTENU_GZIP = 'contenu_gzip'
     CHAMP_DISTRIBUTION_PROGRES = 'distribution_progres'
 
