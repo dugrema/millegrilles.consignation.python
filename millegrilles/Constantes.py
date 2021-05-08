@@ -1864,6 +1864,9 @@ class ConstantesPublication:
     COMMANDE_PUBLIER_SITECONFIGURATION = 'publierSiteConfiguration'
     COMMANDE_PUBLIER_UPLOAD_DATASECTION = 'publierUploadDataSection'
     COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION = 'publierUploadSiteConfiguration'
+    COMMANDE_RESET_RESSOURCES = 'resetRessources'
+    COMMANDE_PUBLIER_COMPLET = 'publierComplet'
+    COMMANDE_CONTINUER_PUBLICATION = 'continuerPublication'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'
@@ -1904,6 +1907,8 @@ class ConstantesPublication:
     CHAMP_LISTE_SOCKETIO = 'listeSocketio'
     CHAMP_DISTRIBUTION_COMPLETE = 'distribution_complete'
     CHAMP_DISTRIBUTION_PUBLIC_COMPLETE = 'distribution_public_complete'
+    CHAMP_DISTRIBUTION_ERREUR = 'distribution_erreur'
+    CHAMP_DISTRIBUTION_MAJ = 'distribution_maj'
     CHAMP_CONTENU_GZIP = 'contenu_gzip'
     CHAMP_DISTRIBUTION_PROGRES = 'distribution_progres'
 

@@ -10,6 +10,7 @@ import requests
 from pymongo import ReturnDocument
 from os import path
 from io import BytesIO
+from typing import Union
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
@@ -18,6 +19,17 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequete
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.util.Hachage import hacher
 from millegrilles.util.JSONMessageEncoders import JSONHelper
+
+
+# Operations pour invalider une ressource
+UNSET_PUBLICATION_RESOURCES = {
+    ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
+    ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
+    ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True,
+    # ConstantesPublication.CHAMP_DISTRIBUTION_MAJ: True,
+    ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
+    ConstantesPublication.CHAMP_CONTENU_GZIP: True,
+}
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
@@ -104,6 +116,13 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             self.gestionnaire.commande_publication_configuration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION:
             self.gestionnaire.commande_publier_upload_siteconfiguration(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_COMPLET:
+            self.gestionnaire.demarrer_publication_complete()
+        elif domaine_action == ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION:
+            self.gestionnaire.continuer_publication(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_RESET_RESSOURCES:
+            matched_count = self.gestionnaire.reset_ressources()
+            reponse = {'ok': True, 'matched_count': matched_count}
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -149,7 +168,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def demarrer(self):
         super().demarrer()
-        # self.initialiser_document(Constantes.LIBVAL_CONFIGURATION, ConstantesPublication.DOCUMENT_DEFAUT)
 
     def creer_index(self):
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
@@ -160,14 +178,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_posts.create_index([(Constantes.DOCUMENT_INFODOC_LIBELLE, 1)], name='mglibelle')
 
         collection_sites.create_index([(ConstantesPublication.CHAMP_NOEUDS_URLS, 1)], name='noeuds_urls')
-
-    def traiter_cedule(self, evenement):
-        super().traiter_cedule(evenement)
-
-        # minutes = evenement['timestamp']['UTC'][4]
-        #
-        # if minutes % 15 == 3:
-        #     self.resoumettre_conversions_manquantes()
 
     def identifier_processus(self, domaine_transaction):
         domaine_action = domaine_transaction.split('.').pop()
@@ -312,10 +322,26 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
 
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        doc_section = collection_sections.find_one_and_update(filtre, ops, upsert=upsert,
-                                                              return_document=ReturnDocument.AFTER)
+        doc_section = collection_sections.find_one_and_update(
+            filtre, ops, upsert=upsert, return_document=ReturnDocument.AFTER)
 
         site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]  # site_id pas inclus dans les updates
+
+        # Ajouter la nouvelle section au site
+        if version_id == section_id:
+            # Nouvelle section, on l'active par defaut
+            collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+            filtre = {ConstantesPublication.CHAMP_SITE_ID: site_id}
+            ops = {
+                '$push': {ConstantesPublication.CHAMP_LISTE_SECTIONS: section_id},
+                '$currentDate': {
+                    Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                }
+            }
+            collection_sites.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
+
+        # Invalider la ressource siteconfig pour publication
+        self.invalider_ressources_siteconfig(site_id)
 
         # Declencher publication des collections
         collections_fichiers = doc_section.get('collections') or list()
@@ -323,34 +349,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             params = {'uuid_collection': c, 'section_id': section_id, 'site_id': site_id}
             self.demarrer_processus('millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers', params)
 
-        # Ajouter la nouvelle section au site
-        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        filtre = {ConstantesPublication.CHAMP_SITE_ID: site_id}
-        ops = {
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
-            }
-        }
-
-        filtre_ressource_site = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-            ConstantesPublication.CHAMP_SITE_ID: site_id,
-        }
-        # self.reset_publication_ressource(filtre_ressource_site)
-        self.maj_site(filtre_ressource_site)
-
-        if version_id == section_id:
-            # Nouvelle section, on l'active par defaut
-            ops['$push'] = {ConstantesPublication.CHAMP_LISTE_SECTIONS: section_id}
-
-        doc_site = collection_sites.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
-
-        # Retransmettre sur exchange 1.public pour maj live
-        self.generateur_transactions.emettre_message(
-            doc_site,
-            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
-            ajouter_certificats=True
-        )
+        # # Retransmettre sur exchange 1.public pour maj live
+        # self.generateur_transactions.emettre_message(
+        #     doc_site,
+        #     'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
+        #     ajouter_certificats=True
+        # )
 
         return doc_section
 
@@ -383,7 +387,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             '$set': set_ops,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
-
         filtre = {
             ConstantesPublication.CHAMP_PARTIEPAGE_ID: page_id,
         }
@@ -620,22 +623,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         nom_site = doc_site.get(ConstantesPublication.CHAMP_NOM_SITE)
         if nom_site:
             transaction_maj_collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nom_site
-        self.generateur_transactions.soumettre_transaction(transaction_maj_collection,
-                                                           'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
+
+        self.generateur_transactions.soumettre_transaction(
+            transaction_maj_collection, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION)
 
         return doc_site
-
-    def reset_publication_ressource(self, filtre_ressource):
-        ops_ressources = {
-            '$unset': {
-                ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
-                ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
-                ConstantesPublication.CHAMP_CONTENU_GZIP: True,
-            },
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        }
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources.update_one(filtre_ressource, ops_ressources)
 
     def maj_post(self, transaction: dict):
         collection_post = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
@@ -716,6 +708,66 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_maj = collection_cdns.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         return doc_maj
+
+    def invalider_ressources_siteconfig(self, site_id: Union[str, list] = None, cdn_ids: list = None):
+        """
+        Enlever marqueurs de deploiement pour les sites
+        :param site_id:
+        :param cdn_ids:
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG
+        }
+
+        if site_id is not None:
+            if isinstance(site_id, str):
+                site_id = [site_id]
+            filtre[ConstantesPublication.CHAMP_SITE_ID] = {'$in': site_id}
+        if cdn_ids is not None:
+            label_cdn = ['contenu', 'cdns', ConstantesPublication.CHAMP_CDN_ID]
+            filtre[label_cdn] = {'$in': cdn_ids}
+
+        self.invalider_ressources(filtre)
+
+    def invalider_ressources_pages(self, section_ids: list = None):
+        """
+        Enlever marqueurs de deploiement pour les sections de type page
+        :param section_ids:
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            ConstantesPublication.CHAMP_SECTION_ID: {'$in': section_ids}
+        }
+        self.invalider_ressources(filtre)
+
+    def invalider_ressources_sections_fichiers(self, section_ids: list = None):
+        """
+        Enlever marqueurs de deploiement pour les sections de type fichiers
+        :param section_ids:
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            ConstantesPublication.CHAMP_SECTION_ID: {'$in': section_ids}
+        }
+        self.invalider_ressources(filtre)
+
+    def invalider_ressources(self, filtre: dict):
+        """
+        Enlever marqueurs de deploiement pour les sites
+        :param filtre:
+        :return:
+        """
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        ops = {
+            '$unset': UNSET_PUBLICATION_RESOURCES,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection_ressources.update(filtre, ops)
 
     def supprimer_cdn(self, params: dict):
         cdn_id = params['cdn_id']
@@ -850,14 +902,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
-        unset_ops = {
-            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
-            ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
-            ConstantesPublication.CHAMP_CONTENU_GZIP: True,
-        }
         ops = {
             '$set': set_ops,
-            '$unset': unset_ops,
+            '$unset': UNSET_PUBLICATION_RESOURCES,
             '$setOnInsert': set_on_insert,
             '$currentDate': {ConstantesPublication.CHAMP_DATE_MODIFICATION: True},
         }
@@ -868,6 +915,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         doc_site = collection_ressources.find_one_and_update(
             filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+        return doc_site
 
     def maj_ressources_page(self, params: dict):
         # Charger page
@@ -968,12 +1017,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # 'fuuids': list(fuuids_info.keys()),
             # ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: fuuid_mimetypes,
         }
-        unset_ops = {
-            'contenu_gzip': True,
-            'distribution_public_complete': True,
-            'distribution_complete': True,
-        }
-
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
@@ -981,7 +1024,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         ops = {
             '$set': set_ops,
-            '$unset': unset_ops,
             '$setOnInsert': set_on_insert,
             '$currentDate': {ConstantesPublication.CHAMP_DATE_MODIFICATION: True},
         }
@@ -1009,7 +1051,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
 
         # Trigger pour upload de tout le site (commencer par les fichiers)
-        self.trigger_publication_complete()
+        self.continuer_publication()
 
         return doc_page
 
@@ -1072,15 +1114,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if sites_coll is not None:
                 sites_id.update(sites_coll)
 
-        # Invalider les sections fichiers
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
-            ConstantesPublication.CHAMP_SECTION_ID: {'%in': list(collections_fichiers_uuids)}
-        }
-
         # Lancer processus maj des collections de fichiers
         if maj_section:
-            self.reset_publication_ressource(filtre)
+            # Invalider les ressources fichiers pour publication
+            self.invalider_ressources_sections_fichiers(list(collections_fichiers_uuids))
+
+            # Publier les ressources fichiers
             for uuid_collection in collections_fichiers_uuids:
                 for site_id in sites_id:
                     processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
@@ -1122,7 +1161,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         collection_ressources.update_one(filtre, ops)
 
-    def creer_ressource_collection(self, site_id, info_collection: dict, liste_fichiers: list):
+    def creer_ressource_collection(self, site_ids, info_collection: dict, liste_fichiers: list):
+        if isinstance(site_ids, str):
+            site_ids = [site_ids]
+
         contenu = {}
         contenu.update(info_collection)
         contenu['fichiers'] = liste_fichiers
@@ -1139,7 +1181,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
         add_to_set = {
-            'sites': site_id,
+            'sites': {'$each': site_ids},
         }
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
@@ -1152,7 +1194,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources.update_one(filtre, ops, upsert=True)
+        doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Creer les entrees manquantes de fichiers
         fuuids_dict = dict()
@@ -1160,12 +1202,27 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         for f in liste_fichiers:
             for fuuid in f['fuuids']:
                 fuuids_dict[fuuid] = f
-        self.maj_ressources_fuuids(fuuids_dict, [site_id], public=flag_public)
+        self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public)
 
-    def maj_ressource_collection(self, site_id, info_collection: dict, liste_fichiers: list):
+        return doc_fichiers
+
+    def maj_ressource_collection(self, site_ids, info_collection: dict, liste_fichiers: list):
+        if isinstance(site_ids, str):
+            site_ids = [site_ids]
+
         contenu = {}
         contenu.update(info_collection)
         contenu['fichiers'] = liste_fichiers
+        uuid_collection = info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        set_fuuids = set()
+        for f in liste_fichiers:
+            fuuids_fichier = f.get('fuuids')
+            if fuuids_fichier:
+                set_fuuids.update(fuuids_fichier)
+
+        info_fichiers = self.trouver_cid_fichiers(uuid_collection, list(set_fuuids))
+        contenu['fuuids'] = info_fichiers
 
         # contenu = self.generateur_transactions.preparer_enveloppe(
         #     contenu, 'Publication.fichiers', ajouter_certificats=True)
@@ -1175,16 +1232,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
-            'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+            'uuid': uuid_collection,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
         add_to_set = {
-            'sites': site_id,
-        }
-        unset_ops = {
-            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
-            ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
-            ConstantesPublication.CHAMP_CONTENU_GZIP: True,
+            'sites': {'$each': site_ids},
         }
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
@@ -1192,13 +1244,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         ops = {
             '$set': set_ops,
-            '$unset': unset_ops,
+            '$unset': UNSET_PUBLICATION_RESOURCES,
             '$setOnInsert': set_on_insert,
             '$addToSet': add_to_set,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources.update_one(filtre, ops, upsert=True)
+        doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Creer les entrees manquantes de fichiers  # ATTENTION, potentiel boucle (flag maj_section=False important)
         fuuids_dict = dict()
@@ -1206,9 +1258,80 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         for f in liste_fichiers:
             for fuuid in f['fuuids']:
                 fuuids_dict[fuuid] = f
-        self.maj_ressources_fuuids(fuuids_dict, [site_id], public=flag_public, maj_section=False)
+        self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public, maj_section=False)
 
-    def trigger_publication_complete(self, params: dict = None):
+        return doc_fichiers
+
+    def trouver_cid_fichiers(self, uuid_collection: str, fuuids: list):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_fichier = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': {'$in': fuuids},
+            'cid': {'$exists': True},
+        }
+        projection_res_fichiers = {'fuuid': True, 'public': True, 'cid': True, 'mimetype': True}
+        curseur_fichier = collection_ressources.find(filtre_fichier, projection=projection_res_fichiers)
+
+        fuuids_info = dict()
+        for fichier in curseur_fichier:
+            fuuid = fichier['fuuid']
+            public = fichier.get('public') or False
+            fuuids_info[fuuid] = {
+                'public': public,
+                'mimetype': fichier.get('mimetype')
+            }
+            fuuids_info[fuuid]['cid'] = fichier['cid']
+
+        return fuuids_info
+
+    def reset_ressources(self):
+        """
+        Reset l'etat de publication et le contenu de toutes les ressources.
+        :return:
+        """
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        unset_opts = {
+            'contenu': True,
+        }
+        unset_opts.update(UNSET_PUBLICATION_RESOURCES)
+        ops = {
+            '$unset': unset_opts,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        resultat = collection_ressources.update_many(dict(), ops)
+
+        return resultat.matched_count
+
+    def demarrer_publication_complete(self):
+        # Marquer toutes les ressources non publiees comme en cours de publication.
+        # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
+        liste_cdns = self.preparer_sitesparcdn()
+        compteur_commandes = 0
+
+        for cdn in liste_cdns:
+            type_cdn = cdn[ConstantesPublication.CHAMP_TYPE_CDN]
+            if type_cdn in ['hiddenService', 'manuel']:
+                continue  # rien a faire pour ces CDNs
+
+            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+            liste_sites = cdn['sites']
+
+            # Recuperer la liste de fichiers qui ne sont pas publies dans tous les CDNs de la liste
+            collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+            filtre = {
+                'sites': {'$in': liste_sites},
+                ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
+            }
+            ops = {
+                '$set': {'distribution_progres.' + cdn_id: False},
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+            resultat = collection_ressources.update_many(filtre, ops)
+            compteur_commandes = compteur_commandes + resultat.matched_count
+
+        return compteur_commandes
+
+    def continuer_publication(self, params: dict = None):
         """
         Declenche une publication complete
         :param params:
@@ -1216,7 +1339,21 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         if params is None:
             params = dict()
-        self.trigger_publication_fichiers(params)
+
+        compteur_fichiers_publies = self.trigger_publication_fichiers(params)
+        if compteur_fichiers_publies > 0:
+            self.__logger.info("Trigger publication fichiers, %d fichiers a publier" % compteur_fichiers_publies)
+            return
+
+        # Aucuns fichiers publies, on emet le trigger de publication des sections
+        compteur_commandes_emises = self.trigger_publication_sections(dict())
+        if compteur_commandes_emises > 0:
+            self.__logger.info("Trigger publication sections, %d commandes emises" % compteur_commandes_emises)
+            return
+
+        # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
+        compteur_commandes_emises = self.commande_publication_configuration(dict())
+        self.__logger.info("Trigger publication siteconfig, %d commandes emises" % compteur_commandes_emises)
 
     def trigger_publication_fichiers(self, params: dict):
         """
@@ -1234,33 +1371,29 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
             liste_sites = cdn['sites']
 
+            label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+
             # Recuperer la liste de fichiers qui ne sont pas publies dans tous les CDNs de la liste
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             filtre_fichiers = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
                 'sites': {'$in': liste_sites},
-                '$or': [
-                    {
-                        'public': False,
-                        'distribution_complete': {'$not': {'$all': [cdn_id]}},
-                    },
-                    {
-                        'public': True,
-                        'distribution_public_complete': {'$not': {'$all': [cdn_id]}},
-                    },
-                ],
-
+                label_champ_distribution: {'$exists': True},
             }
             curseur_res_fichiers = collection_ressources.find(filtre_fichiers)
 
             # Creer les commandes de publication (consignation fichiers) pour tous les fichiers/CDN
             for fichier in curseur_res_fichiers:
-                self.commande_publier_fichier(fichier, cdn)
+                # Verifier si la commande a deja ete transmise
+                valeur_distribution = fichier[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+                if valeur_distribution is False:
+                    # Transmettre la commande
+                    self.commande_publier_fichier(fichier, cdn)
+
+                # Compter le fichier meme si on n'a pas envoye de commande: il est encore en traitement
                 compteur_fichiers_publies = compteur_fichiers_publies + 1
 
-        if compteur_fichiers_publies == 0:
-            # Aucuns fichiers publies, on emet le trigger de publication des sections
-            self.trigger_publication_sections(dict())
+        return compteur_fichiers_publies
 
     def preparer_sitesparcdn(self):
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
@@ -1295,6 +1428,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             cdn['sites'] = sites_par_cdn_dict[cdn_id]
             liste_cdns.append(cdn)
 
+        # Trier les CDNs, IPFS en dernier (le plus lent)
+        def extract_type_cdn(cdn):
+            type_cdn = cdn['type_cdn']
+            if type_cdn in ['ipfs', 'ipfs_gateway']:
+                return 'z' + type_cdn
+            return 'a' + type_cdn
+        liste_cdns.sort(key=extract_type_cdn)
+
         return liste_cdns
 
     def trigger_publication_sections(self, params: dict):
@@ -1304,7 +1445,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :return:
         """
         liste_cdns = self.preparer_sitesparcdn()
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
 
         compteurs_commandes_emises = 0
 
@@ -1316,7 +1456,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
             # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
             fichiers_publies = self.trigger_commande_publier_uploadfichiers(
-                cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC)
+               cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC)
             compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
 
             # Publier pages
@@ -1328,9 +1468,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # Publier forums
             # repertoire: data/forums
 
-        if compteurs_commandes_emises == 0:
-            # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
-            self.commande_publication_configuration(dict())
+        return compteurs_commandes_emises
 
     def commande_publication_configuration(self, params: dict):
         """
@@ -1339,14 +1477,19 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :return:
         """
         liste_cdns = self.preparer_sitesparcdn()
+        compteur_commandes_emises = 0
         for cdn in liste_cdns:
             cdn_id = cdn['cdn_id']
             liste_sites = cdn['sites']
 
-            # Publier les fichiers de configuration de site et le certificat
+            # Publier les fichiers de configuration de site
             # fichiers: /index.json et /certificat.pem
             for site_id in liste_sites:
+                # self.marquer_ressource_encours(cdn_id, filtre_site)
                 self.trigger_commande_publier_configuration(cdn_id, site_id)
+                compteur_commandes_emises = compteur_commandes_emises + 1
+
+        return compteur_commandes_emises
 
     def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PRIVE):
         """
@@ -1355,19 +1498,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :param liste_sites:
         :return:
         """
+        label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
         filtre_fichiers = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
             'sites': {'$in': liste_sites},
-            '$or': [
-                {
-                    'contenu.securite': Constantes.SECURITE_PRIVE,
-                    'distribution_complete': {'$not': {'$all': [cdn_id]}},
-                },
-                {
-                    'contenu.securite': Constantes.SECURITE_PUBLIC,
-                    'distribution_public_complete': {'$not': {'$all': [cdn_id]}},
-                },
-            ],
+            label_champ_distribution: {'$exists': True},
         }
 
         compteur_commandes_emises = 0
@@ -1375,33 +1510,60 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_fichiers = collection_ressources.find(filtre_fichiers)
         for col_fichiers in curseur_fichiers:
-            uuid_col_fichiers = col_fichiers['uuid']
-            contenu_gzippe = col_fichiers.get('contenu_gzip')
-            if contenu_gzippe is None:
-                # Creer contenu .json.gz
+            valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            if valeur_distribution is False:
+                uuid_col_fichiers = col_fichiers['uuid']
                 filtre_fichiers_maj = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
                     'uuid': uuid_col_fichiers,
                 }
-                self.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
+                self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
 
-            # Publier le contenu sur le CDN
-            # Upload avec requests via https://fichiers
-            commande_publier_section = {
-                'type_section': ConstantesPublication.LIBVAL_FICHIERS,
-                'uuid_collection': uuid_col_fichiers,
-                'cdn_id': cdn_id,
-                'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
-                'mimetype': 'application/json',
-                'content_encoding': 'gzip',  # Header Content-Encoding
-                'max_age': 0,
-                'securite': securite,
-            }
-            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
-            self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+                # La collection n'a pas encore ete preparee pour la publication
+                contenu = col_fichiers.get('contenu')
+                if contenu is None:
+                    uuid_collection = col_fichiers['uuid']
+                    # Demarrer un processus pour la preparation et la publication
+                    processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+                    params = {
+                        'uuid_collection': uuid_collection,
+                        'site_ids': liste_sites,
+                        'cdn_id': cdn_id,
+                        'emettre_commande': True,
+                    }
+                    self.demarrer_processus(processus, params)
+                else:
+                    self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
+
             compteur_commandes_emises = compteur_commandes_emises + 1
 
         return compteur_commandes_emises
+
+    def emettre_commande_publication_collectionfichiers(self, cdn_id, col_fichiers, securite):
+        uuid_col_fichiers = col_fichiers['uuid']
+        contenu_gzippe = col_fichiers.get('contenu_gzip')
+        filtre_fichiers_maj = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            'uuid': uuid_col_fichiers,
+        }
+        if contenu_gzippe is None:
+            # Creer contenu .json.gz
+            self.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
+        self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
+        # Publier le contenu sur le CDN
+        # Upload avec requests via https://fichiers
+        commande_publier_section = {
+            'type_section': ConstantesPublication.LIBVAL_FICHIERS,
+            'uuid_collection': uuid_col_fichiers,
+            'cdn_id': cdn_id,
+            'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
+            'mimetype': 'application/json',
+            'content_encoding': 'gzip',  # Header Content-Encoding
+            'max_age': 0,
+            'securite': securite,
+        }
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
+        self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
 
     def trigger_commande_publier_uploadpages(self, cdn_id: str, site_id: str):
         """
@@ -1414,15 +1576,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
         doc_site = collection_sites.find_one(filtre_site)
         securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
-        if securite_site == Constantes.SECURITE_PUBLIC:
-            champ_distribution = 'distribution_public_complete'
-        else:
-            champ_distribution = 'distribution_complete'
+        label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
 
         filtre_pages = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
-            'sites': {'$all': [site_id]},
-            champ_distribution: {'$not': {'$all': [cdn_id]}},
+            'sites': {'$in': [site_id]},
+            label_champ_distribution: {'$exists': True},
         }
 
         compteur_commandes_emises = 0
@@ -1431,35 +1590,45 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         curseur_pages = collection_ressources.find(filtre_pages)
         for doc_page in curseur_pages:
             section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
-            contenu_gzippe = doc_page.get('contenu_gzip')
 
-            filtre_fichiers_maj = {
+            filtre_pages_maj = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
                 ConstantesPublication.CHAMP_SECTION_ID: section_id,
             }
+            valeur_distribution = doc_page[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            if valeur_distribution is False:
 
-            if contenu_gzippe is None:
-                # Creer contenu .json.gz
-                self.sauvegarder_contenu_gzip(doc_page, filtre_fichiers_maj)
+                # Generer la page au besoin
+                contenu = doc_page.get('contenu')
+                if contenu is None:
+                    # Mettre a jour le contenu
+                    doc_page = self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
 
-            # Publier le contenu sur le CDN
-            # Upload avec requests via https://fichiers
-            commande_publier_section = {
-                'type_section': ConstantesPublication.LIBVAL_PAGE,
-                ConstantesPublication.CHAMP_SECTION_ID: section_id,
-                'cdn_id': cdn_id,
-                'securite': securite_site,
-                'remote_path': path.join('data/pages', section_id + '.json.gz'),
-                'mimetype': 'application/json',
-                'content_encoding': 'gzip',  # Header Content-Encoding
-                'max_age': 0,
-            }
-            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
-            self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+                contenu_gzippe = doc_page.get('contenu_gzip')
+                if contenu_gzippe is None:
+                    # Creer contenu .json.gz
+                    self.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
 
-            self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
+                # Transmettre la commande
+                # Compter le fichier meme si on n'a pas envoye de commande: il est encore en traitement
 
-            compteur_commandes_emises = compteur_commandes_emises + 1
+                # Publier le contenu sur le CDN
+                # Upload avec requests via https://fichiers
+                commande_publier_section = {
+                    'type_section': ConstantesPublication.LIBVAL_PAGE,
+                    ConstantesPublication.CHAMP_SECTION_ID: section_id,
+                    'cdn_id': cdn_id,
+                    'securite': securite_site,
+                    'remote_path': path.join('data/pages', section_id + '.json.gz'),
+                    'mimetype': 'application/json',
+                    'content_encoding': 'gzip',  # Header Content-Encoding
+                    'max_age': 0,
+                }
+                domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
+                self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+                self.marquer_ressource_encours(cdn_id, filtre_pages_maj)
+
+                compteur_commandes_emises = compteur_commandes_emises + 1
 
         return compteur_commandes_emises
 
@@ -1480,25 +1649,31 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         for doc_siteconfig in curseur_siteconfig:
             site_id = doc_siteconfig[ConstantesPublication.CHAMP_SITE_ID]
 
-            # Publier le contenu sur le CDN
-            # Upload avec requests via https://fichiers
-            commande_publier_siteconfig = {
-                ConstantesPublication.CHAMP_SITE_ID: site_id,
-                'cdn_id': cdn_id,
-                # 'securite': securite_site,
-                'remote_path': path.join('index.json.gz'),
-                'mimetype': 'application/json',
-                'content_encoding': 'gzip',  # Header Content-Encoding
-                'max_age': 0,
-            }
-            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION
-            self.generateur_transactions.transmettre_commande(commande_publier_siteconfig, domaine_action)
+            try:
+                self.preparer_siteconfig_publication(cdn_id, site_id)
 
-            filtre_section = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-                ConstantesPublication.CHAMP_SITE_ID: site_id,
-            }
-            self.marquer_ressource_encours(cdn_id, filtre_section)
+                # Publier le contenu sur le CDN
+                # Upload avec requests via https://fichiers
+                commande_publier_siteconfig = {
+                    ConstantesPublication.CHAMP_SITE_ID: site_id,
+                    'cdn_id': cdn_id,
+                    # 'securite': securite_site,
+                    'remote_path': path.join('index.json.gz'),
+                    'mimetype': 'application/json',
+                    'content_encoding': 'gzip',  # Header Content-Encoding
+                    'max_age': 0,
+                }
+
+                filtre_section = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+                    ConstantesPublication.CHAMP_SITE_ID: site_id,
+                }
+                self.marquer_ressource_encours(cdn_id, filtre_section)
+
+                domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION
+                self.generateur_transactions.transmettre_commande(commande_publier_siteconfig, domaine_action)
+            except Exception:
+                self.__logger.exception("Erreur preparation traitement site_id %s" % site_id)
 
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1508,14 +1683,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Conserver contenu pour la ressource
         ops = {
-            '$set': {'contenu_gzip': contenu_gzippe},
+            '$set': {'contenu_gzip': contenu_gzippe, 'contenu': contenu},
             '$unset': {'distribution_public_complete': True, 'distribution_complete': True},
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
-        collection_ressources.update_one(filtre_res, ops)
+        doc_res = collection_ressources.find_one_and_update(filtre_res, ops, return_document=ReturnDocument.AFTER)
 
-        return contenu_gzippe
+        return doc_res
 
     def preparer_json_gzip(self, contenu_dict: dict, chiffrer=False) -> bytes:
         if chiffrer is True:
@@ -1606,7 +1781,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.__logger.error(msg)
             return {'err': msg}
 
-        contenu_gzip = self.preparer_siteconfig_publication(cdn_id, res_data)
+        contenu_gzip = res_data.get(ConstantesPublication.CHAMP_CONTENU_GZIP)
+        if contenu_gzip is None:
+            res_data = self.sauvegarder_contenu_gzip(res_data, filtre)
+            contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         filtre_cdn = {'cdn_id': cdn_id}
@@ -1633,14 +1811,29 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def preparer_siteconfig_publication(self, cdn_id, res_data):
-        contenu_siteconfig = res_data['contenu']
-        # Ajouter info de configuraiton du cdn et signer
-        contenu_siteconfig['cdn_id_local'] = cdn_id
-        contenu_siteconfig = self.generateur_transactions.preparer_enveloppe(
-            contenu_siteconfig, 'Publication.siteconfig', ajouter_certificats=True)
-        contenu_gzip = self.preparer_json_gzip(contenu_siteconfig)
-        return contenu_gzip
+    def preparer_siteconfig_publication(self, cdn_id, site_id):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        res_site = collection_ressources.find_one(filtre)
+
+        contenu_siteconfig = res_site.get('contenu')
+
+        if contenu_siteconfig is None:
+            res_site = self.maj_ressources_site({'site_id': site_id})
+            self.sauvegarder_contenu_gzip(res_site, filtre)
+
+        return res_site
+
+        # # Ajouter info de configuraiton du cdn et signer
+        # contenu_siteconfig['cdn_id_local'] = cdn_id
+        # contenu_siteconfig = self.generateur_transactions.preparer_enveloppe(
+        #     contenu_siteconfig, 'Publication.siteconfig', ajouter_certificats=True)
+        #
+        # contenu_gzip = self.preparer_json_gzip(contenu_siteconfig)
+        # return contenu_gzip
 
     def put_publier_fichier_ipns(self, cdn: dict, res_data: dict, securite: str):
         ipns_id = res_data.get('ipns_id')
@@ -1675,14 +1868,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def put_fichier_ipns(self, cdn, identificateur_document, nom_cle, res_data, securite):
         # La cle existe deja. Faire un PUT directement.
-        type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
-        if type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
-            # Mettre a jour et signer la configuration du site. Ajouter CDN
-            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
-            contenu_gzip = self.preparer_siteconfig_publication(cdn_id, res_data)
-            fp_bytesio = BytesIO(contenu_gzip)
-        else:
-            fp_bytesio = BytesIO(res_data['contenu_gzip'])
+        # type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        # if type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+        #     # Mettre a jour et signer la configuration du site. Ajouter CDN
+        #     cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+        #     contenu_gzip = self.preparer_siteconfig_publication(cdn_id, res_data)
+        #     fp_bytesio = BytesIO(contenu_gzip)
+        # else:
+        fp_bytesio = BytesIO(res_data['contenu_gzip'])
 
         files = list()
         files.append(('files', (nom_cle + '.json.gz', fp_bytesio, 'application/json')))
@@ -1739,8 +1932,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def marquer_ressource_encours(self, cdn_id, filtre_ressource):
         ops = {
-            '$set': {'distribution_progres.' + cdn_id: False},
-            '$currentDate': {'distribution_maj': True}
+            '$set': {'distribution_progres.' + cdn_id: True},
+            '$currentDate': {
+                'distribution_maj': True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_one(filtre_ressource, ops)
@@ -1864,17 +2060,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 unset_ops['distribution_progres.' + cdn_id] = True
                 unset_ops['distribution_erreur.' + cdn_id] = True
 
-                if securite == Constantes.SECURITE_PUBLIC:
-                    add_to_set['distribution_public_complete'] = cdn_id
-                    if cid is not None:
-                        set_ops['cid_public'] = cid
-                else:
-                    add_to_set['distribution_complete'] = cdn_id
-                    if cid is not None:
-                        set_ops['cid'] = cid
-
+                add_to_set['distribution_complete'] = cdn_id
                 if cid is not None:
-                    date_ops['ipns_publication'] = True
+                    set_ops['cid'] = cid
+                    date_ops['ipfs_publication'] = True
 
             elif err is not False:
                 # Erreur
@@ -1905,7 +2094,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources.update_one(filtre, ops)
 
         # Voir si on lance un trigger de publication de sections
-        self.trigger_conditionnel_fichiers_completes(params)
+        # self.trigger_conditionnel_fichiers_completes(params)
+        self.continuer_publication()
 
     def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
         # Verifier si on a une reference au fichier ou une collection avec le fichier
@@ -2001,7 +2191,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if compte == 0:
             self.__logger.debug("Tous les fichiers sont publies, declencher publication sections")
-            prochain_trigger(dict())
+            self.continuer_publication()
 
     def preparer_permission_secretawss3(self, secret_chiffre):
         secret_bytes = multibase.decode(secret_chiffre)
@@ -2301,6 +2491,14 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
         self.set_requete(domaine_action, requete)
 
+        site_id = params.get('site_id')
+        site_ids = params.get('site_ids')
+        set_site_ids = set()
+        if site_id is not None:
+            set_site_ids.add(site_id)
+        if site_ids is not None:
+            set_site_ids.update(site_ids)
+
         if res_collection is None:
             # Requete vers grosfichiers pour recuperer le contenu de la collection et initialiser tous les fichiers
             # requete = {'uuid': uuid_collection}
@@ -2309,38 +2507,49 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
             self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_nouvelle_collection.__name__)
         else:
             # S'assurer que la collection a le site_id
-            site_id = params['site_id']
-            if site_id not in res_collection['sites']:
-                self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, site_id)
+            for site_id in set_site_ids:
+                if site_id not in res_collection['sites']:
+                    self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, site_id)
 
             self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_maj_collection.__name__)
 
+        return {'site_ids': list(set_site_ids)}
+
     def traiter_nouvelle_collection(self):
         contenu_collection = self.parametres['reponse'][0]
-        site_id = self.parametres['site_id']
+        site_ids = self.parametres['site_ids']
 
         info_collection = contenu_collection['collection']
         liste_documents = contenu_collection['documents']
 
-        self.controleur.gestionnaire.creer_ressource_collection(site_id, info_collection, liste_documents)
+        col_fichiers = self.controleur.gestionnaire.creer_ressource_collection(site_ids, info_collection, liste_documents)
 
-        self.controleur.gestionnaire.trigger_publication_complete()
+        self.continuer_publication(col_fichiers)
 
         self.set_etape_suivante()  # Termine
 
     def traiter_maj_collection(self):
 
         contenu_collection = self.parametres['reponse'][0]
-        site_id = self.parametres['site_id']
+        site_ids = self.parametres['site_ids']
 
         info_collection = contenu_collection['collection']
         liste_documents = contenu_collection['documents']
 
-        self.controleur.gestionnaire.maj_ressource_collection(site_id, info_collection, liste_documents)
+        col_fichiers = self.controleur.gestionnaire.maj_ressource_collection(site_ids, info_collection, liste_documents)
 
-        self.controleur.gestionnaire.trigger_publication_complete()
+        self.continuer_publication(col_fichiers)
 
         self.set_etape_suivante()
+
+    def continuer_publication(self, col_fichiers):
+        securite = col_fichiers['contenu']['securite']
+        if self.parametres.get('emettre_commande') is True:
+            cdn_id = self.parametres['cdn_id']
+            self.controleur.gestionnaire.emettre_commande_publication_collectionfichiers(
+                cdn_id, col_fichiers, securite)
+        # else:
+        #     self.controleur.gestionnaire.continuer_publication()
 
 
 class ProcessusPublierFichierIpfs(MGProcessus):

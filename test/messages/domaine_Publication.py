@@ -182,6 +182,24 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_commande(
             commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_publier_configuration')
 
+    def commande_publier_complet(self):
+        commande = dict()
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_COMPLET
+        self.generateur.transmettre_commande(
+            commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_publier_complet')
+
+    def commande_reset_ressources(self):
+        commande = dict()
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_RESET_RESSOURCES
+        self.generateur.transmettre_commande(
+            commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_reset_ressources')
+
+    def commande_continuer_publication(self):
+        commande = dict()
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
+        self.generateur.transmettre_commande(
+            commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_continuer_publication')
+
     def executer(self):
         self.__logger.debug("Executer")
 
@@ -199,8 +217,11 @@ class TestPublication(DomaineTest):
         # self.supprimer_cdn()
 
         # self.commande_publier_fichiers()
-        self.commande_publier_sections()
+        # self.commande_publier_sections()
         # self.commande_publier_configuration()
+        # self.commande_reset_ressources()
+        # self.commande_publier_complet()
+        self.commande_continuer_publication()
 
 
 # --- MAIN ---
