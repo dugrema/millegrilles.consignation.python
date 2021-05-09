@@ -190,6 +190,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSection"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_PARTIEPAGE:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPartiepage"
+        elif domaine_action == ConstantesPublication.TRANSACTION_CLE_IPNS:
+            processus = "millegrilles_domaines_Publication:ProcessusSauvegarderCleIpns"
 
         else:
             # Type de transaction inconnue, on lance une exception
@@ -1081,18 +1083,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     }
                     self.demarrer_processus(processus, params)
 
-    def preparer_publication(self):
-
-        # Mettre a jour CDN des ressources par site
-        # Pour chaque site, charger liste CDNs et faire un "update ressources [cdn]requis = True where site_id in sites"
-
-        # Faire un tri des CDNs pour trouver l'ordre de publication (e.g. CDN pour le plus de sites en premier)
-
-        # Parcourir les types de ressources en ordre et demander publication (message fichiers)
-        # Ordre = INSERTS, UPDATES (1. code, 2.contenu, 3.config), DELETES
-
-        pass
-
     def get_ressource_collection_fichiers(self, uuid_collection):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre = {
@@ -1312,10 +1302,18 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Verifier s'il manque des sites
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        projection_sites = {ConstantesPublication.CHAMP_SITE_ID: True}
+        projection_sites = {
+            ConstantesPublication.CHAMP_SITE_ID: True,
+            ConstantesPublication.CHAMP_IPNS_ID: True,
+            ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE: True,
+        }
         curseur_sites = collection_sites.find(dict(), projection=projection_sites)
-        site_ids = [s[ConstantesPublication.CHAMP_SITE_ID] for s in curseur_sites]
-        for site_id in site_ids:
+        # site_ids = [s[ConstantesPublication.CHAMP_SITE_ID] for s in curseur_sites]
+        for doc_site in curseur_sites:
+            site_id = doc_site[ConstantesPublication.CHAMP_SITE_ID]
+            ipns_id = doc_site.get(ConstantesPublication.CHAMP_IPNS_ID)
+            ipns_cle_chiffree = doc_site.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
+
             set_on_insert = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
@@ -1325,6 +1323,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             set_ops = {
                 ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
             }
+            if ipns_id and ipns_cle_chiffree:
+                set_ops[ConstantesPublication.CHAMP_IPNS_ID] = ipns_id
+                set_ops[ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE] = ipns_cle_chiffree
+
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
                 ConstantesPublication.CHAMP_SITE_ID: site_id,
@@ -1339,17 +1341,33 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         curseur_sections = collection_sections.find(dict())
         for section in curseur_sections:
             type_section = section[ConstantesPublication.CHAMP_TYPE_SECTION]
+            ipns_id = section.get(ConstantesPublication.CHAMP_IPNS_ID)
+            ipns_cle_chiffree = section.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
+
+            site_id = section.get(ConstantesPublication.CHAMP_SITE_ID)
+            section_id = section[ConstantesPublication.CHAMP_SECTION_ID]
 
             set_on_insert = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
-                ConstantesPublication.CHAMP_SITE_ID: section[ConstantesPublication.CHAMP_SITE_ID],
-                ConstantesPublication.CHAMP_SECTION_ID: section[ConstantesPublication.CHAMP_SECTION_ID],
+
             }
+            if type_section == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
+                set_on_insert['uuid'] = section_id
+            else:
+                set_on_insert[ConstantesPublication.CHAMP_SECTION_ID] = section_id
+
+            if site_id:
+                set_on_insert[ConstantesPublication.CHAMP_SITE_ID] = site_id
+
             set_ops = {
                 ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
             }
+            if ipns_id and ipns_cle_chiffree:
+                set_ops[ConstantesPublication.CHAMP_IPNS_ID] = ipns_id
+                set_ops[ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE] = ipns_cle_chiffree
+
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
                 ConstantesPublication.CHAMP_SECTION_ID: section[ConstantesPublication.CHAMP_SECTION_ID],
@@ -1471,6 +1489,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: {'$exists': True},
+            ConstantesPublication.CHAMP_LISTE_SITES: {'$exists': True},
         }
         curseur_collections_fichiers = collection_ressources.find(filtre)
 
@@ -1517,6 +1536,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         liste_cdns = self.preparer_sitesparcdn()
 
+        temps_courant = datetime.datetime.utcnow()
+        expiration_distribution_en_cours = temps_courant - datetime.timedelta(minutes=30)
+
         compteur_fichiers_publies = 0  # Compte le nombre de commandes emises
         for cdn in liste_cdns:
             type_cdn = cdn[ConstantesPublication.CHAMP_TYPE_CDN]
@@ -1534,6 +1556,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
                 'sites': {'$in': liste_sites},
                 label_champ_distribution: {'$exists': True},
+                ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': False},
             }
             curseur_res_fichiers = collection_ressources.find(filtre_fichiers)
 
@@ -1541,7 +1564,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             for fichier in curseur_res_fichiers:
                 # Verifier si la commande a deja ete transmise
                 valeur_distribution = fichier[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
-                if valeur_distribution is False:
+                distribution_maj = fichier.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution_en_cours
+                if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution_en_cours):
                     # Transmettre la commande
                     self.commande_publier_fichier(fichier, cdn)
 
@@ -1662,11 +1686,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         compteur_commandes_emises = 0
 
+        expiration_distribution = datetime.datetime.utcnow() - datetime.timedelta(minutes=30)
+
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_fichiers = collection_ressources.find(filtre_fichiers)
         for col_fichiers in curseur_fichiers:
             valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
-            if valeur_distribution is False:
+            distribution_maj = col_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution
+            if valeur_distribution is False or (valeur_distribution is True and distribution_maj > expiration_distribution):
                 uuid_col_fichiers = col_fichiers['uuid']
                 filtre_fichiers_maj = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
@@ -2437,6 +2464,30 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         r.raise_for_status()
 
     def sauvegarder_cle_ipns(self, identificateur_document, params):
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: datetime.datetime.utcnow(),
+        }
+
+        type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        if type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+            filtre = {
+                ConstantesPublication.CHAMP_SITE_ID: identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
+            }
+        elif type_document == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            filtre = {
+                ConstantesPublication.CHAMP_SECTION_ID: identificateur_document['uuid'],
+            }
+            set_on_insert[ConstantesPublication.CHAMP_TYPE_SECTION] = type_document
+        else:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            filtre = {
+                ConstantesPublication.CHAMP_SECTION_ID: identificateur_document[ConstantesPublication.CHAMP_SECTION_ID],
+            }
+            set_on_insert[ConstantesPublication.CHAMP_TYPE_SECTION] = type_document
+
         cle_id = params['cleId']
         cle_chiffree = params['cle_chiffree']
 
@@ -2445,12 +2496,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'ipns_id': cle_id,
                 'ipns_cle_chiffree': cle_chiffree,
             },
+            '$setOnInsert': set_on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
-        collection_res = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        resultat = collection_res.update_one(identificateur_document, ops)
-        if resultat.matched_count != 1:
-            raise Exception("Erreur mise a jour cle IPNS doc %s" % identificateur_document)
+
+        # collection_res = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        resultat = collection_doc.update_one(filtre, ops, upsert=True)
+
+        # Sauvegarder dans les ressources aussi (va etre recopiee au besoin)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(identificateur_document)
+        collection_ressources.update_one(identificateur_document, ops, upsert=True)
 
 
 class ProcessusPublication(MGProcessusTransaction):
@@ -2700,6 +2759,10 @@ class ProcessusPublierFichierIpfs(MGProcessus):
 
 class ProcessusPublierCleEtFichierIpns(MGProcessus):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def initiale(self):
         # Publier la cle ipns
         nom_cle = self.parametres['nom_cle']
@@ -2718,6 +2781,20 @@ class ProcessusPublierCleEtFichierIpns(MGProcessus):
         # "cle_chiffree": "mdiXefgNip2bHL9TA0mTF2wFge5cYY6G+flglfvphroPNpKNf5Y9linAO20ht1KbA6KGppgW1Xo47QpFguqf5WxEy8tZ3Dkh/88I5Zd6f0C79K7dTsEm9GNmBHAp0/ciwIF1llc+ONdngsjv0UQo9oosaUwBgvWZtP0I/lh9DAT4ereqt0d/2mT/7gUHmZ/vVf1sSn5AGP4xKHjn8a4LWmAcvKTdR4qnx0q87+GECp3l6e+X8+8I2V+23/DkXPnuI9j3RGc5SqGP/9oZPnzUexpi50qexHznW9xvGmW8wAzaafg",
         identificateur_document = self.parametres['identificateur_document']
         reponse_cle = self.parametres['reponse'][0]
+
+        if reponse_cle.get('err'):
+            self.__logger.error("Erreur reception cle IPNS : %s" % str(reponse_cle))
+            self.set_etape_suivante()  # Termine
+            return
+
+        # Creer transaction pour sauvegarder la cle IPNS de maniere permanente
+        transaction_cle_ipns = {
+            'identificateur_document': identificateur_document,
+        }
+        transaction_cle_ipns.update(reponse_cle)
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_CLE_IPNS
+        self.ajouter_transaction_a_soumettre(domaine_action, transaction_cle_ipns)
+
         self.controleur.gestionnaire.sauvegarder_cle_ipns(identificateur_document, reponse_cle)
 
         # Publier fichier
@@ -2731,3 +2808,13 @@ class ProcessusPublierCleEtFichierIpns(MGProcessus):
         self.controleur.gestionnaire.put_fichier_ipns(doc_cdn, identificateur_document, nom_cle, res_data, securite)
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusSauvegarderCleIpns(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+        identificateur_document = transaction['identificateur_document']
+        self.controleur.gestionnaire.sauvegarder_cle_ipns(identificateur_document, transaction)
+
+        self.set_etape_suivante()

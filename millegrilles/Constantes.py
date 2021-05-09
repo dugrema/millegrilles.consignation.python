@@ -1856,6 +1856,7 @@ class ConstantesPublication:
     TRANSACTION_MAJ_SECTION = 'majSection'
     TRANSACTION_MAJ_PARTIEPAGE = 'majPartiePage'
     TRANSACTION_SUPPRIMER_CDN = 'supprimerCdn'
+    TRANSACTION_CLE_IPNS = 'cleIpns'
 
     COMMANDE_PUBLIER_SITE = 'publierSite'
     COMMANDE_PUBLIER_PAGE = 'publierPage'
@@ -1916,6 +1917,8 @@ class ConstantesPublication:
     CHAMP_PREPARATION_RESSOURCES = 'preparation_ressources'
     CHAMP_LISTE_SITES = 'sites'
     CHAMP_LISTE_CDNS = 'listeCdn'
+    CHAMP_IPNS_CLE_CHIFFREE = 'ipns_cle_chiffree'
+    CHAMP_IPNS_ID = 'ipns_id'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
