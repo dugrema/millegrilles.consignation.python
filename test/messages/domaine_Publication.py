@@ -196,7 +196,9 @@ class TestPublication(DomaineTest):
             commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_publier_complet')
 
     def commande_reset_ressources(self):
-        commande = dict()
+        commande = {
+            'ignorer': ['fichier']
+        }
         domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_RESET_RESSOURCES
         self.generateur.transmettre_commande(
             commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_reset_ressources')

@@ -119,7 +119,7 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         elif domaine_action == ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION:
             self.gestionnaire.continuer_publication(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_RESET_RESSOURCES:
-            matched_count = self.gestionnaire.reset_ressources()
+            matched_count = self.gestionnaire.reset_ressources(message_dict)
             reponse = {'ok': True, 'matched_count': matched_count}
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
@@ -1237,7 +1237,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return fuuids_info
 
-    def reset_ressources(self):
+    def reset_ressources(self, params: dict):
         """
         Reset l'etat de publication et le contenu de toutes les ressources.
         :return:
@@ -1252,7 +1252,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             '$unset': unset_opts,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
-        resultat = collection_ressources.update_many(dict(), ops)
+
+        filtre = dict()
+        ignorer_ressources = params.get('ignorer')
+        if ignorer_ressources is not None:
+            filtre[Constantes.DOCUMENT_INFODOC_LIBELLE] = {'$nin': ignorer_ressources}
+
+        resultat = collection_ressources.update_many(filtre, ops)
 
         return resultat.matched_count
 
