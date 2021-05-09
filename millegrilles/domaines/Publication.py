@@ -26,9 +26,10 @@ UNSET_PUBLICATION_RESOURCES = {
     ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
     ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
     ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True,
-    # ConstantesPublication.CHAMP_DISTRIBUTION_MAJ: True,
-    ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
+    ConstantesPublication.CHAMP_DISTRIBUTION_MAJ: True,
+    # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
     ConstantesPublication.CHAMP_CONTENU_GZIP: True,
+    # ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
 }
 
 
@@ -684,7 +685,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :return:
         """
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
             ConstantesPublication.CHAMP_SECTION_ID: {'$in': section_ids}
         }
         self.invalider_ressources(filtre)
@@ -696,7 +697,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :return:
         """
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ConstantesPublication.CHAMP_SECTION_ID: {'$in': section_ids}
         }
         self.invalider_ressources(filtre)
@@ -803,7 +804,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
                 }
 
-                if type_section in [ConstantesPublication.LIBVAL_FICHIERS, ConstantesPublication.LIBVAL_ALBUM]:
+                if type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
                     uuid_collections = doc_section[ConstantesPublication.CHAMP_COLLECTIONS]
                     section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
                     uuid_to_map.update(uuid_collections)
@@ -822,9 +823,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre_res_ipns = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                ConstantesPublication.LIBVAL_FICHIERS,
-                ConstantesPublication.LIBVAL_PAGE,
-                ConstantesPublication.LIBVAL_FORUM,
+                ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                ConstantesPublication.LIBVAL_SECTION_PAGE,
+                ConstantesPublication.LIBVAL_SECTION_FORUM,
                 ConstantesPublication.LIBVAL_SITE_CONFIG,
             ]},
             'sites': {'$all': [site_id]},
@@ -970,7 +971,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
         ops = {
@@ -980,7 +981,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         filtre = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         doc_page = collection_ressources.find_one_and_update(
@@ -992,14 +993,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.maj_ressources_fuuids(fuuids_info, sites=[site_id], public=flag_public)
 
         # Transmettre commande pour s'assurer que les fuuid sont inseres dans la collection du site
-        uuid_collection = site_id  # Meme ID par definition
-        domaine_action_associer_collection = 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION
-        for fuuid in fuuids_info.keys():
-            commande_inserer = {
-                ConstantesGrosFichiers.CHAMP_UUID_COLLECTION: uuid_collection,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
-            }
-            self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
+        # uuid_collection = site_id  # Meme ID par definition
+        # domaine_action_associer_collection = 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION
+        # for fuuid in fuuids_info.keys():
+        #     commande_inserer = {
+        #         ConstantesGrosFichiers.CHAMP_UUID_COLLECTION: uuid_collection,
+        #         ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
+        #     }
+        #     self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
 
         # Trigger pour upload de tout le site (commencer par les fichiers)
         # self.continuer_publication()
@@ -1092,72 +1093,72 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         pass
 
-    def get_ressource_collection(self, uuid_collection):
+    def get_ressource_collection_fichiers(self, uuid_collection):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
         }
         res_collection = collection_ressources.find_one(filtre)
         return res_collection
 
-    def ajouter_site_fichiers(self, uuid_collection, site_id):
+    def ajouter_site_fichiers(self, uuid_collection, sites):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
         }
         ops = {
-            '$addToSet': {'sites': site_id}
+            '$addToSet': {'sites': {'$each': sites}}
         }
         collection_ressources.update_one(filtre, ops)
 
-    def creer_ressource_collection(self, site_ids, info_collection: dict, liste_fichiers: list):
-        if isinstance(site_ids, str):
-            site_ids = [site_ids]
+    # def creer_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
+    #     if isinstance(site_ids, str):
+    #         site_ids = [site_ids]
+    #
+    #     contenu = {}
+    #     contenu.update(info_collection)
+    #     contenu['fichiers'] = liste_fichiers
+    #
+    #     # contenu = self.generateur_transactions.preparer_enveloppe(
+    #     #     contenu, 'Publication.fichiers', ajouter_certificats=True)
+    #
+    #     set_ops = {
+    #         'contenu': contenu,
+    #     }
+    #     set_on_insert = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+    #         'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+    #         Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+    #     }
+    #     add_to_set = {
+    #         'sites': {'$each': site_ids},
+    #     }
+    #     filtre = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+    #         'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+    #     }
+    #     ops = {
+    #         '$set': set_ops,
+    #         '$setOnInsert': set_on_insert,
+    #         '$addToSet': add_to_set,
+    #         '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+    #     }
+    #     collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+    #     doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+    #
+    #     # Creer les entrees manquantes de fichiers
+    #     fuuids_dict = dict()
+    #     flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
+    #     for f in liste_fichiers:
+    #         for fuuid in f['fuuids']:
+    #             fuuids_dict[fuuid] = f
+    #     self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public)
+    #
+    #     return doc_fichiers
 
-        contenu = {}
-        contenu.update(info_collection)
-        contenu['fichiers'] = liste_fichiers
-
-        # contenu = self.generateur_transactions.preparer_enveloppe(
-        #     contenu, 'Publication.fichiers', ajouter_certificats=True)
-
-        set_ops = {
-            'contenu': contenu,
-        }
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
-            'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-        }
-        add_to_set = {
-            'sites': {'$each': site_ids},
-        }
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
-            'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
-        }
-        ops = {
-            '$set': set_ops,
-            '$setOnInsert': set_on_insert,
-            '$addToSet': add_to_set,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        }
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
-
-        # Creer les entrees manquantes de fichiers
-        fuuids_dict = dict()
-        flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
-        for f in liste_fichiers:
-            for fuuid in f['fuuids']:
-                fuuids_dict[fuuid] = f
-        self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public)
-
-        return doc_fichiers
-
-    def maj_ressource_collection(self, site_ids, info_collection: dict, liste_fichiers: list):
+    def maj_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
         if isinstance(site_ids, str):
             site_ids = [site_ids]
 
@@ -1180,9 +1181,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         set_ops = {
             'contenu': contenu,
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
         }
         set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid': uuid_collection,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
@@ -1190,7 +1192,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             'sites': {'$each': site_ids},
         }
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
         }
         ops = {
@@ -1242,7 +1244,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         unset_opts = {
-            'contenu': True,
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
         }
         unset_opts.update(UNSET_PUBLICATION_RESOURCES)
         ops = {
@@ -1279,7 +1282,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
             ops = {
-                '$set': {'distribution_progres.' + cdn_id: False},
+                '$set': {
+                    ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+                    'distribution_progres.' + cdn_id: False,
+                },
                 '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             }
             resultat = collection_ressources.update_many(filtre, ops)
@@ -1310,49 +1316,47 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
                 ConstantesPublication.CHAMP_SITE_ID: site_id,
             }
+            set_ops = {
+                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+            }
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
                 ConstantesPublication.CHAMP_SITE_ID: site_id,
             }
             ops = {
+                '$set': set_ops,
                 '$setOnInsert': set_on_insert
             }
             collection_ressources.update_one(filtre, ops, upsert=True)
 
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        projection_sections = {
-            ConstantesPublication.CHAMP_TYPE_SECTION: True,
-            ConstantesPublication.CHAMP_SITE_ID: True,
-            ConstantesPublication.CHAMP_SECTION_ID: True,
-            'uuid': True,
-            'forum_id': True,
-        }
-        curseur_sections = collection_sections.find(dict(), projection=projection_sections)
+        curseur_sections = collection_sections.find(dict())
         for section in curseur_sections:
             type_section = section[ConstantesPublication.CHAMP_TYPE_SECTION]
 
             set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
                 ConstantesPublication.CHAMP_SITE_ID: section[ConstantesPublication.CHAMP_SITE_ID],
+                ConstantesPublication.CHAMP_SECTION_ID: section[ConstantesPublication.CHAMP_SECTION_ID],
+            }
+            set_ops = {
+                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
             }
             filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+                Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
+                ConstantesPublication.CHAMP_SECTION_ID: section[ConstantesPublication.CHAMP_SECTION_ID],
             }
 
-            if type_section == ConstantesPublication.LIBVAL_FICHIERS:
-                set_on_insert['uuid'] = section['uuid']
-                filtre['uuid'] = section['uuid']
-            else:
-                set_on_insert[Constantes.DOCUMENT_INFODOC_LIBELLE] = type_section
-                set_on_insert[ConstantesPublication.CHAMP_SECTION_ID] = section[ConstantesPublication.CHAMP_SECTION_ID]
-                filtre[Constantes.DOCUMENT_INFODOC_LIBELLE] = type_section
-                filtre[ConstantesPublication.CHAMP_SECTION_ID] = section[ConstantesPublication.CHAMP_SECTION_ID]
-
             ops = {
+                '$set': set_ops,
                 '$setOnInsert': set_on_insert
             }
             collection_ressources.update_one(filtre, ops, upsert=True)
+
+        # Effectue l'extraction de tous les fichiers et collections de fichiers requis par les sections
+        self.identifier_ressources_fichiers()
 
     def continuer_publication(self, params: dict = None):
         """
@@ -1362,6 +1366,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         if params is None:
             params = dict()
+
+        compteur_collections_fichiers = self.trigger_traitement_collections_fichiers(params)
+        if compteur_collections_fichiers > 0:
+            self.__logger.info("Preparation des collections de fichiers, %d collections en traitement" % compteur_collections_fichiers)
+            return
 
         compteur_fichiers_publies = self.trigger_publication_fichiers(params)
         if compteur_fichiers_publies > 0:
@@ -1377,6 +1386,123 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
         compteur_commandes_emises = self.commande_publication_configuration(dict())
         self.__logger.info("Trigger publication siteconfig, %d commandes emises" % compteur_commandes_emises)
+
+    def identifier_ressources_fichiers(self):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_res = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPublication.LIBVAL_SECTION_PAGE,
+                ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+                ConstantesPublication.LIBVAL_SECTION_ALBUM,
+                ConstantesPublication.LIBVAL_SECTION_FORUM,
+            ]},
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+        }
+
+        curseur_ressources = collection_ressources.find(filtre_res)
+        for res in curseur_ressources:
+            # Mettre le flag a True immediatement, evite race condition
+            filtre_res_update = {ConstantesPublication.CHAMP_SECTION_ID: res[ConstantesPublication.CHAMP_SECTION_ID]}
+            ops = {
+                '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True},
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+            collection_ressources.update_one(filtre_res_update, ops)
+
+            self.preparer_liste_fichiers(res)
+
+    def preparer_liste_fichiers(self, res: dict):
+        type_section = res[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        section_id = res[ConstantesPublication.CHAMP_SECTION_ID]
+        # collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        # filtre_section = {
+        #     ConstantesPublication.CHAMP_SECTION_ID: section_id
+        # }
+        # doc_section = collection_sections.find_one(filtre_section)
+
+        if type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
+            self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+        elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
+            collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            filtre_section = {
+                ConstantesPublication.CHAMP_SECTION_ID: section_id
+            }
+            doc_section = collection_sections.find_one(filtre_section)
+
+            collection_uuids = doc_section.get('collections') or list()
+            site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]
+            site = self.get_site(site_id)
+            liste_cdns = site[ConstantesPublication.CHAMP_LISTE_CDNS]
+
+            date_courante = datetime.datetime.utcnow()
+            collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+            for collection_uuid in collection_uuids:
+                filtre_res_collfichiers = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                    'uuid': collection_uuid,
+                }
+                set_on_insert = {
+                    Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                    Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+                    ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+                }
+                add_to_set = {
+                    ConstantesPublication.CHAMP_LISTE_SITES: {'$each': [site_id]},
+                }
+                set_ops = dict()
+                for cdn_id in liste_cdns:
+                    set_ops[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id] = False
+                set_on_insert.update(filtre_res_collfichiers)
+                ops = {
+                    '$set': set_ops,
+                    '$addToSet': add_to_set,
+                    '$setOnInsert': set_on_insert,
+                }
+                collection_ressources.update_one(filtre_res_collfichiers, ops, upsert=True)
+
+    def trigger_traitement_collections_fichiers(self, params: dict):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: {'$exists': True},
+        }
+        curseur_collections_fichiers = collection_ressources.find(filtre)
+
+        compteur_collections = 0
+        for collection_fichiers in curseur_collections_fichiers:
+            etat_preparation = collection_fichiers[ConstantesPublication.CHAMP_PREPARATION_RESSOURCES]
+
+            if etat_preparation is True:
+                continue  # Rien a faire, collection de fichiers prete
+
+            compteur_collections = compteur_collections + 1
+
+            if etat_preparation == 'en_cours':
+                continue  # Rien d'autre a faire
+
+            uuid_collection = collection_fichiers['uuid']
+            liste_sites = collection_fichiers[ConstantesPublication.CHAMP_LISTE_SITES]
+            filtre_coll_fichiers = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid': uuid_collection
+            }
+            ops = {
+                '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: 'en_cours'},
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+            collection_ressources.update_one(filtre_coll_fichiers, ops)
+
+            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            params = {
+                'uuid_collection': uuid_collection,
+                'site_ids': liste_sites,
+                # 'cdn_id': cdn_id,
+                'emettre_commande': False,
+                'continuer_publication': True,
+            }
+            self.demarrer_processus(processus, params)
+
+        return compteur_collections
 
     def trigger_publication_fichiers(self, params: dict):
         """
@@ -1514,7 +1640,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return compteur_commandes_emises
 
-    def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PRIVE):
+    def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC):
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
         :param cdn_id:
@@ -1523,7 +1649,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
         filtre_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'sites': {'$in': liste_sites},
             label_champ_distribution: {'$exists': True},
         }
@@ -1537,10 +1663,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if valeur_distribution is False:
                 uuid_col_fichiers = col_fichiers['uuid']
                 filtre_fichiers_maj = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
                     'uuid': uuid_col_fichiers,
                 }
-                self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
+                self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
 
                 # La collection n'a pas encore ete preparee pour la publication
                 contenu = col_fichiers.get('contenu')
@@ -1566,7 +1692,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         uuid_col_fichiers = col_fichiers['uuid']
         contenu_gzippe = col_fichiers.get('contenu_gzip')
         filtre_fichiers_maj = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid': uuid_col_fichiers,
         }
         if contenu_gzippe is None:
@@ -1576,7 +1702,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Publier le contenu sur le CDN
         # Upload avec requests via https://fichiers
         commande_publier_section = {
-            'type_section': ConstantesPublication.LIBVAL_FICHIERS,
+            'type_section': ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid_collection': uuid_col_fichiers,
             'cdn_id': cdn_id,
             'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
@@ -1602,7 +1728,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
 
         filtre_pages = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
             ConstantesPublication.CHAMP_SITE_ID: site_id,
             label_champ_distribution: {'$exists': True},
         }
@@ -1615,7 +1741,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
 
             filtre_pages_maj = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_PAGE,
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
                 ConstantesPublication.CHAMP_SECTION_ID: section_id,
             }
             valeur_distribution = doc_page[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
@@ -1638,7 +1764,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 # Publier le contenu sur le CDN
                 # Upload avec requests via https://fichiers
                 commande_publier_section = {
-                    'type_section': ConstantesPublication.LIBVAL_PAGE,
+                    'type_section': ConstantesPublication.LIBVAL_SECTION_PAGE,
                     ConstantesPublication.CHAMP_SECTION_ID: section_id,
                     'cdn_id': cdn_id,
                     'securite': securite_site,
@@ -1664,11 +1790,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Trouver tous les sites qui n'ont pas ete publies pour le CDN
         filtre_siteconfig = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-            '$or': [
-                {'sites': {'$all': [site_id]}},
-                {'site_id': site_id},
-            ],
-            'distribution_complete': {'$not': {'$all': [cdn_id]}},
+            'site_id': site_id,
+            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_siteconfig = collection_ressources.find(filtre_siteconfig)
@@ -1677,6 +1800,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
             try:
                 self.preparer_siteconfig_publication(cdn_id, site_id)
+                filtre_section = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+                    ConstantesPublication.CHAMP_SITE_ID: site_id,
+                }
+                self.marquer_ressource_encours(cdn_id, filtre_section)
 
                 # Publier le contenu sur le CDN
                 # Upload avec requests via https://fichiers
@@ -1689,12 +1817,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     'content_encoding': 'gzip',  # Header Content-Encoding
                     'max_age': 0,
                 }
-
-                filtre_section = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-                    ConstantesPublication.CHAMP_SITE_ID: site_id,
-                }
-                self.marquer_ressource_encours(cdn_id, filtre_section)
 
                 domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION
                 self.generateur_transactions.transmettre_commande(commande_publier_siteconfig, domaine_action)
@@ -1738,9 +1860,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: type_section
         }
-        if type_section == ConstantesPublication.LIBVAL_FICHIERS:
+        if type_section == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
             filtre['uuid'] = params['uuid_collection']
-        elif type_section == ConstantesPublication.LIBVAL_PAGE:
+        elif type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
             filtre[ConstantesPublication.CHAMP_SECTION_ID] = params[ConstantesPublication.CHAMP_SECTION_ID]
         else:
             msg = 'Type section inconnue: %s' % type_section
@@ -1869,7 +1991,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: type_section,
         }
 
-        if type_section == ConstantesPublication.LIBVAL_FICHIERS:
+        if type_section == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
             nom_cle = res_data['uuid']
             identificateur_document['uuid'] = nom_cle
         elif type_section == ConstantesPublication.LIBVAL_SITE_CONFIG:
@@ -1956,16 +2078,21 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         self.marquer_ressource_encours(cdn_id, filtre_fichier_update)
 
-    def marquer_ressource_encours(self, cdn_id, filtre_ressource):
+    def marquer_ressource_encours(self, cdn_id, filtre_ressource, etat=True, upsert=False):
+        date_courante = datetime.datetime.utcnow()
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: date_courante,
+        }
+        set_on_insert.update(filtre_ressource)
         ops = {
-            '$set': {'distribution_progres.' + cdn_id: True},
+            '$set': {'distribution_progres.' + cdn_id: etat},
             '$currentDate': {
                 'distribution_maj': True,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
             }
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources.update_one(filtre_ressource, ops)
+        collection_ressources.update_one(filtre_ressource, ops, upsert=upsert)
 
     def commande_publier_fichier_sftp(self, res_fichier: dict, cdn_info: dict):
         fuuid = res_fichier['fuuid']
@@ -2144,7 +2271,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Verifier les collections presentes (deja dans ressources)
         filtre_collections_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid': {'$in': list(collection_uuids)}
         }
         projection_collections_fichiers = {'uuid': True, 'sites': True}
@@ -2187,13 +2314,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
             }
             prochain_trigger = self.trigger_publication_sections
-        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_FICHIERS, ConstantesPublication.LIBVAL_FORUM]:
+        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_FORUM]:
             # C'est une section, on verifie si toutes les sections sont completees
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                    ConstantesPublication.LIBVAL_FICHIERS,
-                    ConstantesPublication.LIBVAL_PAGE,
-                    ConstantesPublication.LIBVAL_FORUM,
+                    ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                    ConstantesPublication.LIBVAL_SECTION_PAGE,
+                    ConstantesPublication.LIBVAL_SECTION_FORUM,
                 ]}
             }
             prochain_trigger = self.commande_publication_configuration
@@ -2452,7 +2579,7 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
 
         # Verifier si la collection existe deja dans ressources
         uuid_collection = params['uuid_collection']
-        res_collection = self.controleur.gestionnaire.get_ressource_collection(uuid_collection)
+        res_collection = self.controleur.gestionnaire.get_ressource_collection_fichiers(uuid_collection)
 
         requete = {'uuid': uuid_collection}
         domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
@@ -2466,34 +2593,33 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         if site_ids is not None:
             set_site_ids.update(site_ids)
 
-        if res_collection is None:
-            # Requete vers grosfichiers pour recuperer le contenu de la collection et initialiser tous les fichiers
-            # requete = {'uuid': uuid_collection}
-            # domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
-            # self.set_requete(domaine_action, requete)
-            self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_nouvelle_collection.__name__)
-        else:
-            # S'assurer que la collection a le site_id
-            for site_id in set_site_ids:
-                if site_id not in res_collection['sites']:
-                    self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, site_id)
+        # if res_collection is None:
+        #     # Requete vers grosfichiers pour recuperer le contenu de la collection et initialiser tous les fichiers
+        #     # requete = {'uuid': uuid_collection}
+        #     # domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
+        #     # self.set_requete(domaine_action, requete)
+        #     self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_nouvelle_collection.__name__)
+        # else:
+        if res_collection is not None:
+            # S'assurer que la collection a les site_ids
+            self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, res_collection['sites'])
 
-            self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_maj_collection.__name__)
+        self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_maj_collection.__name__)
 
         return {'site_ids': list(set_site_ids)}
 
-    def traiter_nouvelle_collection(self):
-        contenu_collection = self.parametres['reponse'][0]
-        site_ids = self.parametres['site_ids']
-
-        info_collection = contenu_collection['collection']
-        liste_documents = contenu_collection['documents']
-
-        col_fichiers = self.controleur.gestionnaire.creer_ressource_collection(site_ids, info_collection, liste_documents)
-
-        self.continuer_publication(col_fichiers)
-
-        self.set_etape_suivante()  # Termine
+    # def traiter_nouvelle_collection(self):
+    #     contenu_collection = self.parametres['reponse'][0]
+    #     site_ids = self.parametres['site_ids']
+    #
+    #     info_collection = contenu_collection['collection']
+    #     liste_documents = contenu_collection['documents']
+    #
+    #     col_fichiers = self.controleur.gestionnaire.creer_ressource_collection_fichiers(site_ids, info_collection, liste_documents)
+    #
+    #     self.continuer_publication(col_fichiers)
+    #
+    #     self.set_etape_suivante()  # Termine
 
     def traiter_maj_collection(self):
 
@@ -2503,7 +2629,19 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         info_collection = contenu_collection['collection']
         liste_documents = contenu_collection['documents']
 
-        col_fichiers = self.controleur.gestionnaire.maj_ressource_collection(site_ids, info_collection, liste_documents)
+        col_fichiers = self.controleur.gestionnaire.maj_ressource_collection_fichiers(site_ids, info_collection, liste_documents)
+
+        uuid_collection = self.parametres['uuid_collection']
+        collection_ressources = self.controleur.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_coll_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            'uuid': uuid_collection
+        }
+        ops = {
+            '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection_ressources.update_one(filtre_coll_fichiers, ops)
 
         self.continuer_publication(col_fichiers)
 
@@ -2515,8 +2653,9 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
             cdn_id = self.parametres['cdn_id']
             self.controleur.gestionnaire.emettre_commande_publication_collectionfichiers(
                 cdn_id, col_fichiers, securite)
-        # else:
-        #     self.controleur.gestionnaire.continuer_publication()
+        elif self.parametres.get('continuer_publication') is True:
+            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
+            self.ajouter_commande_a_transmettre(domaine_action, dict())
 
 
 class ProcessusPublierFichierIpfs(MGProcessus):

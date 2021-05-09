@@ -1833,11 +1833,12 @@ class ConstantesPublication:
     LIBVAL_SITE_CONFIG = 'siteconfig'
     LIBVAL_ACCUEIL = 'accueil'
     LIBVAL_POST = 'post'
-    LIBVAL_PAGE = 'page'
-    LIBVAL_FICHIERS = 'fichiers'
-    LIBVAL_ALBUM = 'album'
+    LIBVAL_SECTION_PAGE = 'page'
+    LIBVAL_SECTION_FICHIERS = 'fichiers'
+    LIBVAL_SECTION_ALBUM = 'album'
+    LIBVAL_SECTION_FORUM = 'forum'
+    LIBVAL_COLLECTION_FICHIERS = 'collection_fichiers'
     LIBVAL_FICHIER = 'fichier'
-    LIBVAL_FORUM = 'forum'
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
@@ -1912,6 +1913,9 @@ class ConstantesPublication:
     CHAMP_CONTENU = 'contenu'
     CHAMP_CONTENU_GZIP = 'contenu_gzip'
     CHAMP_DISTRIBUTION_PROGRES = 'distribution_progres'
+    CHAMP_PREPARATION_RESSOURCES = 'preparation_ressources'
+    CHAMP_LISTE_SITES = 'sites'
+    CHAMP_LISTE_CDNS = 'listeCdn'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
