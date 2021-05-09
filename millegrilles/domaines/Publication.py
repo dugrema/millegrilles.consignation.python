@@ -1699,6 +1699,18 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # Creer contenu .json.gz
             self.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
         self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
+
+        # Marquer tous les fichiers associes a cette collection s'ils ne sont pas deja publies
+        # pour ce CDN
+        filtre_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
+            # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {'exists': False},
+            'collections': {'$all': [uuid_col_fichiers]}
+            # 'fuuid': {'$in': liste_fuuids}
+        }
+        self.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
+
         # Publier le contenu sur le CDN
         # Upload avec requests via https://fichiers
         commande_publier_section = {
@@ -2078,7 +2090,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         self.marquer_ressource_encours(cdn_id, filtre_fichier_update)
 
-    def marquer_ressource_encours(self, cdn_id, filtre_ressource, etat=True, upsert=False):
+    def marquer_ressource_encours(self, cdn_id, filtre_ressource, many=False, etat=True, upsert=False):
         date_courante = datetime.datetime.utcnow()
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: date_courante,
@@ -2092,7 +2104,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             }
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources.update_one(filtre_ressource, ops, upsert=upsert)
+        if many is False:
+            collection_ressources.update_one(filtre_ressource, ops, upsert=upsert)
+        else:
+            collection_ressources.update_many(filtre_ressource, ops, upsert=upsert)
 
     def commande_publier_fichier_sftp(self, res_fichier: dict, cdn_info: dict):
         fuuid = res_fichier['fuuid']
