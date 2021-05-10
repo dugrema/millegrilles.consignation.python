@@ -82,7 +82,6 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_ETAT_PUBLICATION:
             reponse = self.gestionnaire.get_etat_publication(message_dict)
-            reponse = {'resultats': reponse}
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -476,15 +475,41 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         return site_pages
 
     def get_configuration_site(self, params: dict):
-        site_id = params['site_id']
-        filtre = {
-            ConstantesPublication.CHAMP_SITE_ID: site_id
-        }
-        hints = [(ConstantesPublication.CHAMP_SITE_ID, 1)]
-        collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        noeud_config = collection_site.find_one(filtre, hint=hints)
+        site_id = params.get('site_id')
+        noeud_id = params.get('noeud_id')
 
-        return noeud_config
+        sites = dict()
+
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        if site_id is not None:
+            filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
+            collection_sites.find(filtre_site)
+        elif noeud_id is not None:
+            filtre = {
+                ConstantesPublication.CHAMP_NOEUD_ID: noeud_id
+            }
+            collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+            curseur_cdn = collection_cdns.find(filtre)
+
+            for cdn in curseur_cdn:
+                cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+                filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
+                curseur_sites = collection_sites.find(filtre_site)
+                for site in curseur_sites:
+                    sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
+
+        # Verifier si la ressource du site est prete (contenu)
+        if len(sites) == 1:
+            # Ok, format simple avec une seule configuration
+            for site in sites.values():
+                site_id = site[ConstantesPublication.CHAMP_SITE_ID]
+
+                # Note : La methode genere le contenu uniquement s'il n'est pas deja present
+                doc_res_site = self.preparer_siteconfig_publication(None, site_id)
+                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU]
+                return contenu
+        else:
+            return {'err': 'Nombre de sites associes a ce noeud %d (1 seul site supporte pour l\'instant)' % len(sites)}
 
     def get_sites_par_noeud(self, params: dict) -> list:
         noeud_id = params['noeud_id']
@@ -512,6 +537,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {
                     '$exists': True,
                     '$ne': dict()
+                },
+                ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {
+                    '$exists': False
                 }
             }},
             {'$group': {
@@ -520,8 +548,33 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             }}
         ]
         curseur = collection_ressources.aggregate(aggregation_pipe)
+
+        en_cours = dict()
         for resultat in curseur:
             self.__logger.debug("Resultat : %s" % str(resultat))
+            type_section = resultat['_id']
+            count_section = resultat['count']
+            en_cours[type_section] = count_section
+
+        filtre_erreurs = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': True}
+        }
+        projection_erreurs = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: True,
+            ConstantesPublication.CHAMP_SITE_ID: True,
+            ConstantesPublication.CHAMP_SECTION_ID: True,
+            'uuid': True
+        }
+        curseur_erreurs = collection_ressources.find(filtre_erreurs, projection=projection_erreurs, limit=1000)
+        erreurs = [e for e in curseur_erreurs]
+
+        reponse = {
+            'erreurs': erreurs,
+            'en_cours': en_cours,
+        }
+
+        return reponse
 
     def creer_site(self, params: dict):
         uuid_transaction = params['en-tete']['uuid_transaction']
@@ -2016,7 +2069,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if contenu_siteconfig is None:
             res_site = self.maj_ressources_site({'site_id': site_id})
-            self.sauvegarder_contenu_gzip(res_site, filtre)
+            res_site = self.sauvegarder_contenu_gzip(res_site, filtre)
 
         return res_site
 

@@ -1919,6 +1919,7 @@ class ConstantesPublication:
     CHAMP_LISTE_CDNS = 'listeCdn'
     CHAMP_IPNS_CLE_CHIFFREE = 'ipns_cle_chiffree'
     CHAMP_IPNS_ID = 'ipns_id'
+    CHAMP_NOEUD_ID = 'noeud_id'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,

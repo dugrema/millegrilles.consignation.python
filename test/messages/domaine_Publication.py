@@ -33,7 +33,10 @@ class TestPublication(DomaineTest):
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
     def requete_config_site(self):
-        requete = {'site_id': self.site_id}
+        requete = {
+            # 'site_id': self.site_id,
+            'noeud_id': '01407632-5a8f-4727-b593-9afa94447dea',
+        }
         domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_CONFIGURATION_SITE
         correlation_id = 'test'
         self.generateur.transmettre_requete(
@@ -214,7 +217,7 @@ class TestPublication(DomaineTest):
 
         # self.requete_liste_sites()
         # self.requete_liste_posts()
-        # self.requete_config_site()
+        self.requete_config_site()
         # self.requete_sites_pour_noeud()
         # self.requete_cdns()
         # self.creer_site()
@@ -229,7 +232,7 @@ class TestPublication(DomaineTest):
         # self.commande_publier_sections()
         # self.commande_publier_configuration()
         # self.commande_reset_ressources()
-        self.commande_publier_complet()
+        # self.commande_publier_complet()
         # self.commande_continuer_publication()
         # self.requete_etat_publication()
 
