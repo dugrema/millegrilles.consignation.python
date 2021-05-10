@@ -1870,6 +1870,7 @@ class ConstantesPublication:
     COMMANDE_RESET_RESSOURCES = 'resetRessources'
     COMMANDE_PUBLIER_COMPLET = 'publierComplet'
     COMMANDE_CONTINUER_PUBLICATION = 'continuerPublication'
+    COMMANDE_POUSSER_SECTIONS = 'pousserSections'
 
     EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
     EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'

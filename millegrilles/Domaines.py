@@ -48,14 +48,15 @@ class TraitementMessageDomaineCommande(TraitementMessageDomaine):
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         raise NotImplementedError()
 
-    def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None):
+    def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None, ajouter_certificats=False):
         if correlation_id is None:
             correlation_id = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
         message_resultat = {
             'resultats': resultats,
         }
-        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(
+            message_resultat, replying_to, correlation_id, ajouter_certificats=ajouter_certificats)
 
 
 class TraitementMessageDomaineEvenement(TraitementMessageDomaine):

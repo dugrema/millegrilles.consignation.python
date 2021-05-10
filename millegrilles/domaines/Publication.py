@@ -15,7 +15,7 @@ from typing import Union
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
-    TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementMessageDomaineEvenement
+    TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementMessageDomaineEvenement, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.util.Hachage import hacher
 from millegrilles.util.JSONMessageEncoders import JSONHelper
@@ -50,6 +50,23 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
             raise Exception("Requete publique non supportee " + routing_key)
+
+        if reponse:
+            self.transmettre_reponse(
+                message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
+
+
+class TraitementCommandesPubliquesPublication(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        domaine_action = routing_key.split('.').pop()
+
+        reponse = None
+        if domaine_action == ConstantesPublication.COMMANDE_POUSSER_SECTIONS:
+            reponse = self.gestionnaire.pousser_sections(message_dict, properties)
+        else:
+            super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
         if reponse:
             self.transmettre_reponse(
@@ -118,6 +135,8 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         elif domaine_action == ConstantesPublication.COMMANDE_RESET_RESSOURCES:
             matched_count = self.gestionnaire.reset_ressources(message_dict)
             reponse = {'ok': True, 'matched_count': matched_count}
+        elif domaine_action == ConstantesPublication.COMMANDE_POUSSER_SECTIONS:
+            reponse = self.gestionnaire.pousser_sections(message_dict, properties)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -152,6 +171,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
 
         self.__handler_commandes = {
+            Constantes.SECURITE_PUBLIC: TraitementCommandesPubliquesPublication(self),
             Constantes.SECURITE_PROTEGE: TraitementCommandesProtegeesPublication(self),
         }
 
@@ -1477,6 +1497,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         compteur_commandes_emises = self.commande_publication_configuration(dict())
         self.__logger.info("Trigger publication siteconfig, %d commandes emises" % compteur_commandes_emises)
 
+        # Publier mapping (index.json)
+
     def identifier_ressources_fichiers(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre_res = {
@@ -1759,7 +1781,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         for col_fichiers in curseur_fichiers:
             valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
             distribution_maj = col_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution
-            if valeur_distribution is False or (valeur_distribution is True and distribution_maj > expiration_distribution):
+            if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution):
                 uuid_col_fichiers = col_fichiers['uuid']
                 filtre_fichiers_maj = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
@@ -1783,7 +1805,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 else:
                     self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
 
-            compteur_commandes_emises = compteur_commandes_emises + 1
+                compteur_commandes_emises = compteur_commandes_emises + 1
 
         return compteur_commandes_emises
 
@@ -1911,6 +1933,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
             try:
                 self.preparer_siteconfig_publication(cdn_id, site_id)
+
                 filtre_section = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
                     ConstantesPublication.CHAMP_SITE_ID: site_id,
@@ -1919,11 +1942,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
                 # Publier le contenu sur le CDN
                 # Upload avec requests via https://fichiers
+                remote_siteconfig = path.join('data/sites', site_id + '.json.gz')
                 commande_publier_siteconfig = {
                     ConstantesPublication.CHAMP_SITE_ID: site_id,
                     'cdn_id': cdn_id,
                     # 'securite': securite_site,
-                    'remote_path': path.join('index.json.gz'),
+                    'remote_path': remote_siteconfig,
                     'mimetype': 'application/json',
                     'content_encoding': 'gzip',  # Header Content-Encoding
                     'max_age': 0,
@@ -2171,22 +2195,25 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         self.__logger.debug("Publication sur CDN_ID:%s fichier %s" % (cdn_id, str(fuuid)))
 
+        # Ajouter flag de publication dans la ressource
+        filtre_fichier_update = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': fuuid,
+        }
+
         if type_cdn == 'sftp':
             self.commande_publier_fichier_sftp(res_fichier, cdn_info)
         elif type_cdn in ['ipfs', 'ipfs_gateway']:
             self.commande_publier_fichier_ipfs(res_fichier, cdn_info)
         elif type_cdn == 'awss3':
             self.commande_publier_fichier_awss3(res_fichier, cdn_info)
-        elif type_cdn in ['hiddenService', 'manuel']:
-            return  # Rien a faire
+        elif type_cdn in ['hiddenService', 'manuel', 'mq']:
+            # Rien a faire
+            self.marquer_ressource_complete(cdn_id, filtre_fichier_update)
+            return
         else:
             raise Exception("Type cdn non supporte %s" % type_cdn)
 
-        # Ajouter flag de publication dans la ressource
-        filtre_fichier_update = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-            'fuuid': fuuid,
-        }
         self.marquer_ressource_encours(cdn_id, filtre_fichier_update)
 
     def marquer_ressource_encours(self, cdn_id, filtre_ressource, many=False, etat=True, upsert=False):
@@ -2207,6 +2234,26 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             collection_ressources.update_one(filtre_ressource, ops, upsert=upsert)
         else:
             collection_ressources.update_many(filtre_ressource, ops, upsert=upsert)
+
+    def marquer_ressource_complete(self, cdn_id, filtre_ressource, many=False):
+        date_courante = datetime.datetime.utcnow()
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: date_courante,
+        }
+        set_on_insert.update(filtre_ressource)
+        ops = {
+            '$unset': {'distribution_progres.' + cdn_id: True},
+            '$addToSet': {ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: cdn_id},
+            '$currentDate': {
+                'distribution_maj': True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        if many is False:
+            collection_ressources.update_one(filtre_ressource, ops)
+        else:
+            collection_ressources.update_many(filtre_ressource, ops)
 
     def commande_publier_fichier_sftp(self, res_fichier: dict, cdn_info: dict):
         fuuid = res_fichier['fuuid']
@@ -2577,6 +2624,37 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         set_on_insert.update(identificateur_document)
         collection_ressources.update_one(identificateur_document, ops, upsert=True)
 
+    def pousser_sections(self, params: dict, properties):
+        """
+        Pousse le contenu des sections. Utilise par serveur Vitrine (CDN MQ).
+        :param params:
+        :param properties:
+        :return:
+        """
+        reply_to = properties.reply_to
+
+        noeud_id = params.get('noeud_id')
+        # A FAIRE : trouver liste de site_ids via CDN MQ
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        # Charger sections avec du contenu (e.g. collection fichiers, pages)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPublication.LIBVAL_SECTION_PAGE,
+                ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+            ]},
+            ConstantesPublication.CHAMP_CONTENU: {'$exists': True},
+            # ConstantesPublication.CHAMP_SITE_ID: {'$in': site_ids} ... OR liste_sites... ,  # A FAIRE
+        }
+        curseur_sections = collection_ressources.find(filtre)
+
+        correlation_id = 'publication.section'
+        for section in curseur_sections:
+            contenu = section[ConstantesPublication.CHAMP_CONTENU]
+            self.generateur_transactions.transmettre_reponse(
+                contenu, replying_to=reply_to, correlation_id=correlation_id, ajouter_certificats=True)
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -2746,7 +2824,7 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         #     # self.set_requete(domaine_action, requete)
         #     self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_nouvelle_collection.__name__)
         # else:
-        if res_collection is not None:
+        if res_collection is not None and res_collection.get('sites'):
             # S'assurer que la collection a les site_ids
             self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, res_collection['sites'])
 

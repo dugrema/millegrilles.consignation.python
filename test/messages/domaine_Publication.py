@@ -211,13 +211,19 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_commande(
             commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_continuer_publication')
 
+    def commande_pousser_sections(self):
+        commande = dict()
+        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_POUSSER_SECTIONS
+        self.generateur.transmettre_commande(
+            commande, domaine_action, reply_to=self.queue_name, correlation_id='commande_continuer_publication')
+
     def executer(self):
         self.__logger.debug("Executer")
 
         # self.requete_liste_sites()
         # self.requete_liste_posts()
         # self.requete_config_site()
-        self.requete_sites_pour_noeud()
+        # self.requete_sites_pour_noeud()
         # self.requete_cdns()
         # self.creer_site()
         # self.maj_site()
@@ -231,9 +237,10 @@ class TestPublication(DomaineTest):
         # self.commande_publier_sections()
         # self.commande_publier_configuration()
         # self.commande_reset_ressources()
-        # self.commande_publier_complet()
+        self.commande_publier_complet()
         # self.commande_continuer_publication()
         # self.requete_etat_publication()
+        # self.commande_pousser_sections()
 
 
 # --- MAIN ---
