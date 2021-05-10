@@ -237,10 +237,10 @@ class TestPublication(DomaineTest):
         # self.commande_publier_sections()
         # self.commande_publier_configuration()
         # self.commande_reset_ressources()
-        self.commande_publier_complet()
+        # self.commande_publier_complet()
         # self.commande_continuer_publication()
         # self.requete_etat_publication()
-        # self.commande_pousser_sections()
+        self.commande_pousser_sections()
 
 
 # --- MAIN ---
