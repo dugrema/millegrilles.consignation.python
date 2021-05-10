@@ -2651,9 +2651,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         correlation_id = 'publication.section'
         for section in curseur_sections:
-            contenu = section[ConstantesPublication.CHAMP_CONTENU]
+            try:
+                del section[ConstantesPublication.CHAMP_CONTENU_GZIP]
+            except KeyError:
+                pass
+            section[ConstantesPublication.CHAMP_TYPE_SECTION] = section[Constantes.DOCUMENT_INFODOC_LIBELLE]
             self.generateur_transactions.transmettre_reponse(
-                contenu, replying_to=reply_to, correlation_id=correlation_id, ajouter_certificats=True)
+                section, replying_to=reply_to, correlation_id=correlation_id, ajouter_certificats=True)
+
+        return {'ok': True}
 
 
 class ProcessusPublication(MGProcessusTransaction):
