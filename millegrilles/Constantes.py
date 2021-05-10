@@ -1841,6 +1841,7 @@ class ConstantesPublication:
     LIBVAL_FICHIER = 'fichier'
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
+    REQUETE_CONFIGURATION_SITES_NOEUD = 'configurationSitesNoeud'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
     REQUETE_LISTE_CDN = 'listeCdn'
     REQUETE_LISTE_SITES = 'listeSites'

@@ -15,8 +15,8 @@ class TestPublication(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.site_id = '09906262-206c-11eb-88cc-af560af5618f'
-        self.noeud_id = '639e1d3b-fa5b-4a13-86b2-d3e6148c9d99'
+        self.site_id = 'fac1ab48-423c-49a8-96d6-9e26bada5b34'
+        self.noeud_id = '01407632-5a8f-4727-b593-9afa94447dea'
 
     def requete_liste_sites(self):
         requete = dict()
@@ -34,8 +34,7 @@ class TestPublication(DomaineTest):
 
     def requete_config_site(self):
         requete = {
-            # 'site_id': self.site_id,
-            'noeud_id': '01407632-5a8f-4727-b593-9afa94447dea',
+            'site_id': self.site_id,
         }
         domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_CONFIGURATION_SITE
         correlation_id = 'test'
@@ -217,8 +216,8 @@ class TestPublication(DomaineTest):
 
         # self.requete_liste_sites()
         # self.requete_liste_posts()
-        self.requete_config_site()
-        # self.requete_sites_pour_noeud()
+        # self.requete_config_site()
+        self.requete_sites_pour_noeud()
         # self.requete_cdns()
         # self.creer_site()
         # self.maj_site()

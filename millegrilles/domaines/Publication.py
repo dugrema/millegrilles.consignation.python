@@ -41,9 +41,8 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
 
         if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
             reponse = self.gestionnaire.get_configuration_site(message_dict)
-        elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
-            reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
-            reponse = {'liste_sites': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITES_NOEUD:
+            reponse = self.gestionnaire.get_configuration_sites_par_noeud(message_dict)
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
             reponse = self.gestionnaire.get_liste_sites()
             reponse = {'resultats': reponse}
@@ -66,8 +65,7 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
         if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
             reponse = self.gestionnaire.get_configuration_site(message_dict)
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
-            reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
-            reponse = {'liste_sites': reponse}
+            reponse = self.gestionnaire.get_configuration_sites_par_noeud(message_dict)
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
             reponse = self.gestionnaire.get_liste_sites()
             reponse = {'resultats': reponse}
@@ -475,60 +473,75 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         return site_pages
 
     def get_configuration_site(self, params: dict):
-        site_id = params.get('site_id')
+        site_id = params['site_id']
+        filtre = {
+            ConstantesPublication.CHAMP_SITE_ID: site_id
+        }
+        hints = [(ConstantesPublication.CHAMP_SITE_ID, 1)]
+        collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        noeud_config = collection_site.find_one(filtre, hint=hints)
+
+        return noeud_config
+
+    def get_configuration_sites_par_noeud(self, params: dict):
         noeud_id = params.get('noeud_id')
 
         sites = dict()
+        configuration_par_url = dict()
+        cdns = dict()
+
+        filtre = {
+            ConstantesPublication.CHAMP_NOEUD_ID: noeud_id
+        }
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        curseur_cdn = collection_cdns.find(filtre)
 
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        if site_id is not None:
-            filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
-            collection_sites.find(filtre_site)
-        elif noeud_id is not None:
-            filtre = {
-                ConstantesPublication.CHAMP_NOEUD_ID: noeud_id
-            }
-            collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-            curseur_cdn = collection_cdns.find(filtre)
+        for cdn in curseur_cdn:
+            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+            filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
+            curseur_sites = collection_sites.find(filtre_site)
+            for site in curseur_sites:
+                sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
 
-            for cdn in curseur_cdn:
-                cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
-                filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
-                curseur_sites = collection_sites.find(filtre_site)
-                for site in curseur_sites:
-                    sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
+        site_defaut = None
+        if len(sites) == 1:
+            # Le site par defaut est le seul disponible
+            site_defaut = list(sites.values())[0]
+        # else:
+        #     raise NotImplementedError("Implementer support de plusieurs sites")
+
+        if site_defaut is not None:
+            configuration_par_url['defaut'] = site_defaut[ConstantesPublication.CHAMP_SITE_ID]
 
         # Verifier si la ressource du site est prete (contenu)
-        if len(sites) == 1:
+        if len(sites) > 0:
             # Ok, format simple avec une seule configuration
+            reponse_sites = list()
             for site in sites.values():
                 site_id = site[ConstantesPublication.CHAMP_SITE_ID]
 
                 # Note : La methode genere le contenu uniquement s'il n'est pas deja present
                 doc_res_site = self.preparer_siteconfig_publication(None, site_id)
                 contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU]
-                return contenu
+                reponse_sites.append(contenu)
+
+                for cdn_site in contenu['cdns']:
+                    cdns[cdn_site[ConstantesPublication.CHAMP_CDN_ID]] = cdn_site
+
+            mapping = {
+                'cdns': list(cdns.values()),
+                'sites': configuration_par_url,
+            }
+            mapping = self.generateur_transactions.preparer_enveloppe(
+                mapping, 'Publication.sites', ajouter_certificats=True)
+
+            return {
+                'mapping': mapping,
+                'sites': reponse_sites,
+            }
         else:
-            return {'err': 'Nombre de sites associes a ce noeud %d (1 seul site supporte pour l\'instant)' % len(sites)}
-
-    def get_sites_par_noeud(self, params: dict) -> list:
-        noeud_id = params['noeud_id']
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-            ConstantesPublication.CHAMP_NOEUDS_URLS + '.' + noeud_id: {'$exists': True}
-        }
-        hints = [(ConstantesPublication.CHAMP_NOEUDS_URLS, 1)]
-
-        collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        curseur = collection_site.find(filtre, hint=hints)
-
-        sites = list()
-        for site in curseur:
-            del site['_id']
-            enveloppe = self.generateur_transactions.preparer_enveloppe(site, ajouter_certificats=True)
-            sites.append(enveloppe)
-
-        return sites
+            return {'err': 'Aucuns sites associes a ce noeud'}
 
     def get_etat_publication(self, params: dict):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
