@@ -892,10 +892,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
                 }
 
-                if type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
-                    uuid_collections = doc_section[ConstantesPublication.CHAMP_COLLECTIONS]
-                    section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
-                    uuid_to_map.update(uuid_collections)
+                if type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
+                    uuid_collections = doc_section.get(ConstantesPublication.CHAMP_COLLECTIONS)
+                    if uuid_collections is not None:
+                        section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
+                        uuid_to_map.update(uuid_collections)
                 else:
                     section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
                     uuid_to_map.add(section_id)
