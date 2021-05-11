@@ -47,7 +47,7 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
             reponse = self.gestionnaire.get_liste_sites()
             reponse = {'resultats': reponse}
         else:
-            reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
+            reponse = {'err': 'Requete invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
             raise Exception("Requete publique non supportee " + routing_key)
 
@@ -544,6 +544,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 # Note : La methode genere le contenu uniquement s'il n'est pas deja present
                 doc_res_site = self.preparer_siteconfig_publication(None, site_id)
                 contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU]
+
+                if contenu.get('_signature') is None:
+                    contenu = self.generateur_transactions.preparer_enveloppe(contenu, 'Publication.site')
+
                 reponse_sites.append(contenu)
 
                 for cdn_site in contenu['cdns']:
@@ -841,7 +845,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE,
             ConstantesPublication.CHAMP_LISTE_SOCKETIO,
         ]
-        contenu = dict()
+        contenu = {
+            ConstantesPublication.CHAMP_TYPE_SECTION: ConstantesPublication.LIBVAL_SITE_CONFIG,
+        }
         for key, value in doc_site.items():
             if key in champs_site:
                 contenu[key] = value
@@ -1003,6 +1009,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 parties_page_ordonnees.append(parties_page[pp_id])
 
         contenu = {
+            ConstantesPublication.CHAMP_TYPE_SECTION: ConstantesPublication.LIBVAL_SECTION_PAGE,
+            ConstantesPublication.CHAMP_SECTION_ID: section_id,
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
         }
         # contenu = self.generateur_transactions.preparer_enveloppe(
@@ -1239,7 +1247,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         if isinstance(site_ids, str):
             site_ids = [site_ids]
 
-        contenu = {}
+        contenu = {
+            ConstantesPublication.CHAMP_TYPE_SECTION: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+        }
         contenu.update(info_collection)
         contenu['fichiers'] = liste_fichiers
         uuid_collection = info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
@@ -2759,7 +2769,7 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
             site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
-        self._transmettre_maj(site_id)
+        # self._transmettre_maj(site_id)
 
         # commande = {
         #     ConstantesPublication.CHAMP_SITE_ID: site_id
