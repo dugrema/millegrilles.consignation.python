@@ -1499,6 +1499,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.__logger.info("Trigger publication siteconfig, %d commandes emises" % compteur_commandes_emises)
 
         # Publier mapping (index.json)
+        pass
 
     def identifier_ressources_fichiers(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1754,8 +1755,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             # fichiers: /index.json et /certificat.pem
             for site_id in liste_sites:
                 # self.marquer_ressource_encours(cdn_id, filtre_site)
-                self.trigger_commande_publier_configuration(cdn_id, site_id)
-                compteur_commandes_emises = compteur_commandes_emises + 1
+                commandes_emises = self.trigger_commande_publier_configuration(cdn_id, site_id)
+                compteur_commandes_emises = compteur_commandes_emises + commandes_emises
 
         return compteur_commandes_emises
 
@@ -1929,9 +1930,16 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_siteconfig = collection_ressources.find(filtre_siteconfig)
+        compteur_commandes = 0
         for doc_siteconfig in curseur_siteconfig:
             site_id = doc_siteconfig[ConstantesPublication.CHAMP_SITE_ID]
-
+            try:
+                etat_distribution = doc_siteconfig[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+                if etat_distribution is True:
+                    # Rien a faire
+                    continue
+            except KeyError:
+                self.__logger.warning("Progres deploiement de site %s sur cdn %s n'est pas conserve correctement" % (site_id, cdn_id))
             try:
                 self.preparer_siteconfig_publication(cdn_id, site_id)
 
@@ -1956,8 +1964,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
                 domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION
                 self.generateur_transactions.transmettre_commande(commande_publier_siteconfig, domaine_action)
+                compteur_commandes = compteur_commandes + 1
             except Exception:
                 self.__logger.exception("Erreur preparation traitement site_id %s" % site_id)
+
+        return compteur_commandes
 
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -2408,9 +2419,47 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_one(filtre, ops)
 
+        self.emettre_evenements_downstream(params)
+
         # Voir si on lance un trigger de publication de sections
         # self.trigger_conditionnel_fichiers_completes(params)
         self.continuer_publication()
+
+    def emettre_evenements_downstream(self, params: dict):
+        """
+        Emet des evenements de changement sur les echanges appropries
+        :param params:
+        :return:
+        """
+        identificateur_document = params.get('identificateur_document')
+
+        if identificateur_document:
+            type_document = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        else:
+            type_document = None
+
+        # message = {
+        #     ConstantesPublication.CHAMP_TYPE_EVENEMENT: type_document,
+        # }
+        if type_document == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_COLLECTION_FICHIERS
+            # message['uuid'] = identificateur_document['uuid']
+        elif type_document == ConstantesPublication.LIBVAL_SECTION_PAGE:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_PAGE
+            # message[ConstantesPublication.CHAMP_SECTION_ID] = identificateur_document[ConstantesPublication.CHAMP_SECTION_ID]
+        elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITECONFIG
+            # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
+        else:
+            # Rien a faire
+            return
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        doc_ressource = collection_ressources.find_one(identificateur_document)
+        if doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_GZIP):
+            # On a le contenu signe (genere en meme temps que le contenu GZIP)
+            contenu_signe = doc_ressource[ConstantesPublication.CHAMP_CONTENU]
+            self.generateur_transactions.emettre_message(contenu_signe, domaine_action, exchanges=[Constantes.SECURITE_PUBLIC])
 
     def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
         # Verifier si on a une reference au fichier ou une collection avec le fichier
@@ -2656,6 +2705,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 del section[ConstantesPublication.CHAMP_CONTENU_GZIP]
             except KeyError:
                 pass
+
             section[ConstantesPublication.CHAMP_TYPE_SECTION] = section[Constantes.DOCUMENT_INFODOC_LIBELLE]
             self.generateur_transactions.transmettre_reponse(
                 section, replying_to=reply_to, correlation_id=correlation_id, ajouter_certificats=True)
@@ -2727,7 +2777,7 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         # Retransmettre sur exchange 1.public pour maj live
         self.generateur_transactions.emettre_message(
             site_config,
-            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
+            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITECONFIG,
             exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
             ajouter_certificats=True
         )

@@ -1872,8 +1872,10 @@ class ConstantesPublication:
     COMMANDE_CONTINUER_PUBLICATION = 'continuerPublication'
     COMMANDE_POUSSER_SECTIONS = 'pousserSections'
 
-    EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
-    EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'
+    EVENEMENT_CONFIRMATION_MAJ_MAPPING = 'confirmationMajMapping'
+    EVENEMENT_CONFIRMATION_MAJ_SITECONFIG = 'confirmationMajSiteconfig'
+    EVENEMENT_CONFIRMATION_MAJ_PAGE = 'confirmationMajPage'
+    EVENEMENT_CONFIRMATION_MAJ_COLLECTION_FICHIERS = 'confirmationMajCollectionFichiers'
 
     CHAMP_SITE_ID = 'site_id'
     CHAMP_POST_ID = 'post_id'
@@ -1922,6 +1924,7 @@ class ConstantesPublication:
     CHAMP_IPNS_CLE_CHIFFREE = 'ipns_cle_chiffree'
     CHAMP_IPNS_ID = 'ipns_id'
     CHAMP_NOEUD_ID = 'noeud_id'
+    CHAMP_TYPE_EVENEMENT = 'type_evenement'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
