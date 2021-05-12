@@ -1830,6 +1830,7 @@ class ConstantesPublication:
         TRANSACTION_MESSAGE_LIBELLE_VERSION: 6,
     }
 
+    LIBVAL_MAPPING = 'mapping'
     LIBVAL_SITE_CONFIG = 'siteconfig'
     LIBVAL_ACCUEIL = 'accueil'
     LIBVAL_POST = 'post'
@@ -1852,6 +1853,7 @@ class ConstantesPublication:
 
     TRANSACTION_CREER_SITE = 'creerSite'
     TRANSACTION_MAJ_SITE = 'majSite'
+    TRANSACTION_MAJ_MAPPING = 'majMapping'
     TRANSACTION_MAJ_POST = 'majPost'
     TRANSACTION_MAJ_CDN = 'majCdn'
     TRANSACTION_MAJ_SECTION = 'majSection'
@@ -1867,6 +1869,7 @@ class ConstantesPublication:
     COMMANDE_PUBLIER_SITECONFIGURATION = 'publierSiteConfiguration'
     COMMANDE_PUBLIER_UPLOAD_DATASECTION = 'publierUploadDataSection'
     COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION = 'publierUploadSiteConfiguration'
+    COMMANDE_PUBLIER_UPLOAD_MAPPING = 'publierUploadMapping'
     COMMANDE_RESET_RESSOURCES = 'resetRessources'
     COMMANDE_PUBLIER_COMPLET = 'publierComplet'
     COMMANDE_CONTINUER_PUBLICATION = 'continuerPublication'
@@ -1927,6 +1930,8 @@ class ConstantesPublication:
     CHAMP_NOEUD_ID = 'noeud_id'
     CHAMP_TYPE_EVENEMENT = 'type_evenement'
     CHAMP_DATE_SIGNATURE = 'date_signature'
+    CHAMP_SITE_DEFAUT = 'site_defaut'
+    CHAMP_LISTE_DOMAINES = 'listeDomaines'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,

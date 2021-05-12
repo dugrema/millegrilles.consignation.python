@@ -125,10 +125,13 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             self.gestionnaire.commande_publier_upload_datasection(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITECONFIGURATION:
             self.gestionnaire.commande_publication_configuration(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_MAPPING:
+            self.gestionnaire.commande_publier_upload_mapping(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION:
             self.gestionnaire.commande_publier_upload_siteconfiguration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_COMPLET:
-            self.gestionnaire.demarrer_publication_complete(message_dict)
+            compte = self.gestionnaire.demarrer_publication_complete(message_dict)
+            reponse = {'ok': True, 'compte': compte}
         elif domaine_action == ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION:
             self.gestionnaire.continuer_publication(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_RESET_RESSOURCES:
@@ -196,6 +199,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusTransactionCreerSite"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_SITE:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSite"
+        elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_MAPPING:
+            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajMapping"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_POST:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
         elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_CDN:
@@ -503,65 +508,93 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         return noeud_config
 
     def get_configuration_sites_par_noeud(self, params: dict):
-        noeud_id = params.get('noeud_id')
-
-        sites = dict()
-        configuration_par_url = dict()
-        cdns = dict()
-
-        filtre = {
-            ConstantesPublication.CHAMP_NOEUD_ID: noeud_id
-        }
-        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-        curseur_cdn = collection_cdns.find(filtre)
-
-        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        for cdn in curseur_cdn:
-            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
-            filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
-            curseur_sites = collection_sites.find(filtre_site)
-            for site in curseur_sites:
-                sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
-
-        site_defaut = None
-        if len(sites) == 1:
-            # Le site par defaut est le seul disponible
-            site_defaut = list(sites.values())[0]
+        # noeud_id = params.get('noeud_id')
+        #
+        # sites = dict()
+        # configuration_par_url = dict()
+        # cdns = dict()
+        #
+        # filtre = {
+        #     ConstantesPublication.CHAMP_NOEUD_ID: noeud_id
+        # }
+        # collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        # curseur_cdn = collection_cdns.find(filtre)
+        #
+        # collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        # for cdn in curseur_cdn:
+        #     cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+        #     filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
+        #     curseur_sites = collection_sites.find(filtre_site)
+        #     for site in curseur_sites:
+        #         sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
+        #
+        # site_defaut = None
+        # if len(sites) == 1:
+        #     # Le site par defaut est le seul disponible
+        #     site_defaut = list(sites.values())[0]
+        # # else:
+        # #     raise NotImplementedError("Implementer support de plusieurs sites")
+        #
+        # if site_defaut is not None:
+        #     configuration_par_url['defaut'] = site_defaut[ConstantesPublication.CHAMP_SITE_ID]
+        #
+        # # Verifier si la ressource du site est prete (contenu)
+        # if len(sites) > 0:
+        #     # Ok, format simple avec une seule configuration
+        #     reponse_sites = list()
+        #     for site in sites.values():
+        #         site_id = site[ConstantesPublication.CHAMP_SITE_ID]
+        #
+        #         # Note : La methode genere le contenu uniquement s'il n'est pas deja present
+        #         doc_res_site = self.preparer_siteconfig_publication(None, site_id)
+        #         contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
+        #
+        #         reponse_sites.append(contenu)
+        #
+        #         for cdn_site in contenu['cdns']:
+        #             cdns[cdn_site[ConstantesPublication.CHAMP_CDN_ID]] = cdn_site
+        #
+        #     mapping = {
+        #         'cdns': list(cdns.values()),
+        #         'sites': configuration_par_url,
+        #     }
+        #     mapping = self.generateur_transactions.preparer_enveloppe(
+        #         mapping, 'Publication.sites', ajouter_certificats=True)
+        #
+        #     return {
+        #         'mapping': mapping,
+        #         'sites': reponse_sites,
+        #     }
         # else:
-        #     raise NotImplementedError("Implementer support de plusieurs sites")
+        #     return {'err': 'Aucuns sites associes a ce noeud'}
 
-        if site_defaut is not None:
-            configuration_par_url['defaut'] = site_defaut[ConstantesPublication.CHAMP_SITE_ID]
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        projection = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: True,
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: True,
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPublication.LIBVAL_MAPPING,
+                ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ]}
+        }
+        curseur = collection_ressources.find(filtre, projection=projection)
+        doc_mapping = None
+        sites = list()
+        for doc in curseur:
+            type_doc = doc[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            if type_doc == ConstantesPublication.LIBVAL_MAPPING:
+                doc_mapping = doc
+            elif type_doc == ConstantesPublication.LIBVAL_SITE_CONFIG:
+                sites.append(doc)
 
-        # Verifier si la ressource du site est prete (contenu)
-        if len(sites) > 0:
-            # Ok, format simple avec une seule configuration
-            reponse_sites = list()
-            for site in sites.values():
-                site_id = site[ConstantesPublication.CHAMP_SITE_ID]
+        reponse = {
+            'mapping': doc_mapping,
+            'sites': sites,
+        }
 
-                # Note : La methode genere le contenu uniquement s'il n'est pas deja present
-                doc_res_site = self.preparer_siteconfig_publication(None, site_id)
-                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
-
-                reponse_sites.append(contenu)
-
-                for cdn_site in contenu['cdns']:
-                    cdns[cdn_site[ConstantesPublication.CHAMP_CDN_ID]] = cdn_site
-
-            mapping = {
-                'cdns': list(cdns.values()),
-                'sites': configuration_par_url,
-            }
-            mapping = self.generateur_transactions.preparer_enveloppe(
-                mapping, 'Publication.sites', ajouter_certificats=True)
-
-            return {
-                'mapping': mapping,
-                'sites': reponse_sites,
-            }
-        else:
-            return {'err': 'Aucuns sites associes a ce noeud'}
+        return reponse
 
     def get_etat_publication(self, params: dict):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -647,6 +680,36 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return site
 
+    def maj_mapping(self, transaction: dict):
+        champs = [ConstantesPublication.CHAMP_SITE_DEFAUT]
+
+        set_ops = dict()
+        for champ in champs:
+            valeur = transaction.get(champ)
+            if valeur is not None:
+                set_ops[champ] = valeur
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)
+
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+        doc_mapping = collection_configuration.update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+        # Invalider ressource mapping
+        self.invalider_ressource_mapping()
+
+        return doc_mapping
+
     def maj_site(self, transaction: dict):
         collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
 
@@ -686,6 +749,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_site = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
         self.invalider_ressources_siteconfig(site_id)
+        self.invalider_ressource_mapping()
 
         # Retirer champs de contenu publie du site
         filtre_site_ressources = {
@@ -743,6 +807,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         doc_maj = collection_cdns.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
+        # Invalider tous les sites - fait regenerer tous les CDNs. Update mapping aussi (pour CDNs)
+        self.invalider_ressources_siteconfig()
+        self.invalider_ressource_mapping()
+
         return doc_maj
 
     def invalider_ressources_siteconfig(self, site_id: Union[str, list] = None, cdn_ids: list = None):
@@ -764,6 +832,16 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             label_cdn = ['contenu', 'cdns', ConstantesPublication.CHAMP_CDN_ID]
             filtre[label_cdn] = {'$in': cdn_ids}
 
+        self.invalider_ressources(filtre)
+
+    def invalider_ressource_mapping(self):
+        """
+        Enlever marqueurs de deploiement pour les sites
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING
+        }
         self.invalider_ressources(filtre)
 
     def invalider_ressources_pages(self, section_ids: list = None):
@@ -825,6 +903,96 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         doc_site = collection_sites.find_one(filtre)
         return doc_site
+    
+    def maj_ressource_mapping(self):
+        sites = dict()
+        configuration_par_url = dict()
+        cdns = dict()
+
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        curseur_cdn = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS).find()
+        for cdn in curseur_cdn:
+            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+            filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
+            curseur_sites = collection_sites.find(filtre_site)
+            for site in curseur_sites:
+                sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
+
+        collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+        doc_mapping = collection_configuration.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING})
+
+        site_defaut = None
+        if len(sites) == 1:
+            # Le site par defaut est le seul disponible
+            site_defaut = list(sites.values())[0]
+            site_id_defaut = site_defaut[ConstantesPublication.CHAMP_SITE_ID]
+        elif doc_mapping is not None:
+            site_id_defaut = doc_mapping.get(ConstantesPublication.CHAMP_SITE_DEFAUT)
+        else:
+            site_id_defaut = None
+
+        # if site_id_defaut is not None:
+        #     configuration_par_url[ConstantesPublication.CHAMP_SITE_DEFAUT] = site_id_defaut
+
+        mapping = {
+            'sites': configuration_par_url,
+        }
+
+        # Verifier si la ressource du site est prete (contenu)
+        if len(sites) > 0:
+            # Ok, format simple avec une seule configuration
+            reponse_sites = list()
+            for site in sites.values():
+                site_id = site[ConstantesPublication.CHAMP_SITE_ID]
+
+                # Note : La methode genere le contenu uniquement s'il n'est pas deja present
+                doc_res_site = self.preparer_siteconfig_publication(None, site_id)
+                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
+
+                reponse_sites.append(contenu)
+
+                for cdn_site in contenu['cdns']:
+                    cdns[cdn_site[ConstantesPublication.CHAMP_CDN_ID]] = cdn_site
+
+                information_site = {
+                    ConstantesPublication.CHAMP_SITE_ID: site_id,
+                }
+                try:
+                    information_site[ConstantesPublication.CHAMP_IPNS_ID] = site[ConstantesPublication.CHAMP_IPNS_ID]
+                except KeyError:
+                    pass  # Ok
+
+                if site_id_defaut == site_id:
+                    mapping[ConstantesPublication.CHAMP_SITE_DEFAUT] = information_site
+
+                try:
+                    for domaine in site[ConstantesPublication.CHAMP_LISTE_DOMAINES]:
+                        configuration_par_url[domaine] = information_site
+                except KeyError:
+                    pass  # Ok
+
+        mapping['cdns'] = list(cdns.values())
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+
+        }
+        set_on_insert.update(filtre)
+        set_ops = {
+            ConstantesPublication.CHAMP_CONTENU: mapping,
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        doc_mapping = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+        return doc_mapping
 
     def maj_ressources_site(self, params: dict):
         site_id = params[ConstantesPublication.CHAMP_SITE_ID]
@@ -1502,10 +1670,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
         compteur_commandes_emises = self.commande_publication_configuration(dict())
-        self.__logger.info("Trigger publication siteconfig, %d commandes emises" % compteur_commandes_emises)
-
-        # Publier mapping (index.json)
-        pass
+        self.__logger.info("Trigger publication siteconfig et mapping, %d commandes emises" % compteur_commandes_emises)
 
     def identifier_ressources_fichiers(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1764,6 +1929,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 commandes_emises = self.trigger_commande_publier_configuration(cdn_id, site_id)
                 compteur_commandes_emises = compteur_commandes_emises + commandes_emises
 
+            compteur = self.trigger_commande_publier_mapping(cdn_id)
+            compteur_commandes_emises = compteur_commandes_emises + compteur
+
         return compteur_commandes_emises
 
     def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC):
@@ -1978,6 +2146,57 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return compteur_commandes
 
+    def trigger_commande_publier_mapping(self, cdn_id: str):
+        filtre_mapping = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        doc_mapping = collection_ressources.find_one(filtre_mapping)
+
+        try:
+            if cdn_id in doc_mapping[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]:
+                # Distribution completee, rien a faire
+                return 0
+        except (KeyError, TypeError):
+            pass  # OK, on va verifier si le deploiement est en cours
+
+        try:
+            etat_distribution = doc_mapping[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            if etat_distribution is True:
+                # Rien a faire
+                return 0
+        except (KeyError, TypeError):
+            self.__logger.warning(
+                "Progres deploiement de mapping sur cdn %s n'est pas conserve correctement" % cdn_id)
+
+        try:
+            doc_res_mapping = self.maj_ressource_mapping()
+            self.sauvegarder_contenu_gzip(doc_res_mapping, filtre_mapping)
+
+            filtre_section = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+            }
+            self.marquer_ressource_encours(cdn_id, filtre_section)
+
+            # Publier le contenu sur le CDN
+            # Upload avec requests via https://fichiers
+            remote_siteconfig = path.join('index.json.gz')
+            commande_publier_mapping = {
+                'cdn_id': cdn_id,
+                'remote_path': remote_siteconfig,
+                'mimetype': 'application/json',
+                'content_encoding': 'gzip',  # Header Content-Encoding
+                'max_age': 0,
+            }
+
+            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_MAPPING
+            self.generateur_transactions.transmettre_commande(commande_publier_mapping, domaine_action)
+
+            return 1
+        except Exception:
+            self.__logger.exception("Erreur preparation traitement mapping")
+            return 0
+
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         contenu = col_fichiers['contenu']
@@ -2108,6 +2327,55 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if type_cdn in ['ipfs', 'ipfs_gateway']:
                 # Publier avec le IPNS associe a la section
                 self.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
+            else:
+                # Methode simple d'upload de fichier avec structure de repertoire
+                fp_bytesio = BytesIO(contenu_gzip)
+                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+                self.put_publier_repertoire([cdn], fichiers, params)
+        except Exception as e:
+            msg = "Erreur publication fichiers %s" % str(params)
+            self.__logger.exception(msg)
+            return {'err': str(e), 'msg': msg}
+
+        return {'ok': True}
+
+    def commande_publier_upload_mapping(self, params: dict):
+        params = params.copy()
+        cdn_id = params['cdn_id']
+        remote_path = params['remote_path']
+        mimetype = params.get('mimetype')
+        # securite = params.get('securite')
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        params['identificateur_document'] = filtre
+
+        res_data = collection_ressources.find_one(filtre)
+        if res_data is None:
+            msg = 'Aucune section ne correspond a %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+        if date_signature is None:
+            res_data = self.sauvegarder_contenu_gzip(res_data, filtre)
+        contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdn = {'cdn_id': cdn_id}
+        cdn = collection_cdns.find_one(filtre_cdn)
+        if cdn is None:
+            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        try:
+            type_cdn = cdn['type_cdn']
+            if type_cdn in ['ipfs', 'ipfs_gateway', 'mq', 'manuel']:
+                # Rien a faire, le mapping est inclus avec le code ou recu via MQ
+                self.marquer_ressource_complete(cdn_id, filtre)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
@@ -2464,6 +2732,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
             domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITECONFIG
             # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
+        elif type_document == ConstantesPublication.LIBVAL_MAPPING:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_MAPPING
+            # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
         else:
             # Rien a faire
             return
@@ -2799,6 +3070,20 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
             exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
             ajouter_certificats=True
         )
+
+
+class ProcessusTransactionMajMapping(MGProcessusTransaction):
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        doc_mapping = self.controleur.gestionnaire.maj_mapping(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'mapping': doc_mapping}
 
 
 class ProcessusTransactionMajCdn(MGProcessusTransaction):
