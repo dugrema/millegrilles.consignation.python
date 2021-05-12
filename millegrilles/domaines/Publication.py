@@ -28,8 +28,9 @@ UNSET_PUBLICATION_RESOURCES = {
     ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True,
     ConstantesPublication.CHAMP_DISTRIBUTION_MAJ: True,
     # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
-    ConstantesPublication.CHAMP_CONTENU_GZIP: True,
+    # ConstantesPublication.CHAMP_CONTENU_GZIP: True,
     # ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
+    ConstantesPublication.CHAMP_DATE_SIGNATURE: True,
 }
 
 
@@ -39,9 +40,7 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
-        if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
-            reponse = self.gestionnaire.get_configuration_site(message_dict)
-        elif domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITES_NOEUD:
+        if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITES_NOEUD:
             reponse = self.gestionnaire.get_configuration_sites_par_noeud(message_dict)
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
             reponse = self.gestionnaire.get_liste_sites()
@@ -543,10 +542,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
                 # Note : La methode genere le contenu uniquement s'il n'est pas deja present
                 doc_res_site = self.preparer_siteconfig_publication(None, site_id)
-                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU]
-
-                if contenu.get('_signature') is None:
-                    contenu = self.generateur_transactions.preparer_enveloppe(contenu, 'Publication.site')
+                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
 
                 reponse_sites.append(contenu)
 
@@ -1823,14 +1819,16 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def emettre_commande_publication_collectionfichiers(self, cdn_id, col_fichiers, securite):
         uuid_col_fichiers = col_fichiers['uuid']
-        contenu_gzippe = col_fichiers.get('contenu_gzip')
         filtre_fichiers_maj = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid': uuid_col_fichiers,
         }
-        if contenu_gzippe is None:
-            # Creer contenu .json.gz
+
+        date_signature = col_fichiers.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+        if date_signature is None:
+            # Creer contenu .json.gz, contenu_signe
             self.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
+
         self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
 
         # Marquer tous les fichiers associes a cette collection s'ils ne sont pas deja publies
@@ -1898,8 +1896,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     # Mettre a jour le contenu
                     doc_page = self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
 
-                contenu_gzippe = doc_page.get('contenu_gzip')
-                if contenu_gzippe is None:
+                date_signature = doc_page.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+                if date_signature is None:
                     # Creer contenu .json.gz
                     self.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
 
@@ -1983,14 +1981,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         contenu = col_fichiers['contenu']
-        contenu = self.generateur_transactions.preparer_enveloppe(contenu, 'Publication', ajouter_certificats=True)
-        contenu_gzippe = self.preparer_json_gzip(contenu, chiffrer)
+        contenu_signe = self.generateur_transactions.preparer_enveloppe(contenu, 'Publication', ajouter_certificats=True)
+        contenu_gzippe = self.preparer_json_gzip(contenu_signe, chiffrer)
 
         # Conserver contenu pour la ressource
         ops = {
-            '$set': {'contenu_gzip': contenu_gzippe, 'contenu': contenu},
+            '$set': {
+                'contenu_gzip': contenu_gzippe,
+                'contenu_signe': contenu_signe
+            },
             '$unset': {'distribution_public_complete': True, 'distribution_complete': True},
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                ConstantesPublication.CHAMP_DATE_SIGNATURE: True,
+            },
         }
 
         doc_res = collection_ressources.find_one_and_update(filtre_res, ops, return_document=ReturnDocument.AFTER)
@@ -2086,10 +2090,10 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             self.__logger.error(msg)
             return {'err': msg}
 
-        contenu_gzip = res_data.get(ConstantesPublication.CHAMP_CONTENU_GZIP)
-        if contenu_gzip is None:
+        date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+        if date_signature is None:
             res_data = self.sauvegarder_contenu_gzip(res_data, filtre)
-            contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
+        contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         filtre_cdn = {'cdn_id': cdn_id}
@@ -2124,9 +2128,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         res_site = collection_ressources.find_one(filtre)
 
-        contenu_siteconfig = res_site.get('contenu')
+        date_signature = res_site.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
 
-        if contenu_siteconfig is None:
+        if date_signature is None:
             res_site = self.maj_ressources_site({'site_id': site_id})
             res_site = self.sauvegarder_contenu_gzip(res_site, filtre)
 
@@ -2466,9 +2470,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         doc_ressource = collection_ressources.find_one(identificateur_document)
-        if doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_GZIP):
+        contenu_signe = doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_SIGNE)
+        if contenu_signe is not None:
             # On a le contenu signe (genere en meme temps que le contenu GZIP)
-            contenu_signe = doc_ressource[ConstantesPublication.CHAMP_CONTENU]
             self.generateur_transactions.emettre_message(contenu_signe, domaine_action, exchanges=[Constantes.SECURITE_PUBLIC])
 
     def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
@@ -2704,18 +2708,22 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 ConstantesPublication.LIBVAL_SECTION_PAGE,
                 ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ]},
-            ConstantesPublication.CHAMP_CONTENU: {'$exists': True},
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: {'$exists': True},
             # ConstantesPublication.CHAMP_SITE_ID: {'$in': site_ids} ... OR liste_sites... ,  # A FAIRE
         }
-        curseur_sections = collection_ressources.find(filtre)
+
+        projection = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: True,
+            ConstantesPublication.CHAMP_TYPE_SECTION: True,
+            ConstantesPublication.CHAMP_SECTION_ID: True,
+            'uuid': True,
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: True,
+        }
+
+        curseur_sections = collection_ressources.find(filtre, projection=projection)
 
         correlation_id = 'publication.section'
         for section in curseur_sections:
-            try:
-                del section[ConstantesPublication.CHAMP_CONTENU_GZIP]
-            except KeyError:
-                pass
-
             section[ConstantesPublication.CHAMP_TYPE_SECTION] = section[Constantes.DOCUMENT_INFODOC_LIBELLE]
             self.generateur_transactions.transmettre_reponse(
                 section, replying_to=reply_to, correlation_id=correlation_id, ajouter_certificats=True)
@@ -2832,13 +2840,13 @@ class ProcessusTransactionMajSection(MGProcessusTransaction):
         }
         type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
 
-        if type_section == 'pages':  # Fix label section => ConstantesPublication.LIBVAL_PAGE:
-            # Traitement special pour publier une section de type page
-            self.ajouter_commande_a_transmettre(
-                'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
-        else:
-            self.ajouter_commande_a_transmettre(
-                'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SECTIONS, commande)
+        # if type_section == 'pages':  # Fix label section => ConstantesPublication.LIBVAL_PAGE:
+        #     # Traitement special pour publier une section de type page
+        #     self.ajouter_commande_a_transmettre(
+        #         'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_PAGE, commande)
+        # else:
+        #     self.ajouter_commande_a_transmettre(
+        #         'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_SECTIONS, commande)
 
         self.set_etape_suivante()  # Termine
 

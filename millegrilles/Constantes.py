@@ -1916,6 +1916,7 @@ class ConstantesPublication:
     CHAMP_DISTRIBUTION_ERREUR = 'distribution_erreur'
     CHAMP_DISTRIBUTION_MAJ = 'distribution_maj'
     CHAMP_CONTENU = 'contenu'
+    CHAMP_CONTENU_SIGNE = 'contenu_signe'
     CHAMP_CONTENU_GZIP = 'contenu_gzip'
     CHAMP_DISTRIBUTION_PROGRES = 'distribution_progres'
     CHAMP_PREPARATION_RESSOURCES = 'preparation_ressources'
@@ -1925,6 +1926,7 @@ class ConstantesPublication:
     CHAMP_IPNS_ID = 'ipns_id'
     CHAMP_NOEUD_ID = 'noeud_id'
     CHAMP_TYPE_EVENEMENT = 'type_evenement'
+    CHAMP_DATE_SIGNATURE = 'date_signature'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,
