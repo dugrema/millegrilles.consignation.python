@@ -65,6 +65,29 @@ class TestConsignationFichiers(DomaineTest):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_fichier_ssh')
 
+    def commande_publier_vitrine_ssh(self):
+        params = {
+            'host': '192.168.2.131',
+            'port': 22,
+            'username': 'sftptest',
+            'repertoireRemote': '/var/opt/millegrilles/nginx/html/site1',
+            'identificateur_document': {'application': 'vitrine'},
+            'cdn_id' : 'DUMMY',
+            # 'securite': '1.public',
+            'keyType': 'rsa',
+        }
+        domaine = 'commande.fichiers.publierVitrineSftp'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_vitrine_ssh')
+
+    def commande_publier_vitrine_ipfs(self):
+        params = {
+            # 'securite': '1.public',
+        }
+        domaine = 'commande.fichiers.publierVitrineIpfs'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='commande_publier_vitrine_ssh')
+
     def commande_publier_fichier_ipfs(self):
         params = {
             'fuuid': self.__fuuid,
@@ -319,7 +342,7 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
         # self.requete_getclessh()
-        self.commande_publier_fichier_ssh()
+        # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
         # self.put_publier_repertoire_ipfs()
@@ -331,6 +354,8 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_publier_cle_ipns()
         # self.commande_creer_cle_ipns()
         # self.put_publier_fichier_ipns()
+        # self.commande_publier_vitrine_ssh()
+        self.commande_publier_vitrine_ipfs()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
