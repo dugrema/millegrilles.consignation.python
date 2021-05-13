@@ -1831,6 +1831,7 @@ class ConstantesPublication:
     }
 
     LIBVAL_MAPPING = 'mapping'
+    LIBVAL_WEBAPPS = 'webapps'
     LIBVAL_SITE_CONFIG = 'siteconfig'
     LIBVAL_ACCUEIL = 'accueil'
     LIBVAL_POST = 'post'
@@ -1864,12 +1865,13 @@ class ConstantesPublication:
     COMMANDE_PUBLIER_SITE = 'publierSite'
     COMMANDE_PUBLIER_PAGE = 'publierPage'
     COMMANDE_PUBLIER_FICHIERS = 'publierFichiers'
-    COMMANDE_PUBLIER_SITECODE = 'publierSiteCode'
+    COMMANDE_PUBLIER_WEBAPPS = 'publierSiteCode'
     COMMANDE_PUBLIER_SECTIONS = 'publierSections'
     COMMANDE_PUBLIER_SITECONFIGURATION = 'publierSiteConfiguration'
     COMMANDE_PUBLIER_UPLOAD_DATASECTION = 'publierUploadDataSection'
     COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION = 'publierUploadSiteConfiguration'
     COMMANDE_PUBLIER_UPLOAD_MAPPING = 'publierUploadMapping'
+    COMMANDE_PUBLIER_UPLOAD_CODE = 'publierUploadCode'
     COMMANDE_RESET_RESSOURCES = 'resetRessources'
     COMMANDE_PUBLIER_COMPLET = 'publierComplet'
     COMMANDE_CONTINUER_PUBLICATION = 'continuerPublication'
@@ -1932,6 +1934,11 @@ class ConstantesPublication:
     CHAMP_DATE_SIGNATURE = 'date_signature'
     CHAMP_SITE_DEFAUT = 'site_defaut'
     CHAMP_LISTE_DOMAINES = 'listeDomaines'
+    CHAMP_AWSS3_BUCKET_DIRFICHIER = 'bucketDirfichier'
+    CHAMP_AWSS3_BUCKET_NAME = 'bucketName'
+    CHAMP_AWSS3_BUCKET_REGION = 'bucketRegion'
+    CHAMP_AWSS3_CREDENTIALS = 'credentialsAccessKeyId'
+    CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE = 'secretAccessKey_chiffre'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,

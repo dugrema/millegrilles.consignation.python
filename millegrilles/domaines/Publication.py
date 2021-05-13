@@ -121,6 +121,8 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             self.gestionnaire.trigger_publication_fichiers(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SECTIONS:
             self.gestionnaire.trigger_publication_sections(message_dict)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_WEBAPPS:
+            self.gestionnaire.commande_trigger_publication_webapps(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION:
             self.gestionnaire.commande_publier_upload_datasection(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITECONFIGURATION:
@@ -1670,7 +1672,13 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
         compteur_commandes_emises = self.commande_publication_configuration(dict())
-        self.__logger.info("Trigger publication siteconfig et mapping, %d commandes emises" % compteur_commandes_emises)
+        if compteur_commandes_emises > 0:
+            self.__logger.info("Trigger publication siteconfig et mapping, %d commandes emises" % compteur_commandes_emises)
+            return
+
+        # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
+        compteur_commandes_emises = self.commande_trigger_publication_webapps(dict())
+        self.__logger.info("Trigger publication code des webapps, %d commandes emises" % compteur_commandes_emises)
 
     def identifier_ressources_fichiers(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1907,6 +1915,82 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
             # Publier forums
             # repertoire: data/forums
+
+        return compteurs_commandes_emises
+
+    def commande_trigger_publication_webapps(self, params: dict):
+        """
+        Emet les commandes de publication du code des webapps (vitrine, place)
+        :param params:
+        :return:
+        """
+        liste_cdns = self.preparer_sitesparcdn()
+
+        collection_config = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS}
+
+        doc_webapps = collection_config.find_one(filtre) or dict()
+        res_webapps = collection_ressources.find_one(filtre) or dict()
+        distribution_progres = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES) or dict()
+        distribution_complete = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE) or list()
+
+        compteurs_commandes_emises = 0
+
+        # Publier collections de fichiers
+        # repertoire: data/fichiers
+        for cdn in liste_cdns:
+            cdn_id = cdn['cdn_id']
+            type_cdn = cdn['type_cdn']
+
+            if cdn_id in distribution_complete:
+                # Code deja distribue, rien a faire
+                continue
+            elif distribution_progres.get(cdn_id) is True:
+                # Distribution deja en cours
+                compteurs_commandes_emises = compteurs_commandes_emises + 1
+                continue
+
+            if type_cdn in ['ipfs', 'ipfs_gateway']:
+                domaine_action = 'commande.fichiers.publierVitrineIpfs'
+                ipns_id = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_ID)
+                cle_chiffree = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
+                if ipns_id is not None and cle_chiffree is not None:
+                    permission = self.preparer_permission_secretawss3(cle_chiffree)
+                    commande = {
+                        'identificateur_document': filtre,
+                        'ipns_key': cle_chiffree,
+                        'ipns_key_name': 'vitrine',
+                        'permission': permission,
+                    }
+                    commande.update(cdn)
+                else:
+                    processus = "millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine"
+                    params = {'cdn_id': cdn['cdn_id']}
+                    self.demarrer_processus(processus, params)
+            elif type_cdn == 'sftp':
+                domaine_action = 'commande.fichiers.publierVitrineSftp'
+                commande = {
+                    'identificateur_document': filtre,
+                }
+                commande.update(cdn)
+            elif type_cdn == 'awss3':
+                permission = self.preparer_permission_secretawss3(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
+                domaine_action = 'commande.fichiers.publierVitrineAwss3'
+                commande = {
+                    'identificateur_document': filtre,
+                    'permission': permission,
+                }
+                commande.update(cdn)
+            else:
+                # Type non supporte ou rien a faire
+                continue
+
+            self.generateur_transactions.transmettre_commande(commande, domaine_action)
+            self.marquer_ressource_encours(cdn_id, filtre, upsert=True)
+
+            compteurs_commandes_emises = compteurs_commandes_emises + 1
 
         return compteurs_commandes_emises
 
@@ -2164,7 +2248,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             etat_distribution = doc_mapping[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
             if etat_distribution is True:
                 # Rien a faire
-                return 0
+                return 1
         except (KeyError, TypeError):
             self.__logger.warning(
                 "Progres deploiement de mapping sur cdn %s n'est pas conserve correctement" % cdn_id)
@@ -2273,14 +2357,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         try:
             type_cdn = cdn['type_cdn']
+            fp_bytesio = BytesIO(contenu_gzip)
             if type_cdn in ['ipfs', 'ipfs_gateway']:
-                # Publier avec le IPNS associe a la section
-                self.put_publier_fichier_ipns(cdn, res_data, securite)
+                # Aucune structure de repertoire, uniquement uploader le fichier
+                fichiers = [{'remote_path': 'fichier.bin', 'fp': fp_bytesio, 'mimetype': mimetype}]
+                params['fichier_unique'] = True
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
-                fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.put_publier_repertoire([cdn], fichiers, params)
+            self.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -2901,6 +2986,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             data_publier['content_encoding'] = content_encoding
         if identificateur_document is not None:
             data_publier['identificateur_document'] = json.dumps(identificateur_document)
+        if params.get('fichier_unique') is True:
+            data_publier['fichier_unique'] = True
 
         r = requests.put(
             'https://fichiers:3021/publier/repertoire',
@@ -2914,11 +3001,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     def sauvegarder_cle_ipns(self, identificateur_document, params):
 
         set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: datetime.datetime.utcnow(),
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
 
         type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
-        if type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+        if type_document == ConstantesPublication.LIBVAL_WEBAPPS:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+            filtre = identificateur_document
+            set_on_insert.update(filtre)
+        elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
             collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
             filtre = {
                 ConstantesPublication.CHAMP_SITE_ID: identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
@@ -3310,6 +3401,68 @@ class ProcessusPublierCleEtFichierIpns(MGProcessus):
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         doc_cdn = collection_cdns.find_one({'cdn_id': cdn_id})
         self.controleur.gestionnaire.put_fichier_ipns(doc_cdn, identificateur_document, nom_cle, res_data, securite)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusCreerCleIpnsVitrine(MGProcessus):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        # Publier la cle ipns
+        commande_creer_cle = {
+            'nom': 'vitrine'
+        }
+        domaine_action = 'commande.fichiers.creerCleIpns'
+        self.ajouter_commande_a_transmettre(domaine_action, commande_creer_cle, blocking=True)
+
+        self.set_etape_suivante(ProcessusCreerCleIpnsVitrine.publier_webapp.__name__)
+
+    def publier_webapp(self):
+        # Sauvegarder la nouvelle cle IPNS
+        # "cleId": "k51qzi5uqu5dio45qeftnomadnnezz2w3ni2rjl9h0q4k2eh8up17gzeylip3c",
+        # "cle_chiffree": "mdiXefgNip2bHL9TA0mTF2wFge5cYY6G+flglfvphroPNpKNf5Y9linAO20ht1KbA6KGppgW1Xo47QpFguqf5WxEy8tZ3Dkh/88I5Zd6f0C79K7dTsEm9GNmBHAp0/ciwIF1llc+ONdngsjv0UQo9oosaUwBgvWZtP0I/lh9DAT4ereqt0d/2mT/7gUHmZ/vVf1sSn5AGP4xKHjn8a4LWmAcvKTdR4qnx0q87+GECp3l6e+X8+8I2V+23/DkXPnuI9j3RGc5SqGP/9oZPnzUexpi50qexHznW9xvGmW8wAzaafg",
+        identificateur_document = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS,
+        }
+        reponse_cle = self.parametres['reponse'][0]
+
+        if reponse_cle.get('err'):
+            self.__logger.error("Erreur reception cle IPNS : %s" % str(reponse_cle))
+            self.set_etape_suivante()  # Termine
+            return
+
+        # Creer transaction pour sauvegarder la cle IPNS de maniere permanente
+        transaction_cle_ipns = {
+            'identificateur_document': identificateur_document,
+        }
+        transaction_cle_ipns.update(reponse_cle)
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_CLE_IPNS
+        self.ajouter_transaction_a_soumettre(domaine_action, transaction_cle_ipns)
+
+        self.controleur.gestionnaire.sauvegarder_cle_ipns(identificateur_document, reponse_cle)
+
+        # Publier fichier
+        cle_id = reponse_cle['cleId']
+        cle_chiffree = reponse_cle['cle_chiffree']
+        cdn_id = self.parametres['cdn_id']
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        doc_cdn = collection_cdns.find_one({'cdn_id': cdn_id})
+
+        permission = self.controleur.gestionnaire.preparer_permission_secretawss3(cle_chiffree)
+        commande = {
+            'identificateur_document': identificateur_document,
+            'ipns_key': cle_chiffree,
+            'ipns_key_name': 'vitrine',
+            'permission': permission,
+        }
+        commande.update(doc_cdn)
+
+        domaine_action = 'commande.fichiers.publierVitrineIpfs'
+        self.ajouter_commande_a_transmettre(domaine_action, commande)
 
         self.set_etape_suivante()  # Termine
 
