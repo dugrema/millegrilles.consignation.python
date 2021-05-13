@@ -1090,21 +1090,21 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 ConstantesPublication.LIBVAL_SITE_CONFIG,
             ]},
             'sites': {'$all': [site_id]},
-            'ipns_id': {'$exists': True},
+            'cid': {'$exists': True},
         }
-        projection = {'ipns_id': True, 'uuid': True, 'section_id': True, Constantes.DOCUMENT_INFODOC_LIBELLE: True}
-        curseur_res_ipns = collection_ressources.find(filtre_res_ipns, projection=projection)
-        uuid_to_ipns = dict()
-        for elem in curseur_res_ipns:
+        projection = {'cid': True, 'uuid': True, 'section_id': True, Constantes.DOCUMENT_INFODOC_LIBELLE: True}
+        curseur_res_cid = collection_ressources.find(filtre_res_ipns, projection=projection)
+        uuid_to_ipfs = dict()
+        for elem in curseur_res_cid:
             type_res = elem[Constantes.DOCUMENT_INFODOC_LIBELLE]
-            ipns_id = elem['ipns_id']
+            cid = elem['cid']
             if type_res == ConstantesPublication.LIBVAL_SITE_CONFIG:
                 # Le site est conserve separement (meme uuid que sa collection de fichiers)
-                contenu['ipns_id'] = ipns_id
+                contenu['cid'] = cid
             else:
                 id_elem = elem.get('uuid') or elem.get('section_id')
-                uuid_to_ipns[id_elem] = ipns_id
-        contenu['ipns_map'] = uuid_to_ipns
+                uuid_to_ipfs[id_elem] = cid
+        contenu['ipfs_map'] = uuid_to_ipfs
 
         # contenu = self.generateur_transactions.preparer_enveloppe(
         #     contenu, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG, ajouter_certificats=True)
