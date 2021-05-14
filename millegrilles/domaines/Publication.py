@@ -1969,6 +1969,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     processus = "millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine"
                     params = {'cdn_id': cdn['cdn_id']}
                     self.demarrer_processus(processus, params)
+                    continue
             elif type_cdn == 'sftp':
                 domaine_action = 'commande.fichiers.publierVitrineSftp'
                 commande = {
@@ -1977,7 +1978,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 commande.update(cdn)
             elif type_cdn == 'awss3':
                 permission = self.preparer_permission_secretawss3(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
-                domaine_action = 'commande.fichiers.publierVitrineAwss3'
+                domaine_action = 'commande.fichiers.publierVitrineAwsS3'
                 commande = {
                     'identificateur_document': filtre,
                     'permission': permission,
