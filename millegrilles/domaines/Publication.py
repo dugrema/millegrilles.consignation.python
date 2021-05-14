@@ -866,7 +866,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         """
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            ConstantesPublication.CHAMP_SECTION_ID: {'$in': section_ids}
+            'uuid': {'$in': section_ids}
         }
         self.invalider_ressources(filtre)
 
@@ -1302,11 +1302,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 for s in sites:
                     add_to_set_ops['sites'] = s
 
-            fuuid_mimetypes = info.get(ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES)
-            if fuuid_mimetypes is not None:
-                mimetype_fichier = fuuid_mimetypes[fuuid]
-                if mimetype_fichier is not None:
-                    set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype_fichier
+            try:
+                fuuid_mimetypes = info[ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES]
+                set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = fuuid_mimetypes[fuuid]
+            except KeyError as ke:
+                if fuuid == info['fuuid_v_courante']:
+                    set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = info['mimetype']
+                else:
+                    raise ke
 
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
@@ -1426,7 +1429,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             if fuuids_fichier:
                 set_fuuids.update(fuuids_fichier)
 
-        info_fichiers = self.trouver_cid_fichiers(uuid_collection, list(set_fuuids))
+        # Creer les entrees manquantes de fichiers  # ATTENTION, potentiel boucle (flag maj_section=False important)
+        fuuids_dict = dict()
+        flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
+        for f in liste_fichiers:
+            for fuuid in f['fuuids']:
+                fuuids_dict[fuuid] = f
+        self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public, maj_section=False)
+
+        info_fichiers = self.trouver_info_fuuid_fichiers(uuid_collection, list(set_fuuids))
         contenu['fuuids'] = info_fichiers
 
         # contenu = self.generateur_transactions.preparer_enveloppe(
@@ -1458,22 +1469,14 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
-        # Creer les entrees manquantes de fichiers  # ATTENTION, potentiel boucle (flag maj_section=False important)
-        fuuids_dict = dict()
-        flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
-        for f in liste_fichiers:
-            for fuuid in f['fuuids']:
-                fuuids_dict[fuuid] = f
-        self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public, maj_section=False)
-
         return doc_fichiers
 
-    def trouver_cid_fichiers(self, uuid_collection: str, fuuids: list):
+    def trouver_info_fuuid_fichiers(self, uuid_collection: str, fuuids: list):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre_fichier = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
             'fuuid': {'$in': fuuids},
-            'cid': {'$exists': True},
+            # 'cid': {'$exists': True},
         }
         projection_res_fichiers = {'fuuid': True, 'public': True, 'cid': True, 'mimetype': True}
         curseur_fichier = collection_ressources.find(filtre_fichier, projection=projection_res_fichiers)
@@ -1486,7 +1489,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'public': public,
                 'mimetype': fichier.get('mimetype')
             }
-            fuuids_info[fuuid]['cid'] = fichier['cid']
+            cid = fichier.get('cid')
+            if cid is not None:
+                fuuids_info[fuuid]['cid'] = cid
 
         return fuuids_info
 
@@ -1506,10 +1511,19 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        filtre = dict()
+        infolib = dict()
+
+        inclure_ressources = params.get('inclure')
+        if inclure_ressources:
+            infolib['$in'] = inclure_ressources
+
         ignorer_ressources = params.get('ignorer')
         if ignorer_ressources is not None:
-            filtre[Constantes.DOCUMENT_INFODOC_LIBELLE] = {'$nin': ignorer_ressources}
+            infolib['$nin'] = ignorer_ressources
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: infolib,
+        }
 
         resultat = collection_ressources.update_many(filtre, ops)
 
@@ -2659,6 +2673,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if mimetype is not None:
             params[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
+        elif securite == Constantes.SECURITE_PUBLIC:
+            raise Exception("Fichier 1.public a publier sans mimetype")
 
         domaine = 'commande.fichiers.publierFichierSftp'
         self.generateur_transactions.transmettre_commande(params, domaine)
@@ -2682,6 +2698,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         if mimetype is not None:
             params[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
+        elif securite == Constantes.SECURITE_PUBLIC:
+            raise Exception("Fichier 1.public a publier sans mimetype")
 
         domaine = 'commande.fichiers.publierFichierIpfs'
         self.generateur_transactions.transmettre_commande(params, domaine)
@@ -2719,6 +2737,9 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
         if mimetype is not None:
             params[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
+        elif securite == Constantes.SECURITE_PUBLIC:
+            raise Exception("Fichier 1.public a publier sans mimetype")
+
         if uuid_fichier is not None:
             params['uuid'] = uuid_fichier
         domaine = 'commande.fichiers.publierFichierAwsS3'
@@ -2838,38 +2859,40 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         fuuids = params.get('fuuids')
 
         collection_uuids = params.get('collections') or list()
+        self.invalider_ressources_sections_fichiers(collection_uuids)
         collection_uuids = set(collection_uuids)
 
-        if fuuids is not None:
-            filtre_fuuids = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-                'fuuid': {'$in': fuuids},
-            }
-            curseur_fichiers = collection_ressources.find(filtre_fuuids)
-            for fichier in curseur_fichiers:
-                collections_fichier = fichier.get('collections')
-                if collections_fichier is not None:
-                    collection_uuids.update(collections_fichier)
+        # if fuuids is not None:
+        #     filtre_fuuids = {
+        #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+        #         'fuuid': {'$in': fuuids},
+        #     }
+        #     curseur_fichiers = collection_ressources.find(filtre_fuuids)
+        #     for fichier in curseur_fichiers:
+        #         collections_fichier = fichier.get('collections')
+        #         if collections_fichier is not None:
+        #             collection_uuids.update(collections_fichier)
+        #
+        # # Verifier les collections presentes (deja dans ressources)
+        # filtre_collections_fichiers = {
+        #     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+        #     'uuid': {'$in': list(collection_uuids)}
+        # }
+        # projection_collections_fichiers = {'uuid': True, 'sites': True}
+        # curseur_collections_fichiers = collection_ressources.find(filtre_collections_fichiers, projection=projection_collections_fichiers)
 
-        # Verifier les collections presentes (deja dans ressources)
-        filtre_collections_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            'uuid': {'$in': list(collection_uuids)}
-        }
-        projection_collections_fichiers = {'uuid': True, 'sites': True}
-        curseur_collections_fichiers = collection_ressources.find(filtre_collections_fichiers, projection=projection_collections_fichiers)
-
-        for collection_fichiers in curseur_collections_fichiers:
-            # Declencher processus de maj de la collection
-            uuid_collection = collection_fichiers['uuid']
-            sites = collection_fichiers['sites']
-            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-            for site_id in sites:
-                params = {
-                    'uuid_collection': uuid_collection,
-                    'site_id': site_id,
-                }
-                self.demarrer_processus(processus, params)
+        # for collection_fichiers in curseur_collections_fichiers:
+        #     # Declencher processus de maj de la collection
+        #     uuid_collection = collection_fichiers['uuid']
+        #
+        #     # sites = collection_fichiers['sites']
+        #     # processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+        #     # for site_id in sites:
+        #     #     params = {
+        #     #         'uuid_collection': uuid_collection,
+        #     #         'site_id': site_id,
+        #     #     }
+        #     #     self.demarrer_processus(processus, params)
 
     def trigger_conditionnel_fichiers_completes(self, params: dict):
         """

@@ -2975,7 +2975,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
             self.generateur_transactions.emettre_message(
                 doc_fichier,
                 domaine_action,
-                exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
+                exchanges=[Constantes.SECURITE_PROTEGE],
                 ajouter_certificats=True
             )
         except TypeError:
