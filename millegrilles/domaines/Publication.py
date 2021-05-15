@@ -366,7 +366,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Declencher publication des collections
         collections_fichiers = doc_section.get('collections') or list()
         for c in collections_fichiers:
-            params = {'uuid_collection': c, 'section_id': section_id, 'site_id': site_id}
+            params = {
+                'uuid_collection': c,
+                'section_id': section_id,
+                'site_id': site_id
+            }
             self.demarrer_processus('millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers', params)
 
         # # Retransmettre sur exchange 1.public pour maj live
@@ -1412,6 +1416,23 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     #
     #     return doc_fichiers
 
+    def marquer_collection_fichiers_prete(self, uuid_collection: str):
+        set_ops = {
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            'uuid': uuid_collection,
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+
+        return doc_fichiers
+
     def maj_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
         if isinstance(site_ids, str):
             site_ids = [site_ids]
@@ -1744,6 +1765,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             date_courante = datetime.datetime.utcnow()
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             for collection_uuid in collection_uuids:
+                # Trouver les collections
                 filtre_res_collfichiers = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
                     'uuid': collection_uuid,
@@ -1757,14 +1779,24 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                     ConstantesPublication.CHAMP_LISTE_SITES: {'$each': [site_id]},
                 }
                 set_ops = dict()
+
+                res_coll_fichiers = collection_ressources.find_one(filtre_res_collfichiers) or dict()
+                try:
+                    distribution_complete = res_coll_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]
+                except KeyError:
+                    distribution_complete = list()
+
                 for cdn_id in liste_cdns:
-                    set_ops[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id] = False
+                    if cdn_id not in distribution_complete:
+                        set_ops[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id] = False
                 set_on_insert.update(filtre_res_collfichiers)
                 ops = {
-                    '$set': set_ops,
+                    # '$set': set_ops,
                     '$addToSet': add_to_set,
                     '$setOnInsert': set_on_insert,
                 }
+                if set_ops is not None:
+                    ops['$set'] = set_ops
                 collection_ressources.update_one(filtre_res_collfichiers, ops, upsert=True)
 
     def trigger_traitement_collections_fichiers(self, params: dict):
@@ -1907,19 +1939,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :return:
         """
         liste_cdns = self.preparer_sitesparcdn()
+        cdn_ids = [c['cdn_id'] for c in liste_cdns]
 
         compteurs_commandes_emises = 0
 
         # Publier collections de fichiers
         # repertoire: data/fichiers
+        # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
+        fichiers_publies = self.trigger_commande_publier_uploadfichiers(
+            liste_cdns, securite=Constantes.SECURITE_PUBLIC)
+        compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
+
         for cdn in liste_cdns:
             cdn_id = cdn['cdn_id']
             liste_sites = cdn['sites']
-
-            # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
-            fichiers_publies = self.trigger_commande_publier_uploadfichiers(
-               cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC)
-            compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
 
             # Publier pages
             # repertoire: data/pages
@@ -2033,18 +2066,23 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return compteur_commandes_emises
 
-    def trigger_commande_publier_uploadfichiers(self, cdn_id, liste_sites, securite=Constantes.SECURITE_PUBLIC):
+    def trigger_commande_publier_uploadfichiers(self, liste_res_cdns: list, securite=Constantes.SECURITE_PUBLIC):
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
         :param cdn_id:
         :param liste_sites:
         :return:
         """
-        label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+        liste_sites = set()
+        for cdn in liste_res_cdns:
+            liste_sites.update(cdn['sites'])
+        liste_sites = list(liste_sites)
+
+        # label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
         filtre_fichiers = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'sites': {'$in': liste_sites},
-            label_champ_distribution: {'$exists': True},
+            # label_champ_distribution: {'$exists': True},
         }
 
         compteur_commandes_emises = 0
@@ -2054,31 +2092,32 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_fichiers = collection_ressources.find(filtre_fichiers)
         for col_fichiers in curseur_fichiers:
-            valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            # valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
             distribution_maj = col_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution
-            if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution):
+            # if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution):
+            if distribution_maj <= expiration_distribution:
                 uuid_col_fichiers = col_fichiers['uuid']
                 filtre_fichiers_maj = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
                     'uuid': uuid_col_fichiers,
                 }
-                self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
+                # self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
 
                 # La collection n'a pas encore ete preparee pour la publication
-                contenu = col_fichiers.get('contenu')
-                if contenu is None:
-                    uuid_collection = col_fichiers['uuid']
-                    # Demarrer un processus pour la preparation et la publication
-                    processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-                    params = {
-                        'uuid_collection': uuid_collection,
-                        'site_ids': liste_sites,
-                        'cdn_id': cdn_id,
-                        'emettre_commande': True,
-                    }
-                    self.demarrer_processus(processus, params)
-                else:
-                    self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
+                # contenu = col_fichiers.get('contenu')
+                # if contenu is None:
+                uuid_collection = col_fichiers['uuid']
+                # Demarrer un processus pour la preparation et la publication
+                processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+                params = {
+                    'uuid_collection': uuid_collection,
+                    'site_ids': liste_sites,
+                    'cdn_ids': [c['cdn_id'] for c in liste_res_cdns],
+                    'emettre_commande': True,
+                }
+                self.demarrer_processus(processus, params)
+                # else:
+                #     self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
 
                 compteur_commandes_emises = compteur_commandes_emises + 1
 
@@ -3116,6 +3155,41 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
+    def detecter_changement_collection(self, contenu_collection: dict):
+        """
+        Detecte si le contenu de collection de fichiers est different (ressource collection_fichiers)
+        :param contenu_collection: dict {collection, documents} tel que recu de la requete sur GrosFichiers
+        :return: True si le parametre est different du contenu_signe de la ressource de collection
+        """
+        info_collection = contenu_collection['collection']
+        liste_documents = contenu_collection['documents']
+
+        uuid_collection = info_collection['uuid']
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        res_collection = collection_ressources.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            'uuid': uuid_collection,
+        })
+        try:
+            contenu_signe = res_collection[ConstantesPublication.CHAMP_CONTENU_SIGNE]
+        except KeyError:
+            # Contenu jamais publie ou invalide, on va recharger le contenu de la collection
+            return True
+
+        # Generer un dict des donnees mutables et verifier si elles ont changees
+        fuuids_recus = set()
+        for fichier in liste_documents:
+            fuuids_recus.update(fichier[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS])
+            fuuids_recus.add(fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE])
+        fuuids_signes = set(contenu_signe['fuuids'].keys())
+
+        fuuids_differents = fuuids_recus ^ fuuids_signes  # Extraire fuuids presents dans une seule liste
+        if len(fuuids_differents) > 0:
+            # On a une difference entre les listes de fuuids
+            return True
+
+        return False
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -3273,6 +3347,10 @@ class ProcessusTransactionMajPartiepage(MGProcessusTransaction):
 
 class ProcessusPublierCollectionGrosFichiers(MGProcessus):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def initiale(self):
         params = self.parametres
 
@@ -3324,34 +3402,70 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
 
         contenu_collection = self.parametres['reponse'][0]
         site_ids = self.parametres['site_ids']
-
-        info_collection = contenu_collection['collection']
-        liste_documents = contenu_collection['documents']
-
-        col_fichiers = self.controleur.gestionnaire.maj_ressource_collection_fichiers(site_ids, info_collection, liste_documents)
-
         uuid_collection = self.parametres['uuid_collection']
-        collection_ressources = self.controleur.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        filtre_coll_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            'uuid': uuid_collection
-        }
-        ops = {
-            '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True},
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        }
-        collection_ressources.update_one(filtre_coll_fichiers, ops)
+        cdn_ids = self.parametres.get('cdn_ids') or list()
 
-        self.continuer_publication(col_fichiers)
+        changement_detecte = self.controleur.gestionnaire.detecter_changement_collection(contenu_collection)
+        if changement_detecte is True:
+            info_collection = contenu_collection['collection']
+            liste_documents = contenu_collection['documents']
 
-        self.set_etape_suivante()
+            col_fichiers = self.controleur.gestionnaire.maj_ressource_collection_fichiers(site_ids, info_collection, liste_documents)
+
+            collection_ressources = self.controleur.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+            filtre_coll_fichiers = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid': uuid_collection
+            }
+
+            set_ops = {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True}
+            # Ajouter progres = false pour tous les cdn_is
+            for cdn_id in cdn_ids:
+                label_progres = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+                set_ops[label_progres] = False
+
+            ops = {
+                '$set': set_ops,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+            collection_ressources.update_one(filtre_coll_fichiers, ops)
+
+            self.continuer_publication(col_fichiers)
+
+        else:
+            # Aucun changement a apporter, la version deja signee/gzipee ne change pas
+            col_fichiers = self.controleur.gestionnaire.marquer_collection_fichiers_prete(uuid_collection)
+            self.continuer_publication(col_fichiers)
+
+            # # Continuer la publication
+            # if self.parametres.get('continuer_publication') is True:
+            #     domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
+            #     self.ajouter_commande_a_transmettre(domaine_action, dict())
+
+        self.set_etape_suivante()  # Termine
 
     def continuer_publication(self, col_fichiers):
-        securite = col_fichiers['contenu']['securite']
         if self.parametres.get('emettre_commande') is True:
-            cdn_id = self.parametres['cdn_id']
-            self.controleur.gestionnaire.emettre_commande_publication_collectionfichiers(
-                cdn_id, col_fichiers, securite)
+            try:
+                securite = col_fichiers['contenu']['securite']
+            except KeyError:
+                self.__logger.exception(
+                    "Niveau se securite n'est pas inclus dans collection fichiers %s" % self.parametres[
+                        'uuid_collection'])
+                self.__logger.error("Contenu col fichiers : %s" % str(col_fichiers))
+                securite = Constantes.SECURITE_PRIVE
+
+            cdn_id = self.parametres.get('cdn_id')
+            cdn_ids = self.parametres.get('cdn_ids')
+            cdns = set()
+            if cdn_id is not None:
+                cdns.add(cdn_id)
+            if cdn_ids is not None:
+                cdns.update(cdn_ids)
+
+            for cdn_id_l in cdns:
+                self.controleur.gestionnaire.emettre_commande_publication_collectionfichiers(
+                    cdn_id_l, col_fichiers, securite)
         elif self.parametres.get('continuer_publication') is True:
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
             self.ajouter_commande_a_transmettre(domaine_action, dict())
