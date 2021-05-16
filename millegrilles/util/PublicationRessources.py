@@ -6,7 +6,6 @@ import json
 import requests
 import datetime
 
-from typing import Union
 from os import path
 from io import BytesIO
 from typing import Union
@@ -171,450 +170,9 @@ class InvalidateurRessources:
         return doc_fichiers
 
 
-class GestionnaireCascadePublication:
-
-    def __init__(self, gestionnaire_domaine):
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        self.__gestionnaire_domaine = gestionnaire_domaine
-
-        self.__ressources_publication = RessourcesPublication(self)
-        self.__triggers_publication = TriggersPublication(self)
-        self.__invalidateur = InvalidateurRessources(self)
-        self.__http_publication = HttpPublication(self)
-
-    def commande_publier_upload_datasection(self, params: dict):
-        params = params.copy()
-        type_section = params['type_section']
-        cdn_id = params['cdn_id']
-        remote_path = params['remote_path']
-        mimetype = params.get('mimetype')
-        securite = params.get('securite')
-
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: type_section
-        }
-        if type_section == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
-            filtre['uuid'] = params['uuid_collection']
-        elif type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
-            filtre[ConstantesPublication.CHAMP_SECTION_ID] = params[ConstantesPublication.CHAMP_SECTION_ID]
-        else:
-            msg = 'Type section inconnue: %s' % type_section
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        params['identificateur_document'] = filtre
-
-        res_data = collection_ressources.find_one(filtre)
-        if res_data is None:
-            msg = 'Aucune section ne correspond a %s' % str(filtre)
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        contenu_gzip = res_data.get('contenu_gzip')
-        if contenu_gzip is None:
-            msg = 'Le contenu gzip de la section n\'est pas pret. Section : %s' % str(filtre)
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-        filtre_cdn = {'cdn_id': cdn_id}
-        cdn = collection_cdns.find_one(filtre_cdn)
-        if cdn is None:
-            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        try:
-            type_cdn = cdn['type_cdn']
-            fp_bytesio = BytesIO(contenu_gzip)
-            if type_cdn in ['ipfs', 'ipfs_gateway']:
-                # Aucune structure de repertoire, uniquement uploader le fichier
-                fichiers = [{'remote_path': 'fichier.bin', 'fp': fp_bytesio, 'mimetype': mimetype}]
-                params['fichier_unique'] = True
-            else:
-                # Methode simple d'upload de fichier avec structure de repertoire
-                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-            self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
-        except Exception as e:
-            msg = "Erreur publication fichiers %s" % str(params)
-            self.__logger.exception(msg)
-            return {'err': str(e), 'msg': msg}
-
-        return {'ok': True}
-
-    def commande_publier_upload_siteconfiguration(self, params: dict):
-        params = params.copy()
-        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
-        cdn_id = params['cdn_id']
-        remote_path = params['remote_path']
-        mimetype = params.get('mimetype')
-        # securite = params.get('securite')
-
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
-            ConstantesPublication.CHAMP_SITE_ID: site_id,
-        }
-        params['identificateur_document'] = filtre
-
-        res_data = collection_ressources.find_one(filtre)
-        if res_data is None:
-            msg = 'Aucune section ne correspond a %s' % str(filtre)
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
-        if date_signature is None:
-            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
-        contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
-
-        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-        filtre_cdn = {'cdn_id': cdn_id}
-        cdn = collection_cdns.find_one(filtre_cdn)
-        if cdn is None:
-            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        try:
-            type_cdn = cdn['type_cdn']
-            if type_cdn in ['ipfs', 'ipfs_gateway']:
-                # Publier avec le IPNS associe a la section
-                self.__http_publication.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
-            else:
-                # Methode simple d'upload de fichier avec structure de repertoire
-                fp_bytesio = BytesIO(contenu_gzip)
-                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
-        except Exception as e:
-            msg = "Erreur publication fichiers %s" % str(params)
-            self.__logger.exception(msg)
-            return {'err': str(e), 'msg': msg}
-
-        return {'ok': True}
-
-    def commande_publier_upload_mapping(self, params: dict):
-        params = params.copy()
-        cdn_id = params['cdn_id']
-        remote_path = params['remote_path']
-        mimetype = params.get('mimetype')
-        # securite = params.get('securite')
-
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
-        }
-        params['identificateur_document'] = filtre
-
-        res_data = collection_ressources.find_one(filtre)
-        if res_data is None:
-            msg = 'Aucune section ne correspond a %s' % str(filtre)
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
-        if date_signature is None:
-            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
-        contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
-
-        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-        filtre_cdn = {'cdn_id': cdn_id}
-        cdn = collection_cdns.find_one(filtre_cdn)
-        if cdn is None:
-            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
-            self.__logger.error(msg)
-            return {'err': msg}
-
-        try:
-            type_cdn = cdn['type_cdn']
-            if type_cdn in ['ipfs', 'ipfs_gateway', 'mq', 'manuel']:
-                # Rien a faire, le mapping est inclus avec le code ou recu via MQ
-                self.__invalidateur.marquer_ressource_complete(cdn_id, filtre)
-            else:
-                # Methode simple d'upload de fichier avec structure de repertoire
-                fp_bytesio = BytesIO(contenu_gzip)
-                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
-        except Exception as e:
-            msg = "Erreur publication fichiers %s" % str(params)
-            self.__logger.exception(msg)
-            return {'err': str(e), 'msg': msg}
-
-        return {'ok': True}
-
-    def traiter_evenement_publicationfichier(self, params: dict):
-        identificateur_document = params['identificateur_document']
-        cdn_ids = params.get('cdn_ids') or list()
-        cdn_id_unique = params.get('cdn_id')
-        if cdn_id_unique:
-            cdn_ids.append(cdn_id_unique)
-
-        # fuuid = params.get('fuuid')
-        securite = params.get('securite') or Constantes.SECURITE_PRIVE
-        flag_complete = params.get('complete') or False
-        err = params.get('err') or False
-        current_bytes = params.get('current_bytes')
-        total_bytes = params.get('total_bytes')
-
-        cid = params.get('cid')  # Identificateur IPFS
-
-        # Determiner type evenement
-        set_ops = dict()
-        unset_ops = dict()
-        add_to_set = dict()
-        date_ops = {
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
-        }
-        for cdn_id in cdn_ids:
-            if flag_complete:
-                # Publication completee
-                unset_ops['distribution_encours.' + cdn_id] = True
-                unset_ops['distribution_progres.' + cdn_id] = True
-                unset_ops['distribution_erreur.' + cdn_id] = True
-
-                add_to_set['distribution_complete'] = cdn_id
-                if cid is not None:
-                    set_ops['cid'] = cid
-                    date_ops['ipfs_publication'] = True
-
-            elif err is not False:
-                # Erreur
-                unset_ops['distribution_encours.' + cdn_id] = True
-                unset_ops['distribution_progres.' + cdn_id] = True
-                set_ops['distribution_erreur.' + cdn_id] = err
-            elif current_bytes is not None and total_bytes is not None:
-                # Progres
-                progres = math.floor(current_bytes * 100 / total_bytes)
-                set_ops['distribution_progres.' + cdn_id] = progres
-
-        ops = {
-            '$currentDate': date_ops
-        }
-        if len(set_ops) > 0:
-            ops['$set'] = set_ops
-        if len(unset_ops) > 0:
-            ops['$unset'] = unset_ops
-        if len(add_to_set) > 0:
-            ops['$addToSet'] = add_to_set
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-            # 'fuuid': fuuid,
-        }
-        filtre.update(identificateur_document)
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources.update_one(filtre, ops)
-
-        self.emettre_evenements_downstream(params)
-
-        # Voir si on lance un trigger de publication de sections
-        # self.trigger_conditionnel_fichiers_completes(params)
-        self.continuer_publication()
-
-    def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
-        # Verifier si on a une reference au fichier ou une collection avec le fichier
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        fuuids = params.get('fuuids')
-
-        collection_uuids = params.get('collections') or list()
-        self.__invalidateur.invalider_ressources_sections_fichiers(collection_uuids)
-        collection_uuids = set(collection_uuids)
-
-        # if fuuids is not None:
-        #     filtre_fuuids = {
-        #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-        #         'fuuid': {'$in': fuuids},
-        #     }
-        #     curseur_fichiers = collection_ressources.find(filtre_fuuids)
-        #     for fichier in curseur_fichiers:
-        #         collections_fichier = fichier.get('collections')
-        #         if collections_fichier is not None:
-        #             collection_uuids.update(collections_fichier)
-        #
-        # # Verifier les collections presentes (deja dans ressources)
-        # filtre_collections_fichiers = {
-        #     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-        #     'uuid': {'$in': list(collection_uuids)}
-        # }
-        # projection_collections_fichiers = {'uuid': True, 'sites': True}
-        # curseur_collections_fichiers = collection_ressources.find(filtre_collections_fichiers, projection=projection_collections_fichiers)
-
-        # for collection_fichiers in curseur_collections_fichiers:
-        #     # Declencher processus de maj de la collection
-        #     uuid_collection = collection_fichiers['uuid']
-        #
-        #     # sites = collection_fichiers['sites']
-        #     # processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-        #     # for site_id in sites:
-        #     #     params = {
-        #     #         'uuid_collection': uuid_collection,
-        #     #         'site_id': site_id,
-        #     #     }
-        #     #     self.demarrer_processus(processus, params)
-
-    def continuer_publication(self, params: dict = None):
-        """
-        Declenche une publication complete
-        :param params:
-        :return:
-        """
-        if params is None:
-            params = dict()
-
-        compteur_collections_fichiers = self.__triggers_publication.trigger_traitement_collections_fichiers(params)
-        if compteur_collections_fichiers > 0:
-            self.__logger.info("Preparation des collections de fichiers, %d collections en traitement" % compteur_collections_fichiers)
-            return
-
-        compteur_fichiers_publies = self.__triggers_publication.trigger_publication_fichiers(params)
-        if compteur_fichiers_publies > 0:
-            self.__logger.info("Trigger publication fichiers, %d fichiers a publier" % compteur_fichiers_publies)
-            return
-
-        # Aucuns fichiers publies, on emet le trigger de publication des sections
-        compteur_commandes_emises = self.__triggers_publication.continuer_publication_sections(dict())
-        if compteur_commandes_emises > 0:
-            self.__logger.info("Trigger publication sections, %d commandes emises" % compteur_commandes_emises)
-            return
-
-        # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
-        compteur_commandes_emises = self.__triggers_publication.commande_publication_configuration(dict())
-        if compteur_commandes_emises > 0:
-            self.__logger.info("Trigger publication siteconfig et mapping, %d commandes emises" % compteur_commandes_emises)
-            return
-
-        # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
-        compteur_commandes_emises = self.__triggers_publication.commande_trigger_publication_webapps(dict())
-        self.__logger.info("Trigger publication code des webapps, %d commandes emises" % compteur_commandes_emises)
-
-    def emettre_evenements_downstream(self, params: dict):
-        """
-        Emet des evenements de changement sur les echanges appropries
-        :param params:
-        :return:
-        """
-        identificateur_document = params.get('identificateur_document')
-
-        if identificateur_document:
-            type_document = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-        else:
-            type_document = None
-
-        # message = {
-        #     ConstantesPublication.CHAMP_TYPE_EVENEMENT: type_document,
-        # }
-        if type_document == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
-            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_COLLECTION_FICHIERS
-            # message['uuid'] = identificateur_document['uuid']
-        elif type_document == ConstantesPublication.LIBVAL_SECTION_PAGE:
-            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_PAGE
-            # message[ConstantesPublication.CHAMP_SECTION_ID] = identificateur_document[ConstantesPublication.CHAMP_SECTION_ID]
-        elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
-            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITECONFIG
-            # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
-        elif type_document == ConstantesPublication.LIBVAL_MAPPING:
-            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_MAPPING
-            # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
-        else:
-            # Rien a faire
-            return
-
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        doc_ressource = collection_ressources.find_one(identificateur_document)
-        contenu_signe = doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_SIGNE)
-        if contenu_signe is not None:
-            # On a le contenu signe (genere en meme temps que le contenu GZIP)
-            self.generateur_transactions.emettre_message(contenu_signe, domaine_action, exchanges=[Constantes.SECURITE_PUBLIC])
-
-    def trigger_conditionnel_fichiers_completes(self, params: dict):
-        """
-        Verifie si la publication de tous les fichiers est completee
-        Soumet un trigger de publication de sections au besoin
-        :return:
-        """
-        # Determiner le type de message recu
-        flag_complete = params.get('complete') or False
-        err = params.get('err')
-        identificateur_document = params['identificateur_document']
-
-        if err is not None or flag_complete is False:
-            # Rien a faire
-            return
-
-        fuuid = identificateur_document.get('fuuid')
-        section_id = identificateur_document.get('section_id')
-        type_section = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-
-        prochain_trigger = None
-        if fuuid is not None:
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-            }
-            prochain_trigger = self.__triggers_publication.continuer_publication_sections
-        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_FORUM]:
-            # C'est une section, on verifie si toutes les sections sont completees
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                    ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                    ConstantesPublication.LIBVAL_SECTION_PAGE,
-                    ConstantesPublication.LIBVAL_SECTION_FORUM,
-                ]}
-            }
-            prochain_trigger = self.__triggers_publication.commande_publication_configuration
-        else:
-            # Rien a verifier
-            return
-
-        filtre[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES] = {
-            '$exists': True,
-            '$ne': dict(),
-        }
-        aggregation_pipeline = [
-            {'$match': filtre},
-            {'$count': 'en_cours'},
-        ]
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        resultat = collection_ressources.aggregate(aggregation_pipeline)
-        compte = 0
-        for r in resultat:
-            compte = r['en_cours']
-
-        if compte == 0:
-            self.__logger.debug("Tous les fichiers sont publies, declencher publication sections")
-            self.continuer_publication()
-
-    def preparer_permission_secret(self, secret_chiffre):
-        secret_bytes = multibase.decode(secret_chiffre)
-        secret_hachage = hacher(secret_bytes, encoding='base58btc')
-        permission = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [secret_hachage],
-            'duree': 30 * 60 * 60,  # 30 minutes
-            'securite': '3.protege',
-            'roles_permis': ['Publication'],
-        }
-        permission = self.generateur_transactions.preparer_enveloppe(permission)
-        return permission
-
-    def demarrer_processus(self, processus: str, params: dict):
-        self.__gestionnaire_domaine.demarrer_processus(processus, params)
-
-    @property
-    def invalidateur(self) -> InvalidateurRessources:
-        return self.__invalidateur
-
-    @property
-    def document_dao(self):
-        return self.__gestionnaire_domaine.document_dao
-
-    @property
-    def generateur_transactions(self):
-        return self.__gestionnaire_domaine.generateur_transactions
-
-
 class RessourcesPublication:
 
-    def __init__(self, cascade: GestionnaireCascadePublication):
+    def __init__(self, cascade):
         self.__cascade = cascade
 
     @property
@@ -966,7 +524,7 @@ class RessourcesPublication:
             filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Ajouter les fichiers requis comme ressource pour le site
-        doc_site = self.get_site(site_id)
+        doc_site = self.__cascade.gestionnaire.get_site(site_id)
         flag_public = doc_site['securite'] == Constantes.SECURITE_PUBLIC
         self.maj_ressources_fuuids(fuuids_info, sites=[site_id], public=flag_public)
 
@@ -1050,7 +608,7 @@ class RessourcesPublication:
         # Lancer processus maj des collections de fichiers
         if maj_section:
             # Invalider les ressources fichiers pour publication
-            self.__triggers_publication.invalider_ressources_sections_fichiers(list(collections_fichiers_uuids))
+            self.__cascade.invalidateur.invalider_ressources_sections_fichiers(list(collections_fichiers_uuids))
 
             # Publier les ressources fichiers
             for uuid_collection in collections_fichiers_uuids:
@@ -1060,7 +618,7 @@ class RessourcesPublication:
                         'uuid_collection': uuid_collection,
                         'site_id': site_id,
                     }
-                    self.demarrer_processus(processus, params)
+                    self.__cascade.demarrer_processus(processus, params)
 
     def get_ressource_collection_fichiers(self, uuid_collection):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1205,7 +763,7 @@ class RessourcesPublication:
 
             collection_uuids = doc_section.get('collections') or list()
             site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]
-            site = self.get_site(site_id)
+            site = self.__cascade.gestionnaire.get_site(site_id)
             liste_cdns = site[ConstantesPublication.CHAMP_LISTE_CDNS]
 
             date_courante = datetime.datetime.utcnow()
@@ -1410,7 +968,7 @@ class RessourcesPublication:
     def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         contenu = col_fichiers['contenu']
-        contenu_signe = self.generateur_transactions.preparer_enveloppe(contenu, 'Publication', ajouter_certificats=True)
+        contenu_signe = self.__cascade.generateur_transactions.preparer_enveloppe(contenu, 'Publication', ajouter_certificats=True)
         contenu_gzippe = self.preparer_json_gzip(contenu_signe, chiffrer)
 
         # Conserver contenu pour la ressource
@@ -1509,6 +1067,600 @@ class RessourcesPublication:
         collection_ressources.update_one(filtre, ops)
 
 
+class GestionnaireCascadePublication:
+
+    def __init__(self, gestionnaire_domaine):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__gestionnaire_domaine = gestionnaire_domaine
+
+        self.__ressources_publication = RessourcesPublication(self)
+        self.__triggers_publication = TriggersPublication(self)
+        self.__invalidateur = InvalidateurRessources(self)
+        self.__http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
+
+    def commande_publier_upload_datasection(self, params: dict):
+        params = params.copy()
+        type_section = params['type_section']
+        cdn_id = params['cdn_id']
+        remote_path = params['remote_path']
+        mimetype = params.get('mimetype')
+        securite = params.get('securite')
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: type_section
+        }
+        if type_section == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
+            filtre['uuid'] = params['uuid_collection']
+        elif type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
+            filtre[ConstantesPublication.CHAMP_SECTION_ID] = params[ConstantesPublication.CHAMP_SECTION_ID]
+        else:
+            msg = 'Type section inconnue: %s' % type_section
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        params['identificateur_document'] = filtre
+
+        res_data = collection_ressources.find_one(filtre)
+        if res_data is None:
+            msg = 'Aucune section ne correspond a %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        contenu_gzip = res_data.get('contenu_gzip')
+        if contenu_gzip is None:
+            msg = 'Le contenu gzip de la section n\'est pas pret. Section : %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdn = {'cdn_id': cdn_id}
+        cdn = collection_cdns.find_one(filtre_cdn)
+        if cdn is None:
+            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        try:
+            type_cdn = cdn['type_cdn']
+            fp_bytesio = BytesIO(contenu_gzip)
+            if type_cdn in ['ipfs', 'ipfs_gateway']:
+                # Aucune structure de repertoire, uniquement uploader le fichier
+                fichiers = [{'remote_path': 'fichier.bin', 'fp': fp_bytesio, 'mimetype': mimetype}]
+                params['fichier_unique'] = True
+            else:
+                # Methode simple d'upload de fichier avec structure de repertoire
+                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+            self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
+        except Exception as e:
+            msg = "Erreur publication fichiers %s" % str(params)
+            self.__logger.exception(msg)
+            return {'err': str(e), 'msg': msg}
+
+        return {'ok': True}
+
+    def commande_publier_upload_siteconfiguration(self, params: dict):
+        params = params.copy()
+        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        cdn_id = params['cdn_id']
+        remote_path = params['remote_path']
+        mimetype = params.get('mimetype')
+        # securite = params.get('securite')
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+        }
+        params['identificateur_document'] = filtre
+
+        res_data = collection_ressources.find_one(filtre)
+        if res_data is None:
+            msg = 'Aucune section ne correspond a %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+        if date_signature is None:
+            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
+        contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdn = {'cdn_id': cdn_id}
+        cdn = collection_cdns.find_one(filtre_cdn)
+        if cdn is None:
+            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        try:
+            type_cdn = cdn['type_cdn']
+            if type_cdn in ['ipfs', 'ipfs_gateway']:
+                # Publier avec le IPNS associe a la section
+                self.__http_publication.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
+            else:
+                # Methode simple d'upload de fichier avec structure de repertoire
+                fp_bytesio = BytesIO(contenu_gzip)
+                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
+        except Exception as e:
+            msg = "Erreur publication fichiers %s" % str(params)
+            self.__logger.exception(msg)
+            return {'err': str(e), 'msg': msg}
+
+        return {'ok': True}
+
+    def commande_publier_upload_mapping(self, params: dict):
+        params = params.copy()
+        cdn_id = params['cdn_id']
+        remote_path = params['remote_path']
+        mimetype = params.get('mimetype')
+        # securite = params.get('securite')
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        params['identificateur_document'] = filtre
+
+        res_data = collection_ressources.find_one(filtre)
+        if res_data is None:
+            msg = 'Aucune section ne correspond a %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+        if date_signature is None:
+            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
+        contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdn = {'cdn_id': cdn_id}
+        cdn = collection_cdns.find_one(filtre_cdn)
+        if cdn is None:
+            msg = 'Le CDN "%s" n\'existe pas' % cdn_id
+            self.__logger.error(msg)
+            return {'err': msg}
+
+        try:
+            type_cdn = cdn['type_cdn']
+            if type_cdn in ['ipfs', 'ipfs_gateway', 'mq', 'manuel']:
+                # Rien a faire, le mapping est inclus avec le code ou recu via MQ
+                self.__invalidateur.marquer_ressource_complete(cdn_id, filtre)
+            else:
+                # Methode simple d'upload de fichier avec structure de repertoire
+                fp_bytesio = BytesIO(contenu_gzip)
+                fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
+        except Exception as e:
+            msg = "Erreur publication fichiers %s" % str(params)
+            self.__logger.exception(msg)
+            return {'err': str(e), 'msg': msg}
+
+        return {'ok': True}
+
+    def traiter_evenement_publicationfichier(self, params: dict):
+        identificateur_document = params['identificateur_document']
+        cdn_ids = params.get('cdn_ids') or list()
+        cdn_id_unique = params.get('cdn_id')
+        if cdn_id_unique:
+            cdn_ids.append(cdn_id_unique)
+
+        # fuuid = params.get('fuuid')
+        securite = params.get('securite') or Constantes.SECURITE_PRIVE
+        flag_complete = params.get('complete') or False
+        err = params.get('err') or False
+        current_bytes = params.get('current_bytes')
+        total_bytes = params.get('total_bytes')
+
+        cid = params.get('cid')  # Identificateur IPFS
+
+        # Determiner type evenement
+        set_ops = dict()
+        unset_ops = dict()
+        add_to_set = dict()
+        date_ops = {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+        }
+        for cdn_id in cdn_ids:
+            if flag_complete:
+                # Publication completee
+                unset_ops['distribution_encours.' + cdn_id] = True
+                unset_ops['distribution_progres.' + cdn_id] = True
+                unset_ops['distribution_erreur.' + cdn_id] = True
+
+                add_to_set['distribution_complete'] = cdn_id
+                if cid is not None:
+                    set_ops['cid'] = cid
+                    date_ops['ipfs_publication'] = True
+
+            elif err is not False:
+                # Erreur
+                unset_ops['distribution_encours.' + cdn_id] = True
+                unset_ops['distribution_progres.' + cdn_id] = True
+                set_ops['distribution_erreur.' + cdn_id] = err
+            elif current_bytes is not None and total_bytes is not None:
+                # Progres
+                progres = math.floor(current_bytes * 100 / total_bytes)
+                set_ops['distribution_progres.' + cdn_id] = progres
+
+        ops = {
+            '$currentDate': date_ops
+        }
+        if len(set_ops) > 0:
+            ops['$set'] = set_ops
+        if len(unset_ops) > 0:
+            ops['$unset'] = unset_ops
+        if len(add_to_set) > 0:
+            ops['$addToSet'] = add_to_set
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            # 'fuuid': fuuid,
+        }
+        filtre.update(identificateur_document)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_one(filtre, ops)
+
+        self.__triggers_publication.emettre_evenements_downstream(params)
+
+        # Voir si on lance un trigger de publication de sections
+        # self.trigger_conditionnel_fichiers_completes(params)
+        self.continuer_publication()
+
+    def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
+        # Verifier si on a une reference au fichier ou une collection avec le fichier
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        fuuids = params.get('fuuids')
+
+        collection_uuids = params.get('collections') or list()
+        self.__invalidateur.invalider_ressources_sections_fichiers(collection_uuids)
+        collection_uuids = set(collection_uuids)
+
+        # if fuuids is not None:
+        #     filtre_fuuids = {
+        #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+        #         'fuuid': {'$in': fuuids},
+        #     }
+        #     curseur_fichiers = collection_ressources.find(filtre_fuuids)
+        #     for fichier in curseur_fichiers:
+        #         collections_fichier = fichier.get('collections')
+        #         if collections_fichier is not None:
+        #             collection_uuids.update(collections_fichier)
+        #
+        # # Verifier les collections presentes (deja dans ressources)
+        # filtre_collections_fichiers = {
+        #     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+        #     'uuid': {'$in': list(collection_uuids)}
+        # }
+        # projection_collections_fichiers = {'uuid': True, 'sites': True}
+        # curseur_collections_fichiers = collection_ressources.find(filtre_collections_fichiers, projection=projection_collections_fichiers)
+
+        # for collection_fichiers in curseur_collections_fichiers:
+        #     # Declencher processus de maj de la collection
+        #     uuid_collection = collection_fichiers['uuid']
+        #
+        #     # sites = collection_fichiers['sites']
+        #     # processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+        #     # for site_id in sites:
+        #     #     params = {
+        #     #         'uuid_collection': uuid_collection,
+        #     #         'site_id': site_id,
+        #     #     }
+        #     #     self.demarrer_processus(processus, params)
+
+    def trigger_conditionnel_fichiers_completes(self, params: dict):
+        """
+        Verifie si la publication de tous les fichiers est completee
+        Soumet un trigger de publication de sections au besoin
+        :return:
+        """
+        # Determiner le type de message recu
+        flag_complete = params.get('complete') or False
+        err = params.get('err')
+        identificateur_document = params['identificateur_document']
+
+        if err is not None or flag_complete is False:
+            # Rien a faire
+            return
+
+        fuuid = identificateur_document.get('fuuid')
+        section_id = identificateur_document.get('section_id')
+        type_section = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+
+        prochain_trigger = None
+        if fuuid is not None:
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            }
+        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_FORUM]:
+            # C'est une section, on verifie si toutes les sections sont completees
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                    ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                    ConstantesPublication.LIBVAL_SECTION_PAGE,
+                    ConstantesPublication.LIBVAL_SECTION_FORUM,
+                ]}
+            }
+        else:
+            # Rien a verifier
+            return
+
+        filtre[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES] = {
+            '$exists': True,
+            '$ne': dict(),
+        }
+        aggregation_pipeline = [
+            {'$match': filtre},
+            {'$count': 'en_cours'},
+        ]
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        resultat = collection_ressources.aggregate(aggregation_pipeline)
+        compte = 0
+        for r in resultat:
+            compte = r['en_cours']
+
+        if compte == 0:
+            self.__logger.debug("Tous les fichiers sont publies, declencher publication sections")
+            self.continuer_publication()
+
+    def preparer_permission_secret(self, secret_chiffre):
+        secret_bytes = multibase.decode(secret_chiffre)
+        secret_hachage = hacher(secret_bytes, encoding='base58btc')
+        permission = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [secret_hachage],
+            'duree': 30 * 60 * 60,  # 30 minutes
+            'securite': '3.protege',
+            'roles_permis': ['Publication'],
+        }
+        permission = self.generateur_transactions.preparer_enveloppe(permission)
+        return permission
+
+    def continuer_publication(self, params: dict = None):
+        """
+        Declenche une publication complete
+        :param params:
+        :return:
+        """
+        if params is None:
+            params = dict()
+
+        compteur_collections_fichiers = self.__triggers_publication.trigger_traitement_collections_fichiers()
+        if compteur_collections_fichiers > 0:
+            self.__logger.info("Preparation des collections de fichiers, %d collections en traitement" % compteur_collections_fichiers)
+            return
+
+        compteur_fichiers_publies = self.__triggers_publication.trigger_publication_fichiers()
+        if compteur_fichiers_publies > 0:
+            self.__logger.info("Trigger publication fichiers, %d fichiers a publier" % compteur_fichiers_publies)
+            return
+
+        # Aucuns fichiers publies, on emet le trigger de publication des sections
+        compteur_commandes_emises = self.continuer_publication_sections()
+        if compteur_commandes_emises > 0:
+            self.__logger.info("Trigger publication sections, %d commandes emises" % compteur_commandes_emises)
+            return
+
+        # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
+        compteur_commandes_emises = self.continuer_publication_configuration()
+        if compteur_commandes_emises > 0:
+            self.__logger.info("Trigger publication siteconfig et mapping, %d commandes emises" % compteur_commandes_emises)
+            return
+
+        # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
+        compteur_commandes_emises = self.continuer_publication_webapps()
+        self.__logger.info("Trigger publication code des webapps, %d commandes emises" % compteur_commandes_emises)
+
+    def continuer_publier_uploadfichiers(self, liste_res_cdns: list, securite=Constantes.SECURITE_PUBLIC):
+        """
+        Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
+        :param liste_res_cdns:
+        :param securite:
+        :return:
+        """
+        liste_sites = set()
+        for cdn in liste_res_cdns:
+            liste_sites.update(cdn['sites'])
+        liste_sites = list(liste_sites)
+
+        # label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+        filtre_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            'sites': {'$in': liste_sites},
+            # label_champ_distribution: {'$exists': True},
+        }
+
+        compteur_commandes_emises = 0
+
+        expiration_distribution = datetime.datetime.utcnow() - datetime.timedelta(minutes=30)
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        curseur_fichiers = collection_ressources.find(filtre_fichiers)
+        for col_fichiers in curseur_fichiers:
+            # valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            distribution_maj = col_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution
+            # if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution):
+            if distribution_maj <= expiration_distribution:
+                uuid_col_fichiers = col_fichiers['uuid']
+                filtre_fichiers_maj = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                    'uuid': uuid_col_fichiers,
+                }
+                # self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
+
+                # La collection n'a pas encore ete preparee pour la publication
+                # contenu = col_fichiers.get('contenu')
+                # if contenu is None:
+                uuid_collection = col_fichiers['uuid']
+                # Demarrer un processus pour la preparation et la publication
+                processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+                params = {
+                    'uuid_collection': uuid_collection,
+                    'site_ids': liste_sites,
+                    'cdn_ids': [c['cdn_id'] for c in liste_res_cdns],
+                    'emettre_commande': True,
+                }
+                self.demarrer_processus(processus, params)
+                # else:
+                #     self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
+
+                compteur_commandes_emises = compteur_commandes_emises + 1
+
+        return compteur_commandes_emises
+
+    def continuer_publication_sections(self):
+        """
+        Publie les donnes du site (repertoire data/ avec les sections pages et collections de fichiers).
+        :return:
+        """
+        liste_cdns = self.__triggers_publication.preparer_sitesparcdn()
+        cdn_ids = [c['cdn_id'] for c in liste_cdns]
+
+        compteurs_commandes_emises = 0
+
+        # Publier collections de fichiers
+        # repertoire: data/fichiers
+        # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
+        fichiers_publies = self.continuer_publier_uploadfichiers(liste_cdns, securite=Constantes.SECURITE_PUBLIC)
+        compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
+
+        for cdn in liste_cdns:
+            cdn_id = cdn['cdn_id']
+            liste_sites = cdn['sites']
+
+            # Publier pages
+            # repertoire: data/pages
+            for site_id in liste_sites:
+                pages_publies = self.__triggers_publication.emettre_publier_uploadpages(cdn_id, site_id)
+                compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
+
+            # Publier forums
+            # repertoire: data/forums
+
+        return compteurs_commandes_emises
+
+    def continuer_publication_configuration(self):
+        """
+        Publie la configuration d'un site
+        :return:
+        """
+        liste_cdns = self.__triggers_publication.preparer_sitesparcdn()
+        compteur_commandes_emises = 0
+        for cdn in liste_cdns:
+            cdn_id = cdn['cdn_id']
+            liste_sites = cdn['sites']
+
+            # Publier les fichiers de configuration de site
+            # fichiers: /index.json et /certificat.pem
+            for site_id in liste_sites:
+                # self.marquer_ressource_encours(cdn_id, filtre_site)
+                commandes_emises = self.__triggers_publication.emettre_publier_configuration(cdn_id, site_id)
+                compteur_commandes_emises = compteur_commandes_emises + commandes_emises
+
+            compteur = self.__triggers_publication.emettre_publier_mapping(cdn_id)
+            compteur_commandes_emises = compteur_commandes_emises + compteur
+
+        return compteur_commandes_emises
+
+    def continuer_publication_webapps(self):
+        """
+        Emet les commandes de publication du code des webapps (vitrine, place)
+        :return:
+        """
+        liste_cdns = self.__triggers_publication.preparer_sitesparcdn()
+
+        collection_config = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS}
+
+        doc_webapps = collection_config.find_one(filtre) or dict()
+        res_webapps = collection_ressources.find_one(filtre) or dict()
+        distribution_progres = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES) or dict()
+        distribution_complete = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE) or list()
+
+        compteurs_commandes_emises = 0
+
+        # Publier code des applications web
+        # repertoire: data/fichiers
+        for cdn in liste_cdns:
+            cdn_id = cdn['cdn_id']
+            # type_cdn = cdn['type_cdn']
+
+            if cdn_id in distribution_complete:
+                # Code deja distribue, rien a faire
+                continue
+            elif distribution_progres.get(cdn_id) is True:
+                # Distribution deja en cours
+                compteurs_commandes_emises = compteurs_commandes_emises + 1
+                continue
+
+            compteur = self.__triggers_publication.emettre_publier_webapps(cdn_id)
+            compteurs_commandes_emises = compteurs_commandes_emises + compteur
+
+            # if type_cdn in ['ipfs', 'ipfs_gateway']:
+            #     domaine_action = 'commande.fichiers.publierVitrineIpfs'
+            #     ipns_id = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_ID)
+            #     cle_chiffree = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
+            #     if ipns_id is not None and cle_chiffree is not None:
+            #         permission = self.preparer_permission_secretawss3(cle_chiffree)
+            #         commande = {
+            #             'identificateur_document': filtre,
+            #             'ipns_key': cle_chiffree,
+            #             'ipns_key_name': 'vitrine',
+            #             'permission': permission,
+            #         }
+            #         commande.update(cdn)
+            #     else:
+            #         processus = "millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine"
+            #         params = {'cdn_id': cdn['cdn_id']}
+            #         self.demarrer_processus(processus, params)
+            #         continue
+            # elif type_cdn == 'sftp':
+            #     domaine_action = 'commande.fichiers.publierVitrineSftp'
+            #     commande = {
+            #         'identificateur_document': filtre,
+            #     }
+            #     commande.update(cdn)
+            # elif type_cdn == 'awss3':
+            #     permission = self.preparer_permission_secretawss3(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
+            #     domaine_action = 'commande.fichiers.publierVitrineAwsS3'
+            #     commande = {
+            #         'identificateur_document': filtre,
+            #         'permission': permission,
+            #     }
+            #     commande.update(cdn)
+            # else:
+            #     # Type non supporte ou rien a faire
+            #     continue
+
+            # self.generateur_transactions.transmettre_commande(commande, domaine_action)
+            # self.marquer_ressource_encours(cdn_id, filtre, upsert=True)
+
+            # compteurs_commandes_emises = compteurs_commandes_emises + 1
+
+        return compteurs_commandes_emises
+
+    def demarrer_processus(self, processus: str, params: dict):
+        self.__gestionnaire_domaine.demarrer_processus(processus, params)
+
+    @property
+    def invalidateur(self) -> InvalidateurRessources:
+        return self.__invalidateur
+
+    @property
+    def ressources(self) -> RessourcesPublication:
+        return self.__ressources_publication
+
+    @property
+    def document_dao(self):
+        return self.__gestionnaire_domaine.document_dao
+
+    @property
+    def generateur_transactions(self):
+        return self.__gestionnaire_domaine.generateur_transactions
+
+
 class TriggersPublication:
 
     def __init__(self, cascade: GestionnaireCascadePublication):
@@ -1572,7 +1724,7 @@ class TriggersPublication:
     def demarrer_publication_complete(self, params: dict):
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
-        self.trouver_ressources_manquantes()
+        self.__cascade.ressources.trouver_ressources_manquantes()
 
         liste_cdns = self.preparer_sitesparcdn()
         compteur_commandes = 0
@@ -1699,200 +1851,44 @@ class TriggersPublication:
 
         return compteur_fichiers_publies
 
-
-    def continuer_publier_uploadfichiers(self, liste_res_cdns: list, securite=Constantes.SECURITE_PUBLIC):
+    def emettre_evenements_downstream(self, params: dict):
         """
-        Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
-        :param cdn_id:
-        :param liste_sites:
+        Emet des evenements de changement sur les echanges appropries
+        :param params:
         :return:
         """
-        liste_sites = set()
-        for cdn in liste_res_cdns:
-            liste_sites.update(cdn['sites'])
-        liste_sites = list(liste_sites)
+        identificateur_document = params.get('identificateur_document')
 
-        # label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
-        filtre_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            'sites': {'$in': liste_sites},
-            # label_champ_distribution: {'$exists': True},
-        }
+        if identificateur_document:
+            type_document = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        else:
+            type_document = None
 
-        compteur_commandes_emises = 0
-
-        expiration_distribution = datetime.datetime.utcnow() - datetime.timedelta(minutes=30)
+        # message = {
+        #     ConstantesPublication.CHAMP_TYPE_EVENEMENT: type_document,
+        # }
+        if type_document == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_COLLECTION_FICHIERS
+            # message['uuid'] = identificateur_document['uuid']
+        elif type_document == ConstantesPublication.LIBVAL_SECTION_PAGE:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_PAGE
+            # message[ConstantesPublication.CHAMP_SECTION_ID] = identificateur_document[ConstantesPublication.CHAMP_SECTION_ID]
+        elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITECONFIG
+            # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
+        elif type_document == ConstantesPublication.LIBVAL_MAPPING:
+            domaine_action = 'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_MAPPING
+            # message[ConstantesPublication.CHAMP_SITE_ID] = identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
+        else:
+            # Rien a faire
+            return
 
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        curseur_fichiers = collection_ressources.find(filtre_fichiers)
-        for col_fichiers in curseur_fichiers:
-            # valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
-            distribution_maj = col_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution
-            # if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution):
-            if distribution_maj <= expiration_distribution:
-                uuid_col_fichiers = col_fichiers['uuid']
-                filtre_fichiers_maj = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                    'uuid': uuid_col_fichiers,
-                }
-                # self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
-
-                # La collection n'a pas encore ete preparee pour la publication
-                # contenu = col_fichiers.get('contenu')
-                # if contenu is None:
-                uuid_collection = col_fichiers['uuid']
-                # Demarrer un processus pour la preparation et la publication
-                processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-                params = {
-                    'uuid_collection': uuid_collection,
-                    'site_ids': liste_sites,
-                    'cdn_ids': [c['cdn_id'] for c in liste_res_cdns],
-                    'emettre_commande': True,
-                }
-                self.demarrer_processus(processus, params)
-                # else:
-                #     self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
-
-                compteur_commandes_emises = compteur_commandes_emises + 1
-
-        return compteur_commandes_emises
-
-    def continuer_publication_sections(self):
-        """
-        Publie les donnes du site (repertoire data/ avec les sections pages et collections de fichiers).
-        :param params:
-        :return:
-        """
-        liste_cdns = self.preparer_sitesparcdn()
-        cdn_ids = [c['cdn_id'] for c in liste_cdns]
-
-        compteurs_commandes_emises = 0
-
-        # Publier collections de fichiers
-        # repertoire: data/fichiers
-        # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
-        fichiers_publies = self.continuer_publier_uploadfichiers(liste_cdns, securite=Constantes.SECURITE_PUBLIC)
-        compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
-
-        for cdn in liste_cdns:
-            cdn_id = cdn['cdn_id']
-            liste_sites = cdn['sites']
-
-            # Publier pages
-            # repertoire: data/pages
-            for site_id in liste_sites:
-                pages_publies = self.emettre_publier_uploadpages(cdn_id, site_id)
-                compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
-
-            # Publier forums
-            # repertoire: data/forums
-
-        return compteurs_commandes_emises
-
-    def continuer_publication_configuration(self):
-        """
-        Publie la configuration d'un site
-        :param params:
-        :return:
-        """
-        liste_cdns = self.preparer_sitesparcdn()
-        compteur_commandes_emises = 0
-        for cdn in liste_cdns:
-            cdn_id = cdn['cdn_id']
-            liste_sites = cdn['sites']
-
-            # Publier les fichiers de configuration de site
-            # fichiers: /index.json et /certificat.pem
-            for site_id in liste_sites:
-                # self.marquer_ressource_encours(cdn_id, filtre_site)
-                commandes_emises = self.emettre_publier_configuration(cdn_id, site_id)
-                compteur_commandes_emises = compteur_commandes_emises + commandes_emises
-
-            compteur = self.emettre_publier_mapping(cdn_id)
-            compteur_commandes_emises = compteur_commandes_emises + compteur
-
-        return compteur_commandes_emises
-
-    def continuer_publication_webapps(self, params: dict):
-        """
-        Emet les commandes de publication du code des webapps (vitrine, place)
-        :param params:
-        :return:
-        """
-        liste_cdns = self.preparer_sitesparcdn()
-
-        collection_config = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-
-        filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS}
-
-        doc_webapps = collection_config.find_one(filtre) or dict()
-        res_webapps = collection_ressources.find_one(filtre) or dict()
-        distribution_progres = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES) or dict()
-        distribution_complete = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE) or list()
-
-        compteurs_commandes_emises = 0
-
-        # Publier code des applications web
-        # repertoire: data/fichiers
-        for cdn in liste_cdns:
-            cdn_id = cdn['cdn_id']
-            # type_cdn = cdn['type_cdn']
-
-            if cdn_id in distribution_complete:
-                # Code deja distribue, rien a faire
-                continue
-            elif distribution_progres.get(cdn_id) is True:
-                # Distribution deja en cours
-                compteurs_commandes_emises = compteurs_commandes_emises + 1
-                continue
-
-            compteur = self.emettre_publier_webapps(cdn_id)
-            compteurs_commandes_emises = compteurs_commandes_emises + compteur
-
-            # if type_cdn in ['ipfs', 'ipfs_gateway']:
-            #     domaine_action = 'commande.fichiers.publierVitrineIpfs'
-            #     ipns_id = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_ID)
-            #     cle_chiffree = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
-            #     if ipns_id is not None and cle_chiffree is not None:
-            #         permission = self.preparer_permission_secretawss3(cle_chiffree)
-            #         commande = {
-            #             'identificateur_document': filtre,
-            #             'ipns_key': cle_chiffree,
-            #             'ipns_key_name': 'vitrine',
-            #             'permission': permission,
-            #         }
-            #         commande.update(cdn)
-            #     else:
-            #         processus = "millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine"
-            #         params = {'cdn_id': cdn['cdn_id']}
-            #         self.demarrer_processus(processus, params)
-            #         continue
-            # elif type_cdn == 'sftp':
-            #     domaine_action = 'commande.fichiers.publierVitrineSftp'
-            #     commande = {
-            #         'identificateur_document': filtre,
-            #     }
-            #     commande.update(cdn)
-            # elif type_cdn == 'awss3':
-            #     permission = self.preparer_permission_secretawss3(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
-            #     domaine_action = 'commande.fichiers.publierVitrineAwsS3'
-            #     commande = {
-            #         'identificateur_document': filtre,
-            #         'permission': permission,
-            #     }
-            #     commande.update(cdn)
-            # else:
-            #     # Type non supporte ou rien a faire
-            #     continue
-
-            # self.generateur_transactions.transmettre_commande(commande, domaine_action)
-            # self.marquer_ressource_encours(cdn_id, filtre, upsert=True)
-
-            # compteurs_commandes_emises = compteurs_commandes_emises + 1
-
-        return compteurs_commandes_emises
-
+        doc_ressource = collection_ressources.find_one(identificateur_document)
+        contenu_signe = doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_SIGNE)
+        if contenu_signe is not None:
+            # On a le contenu signe (genere en meme temps que le contenu GZIP)
+            self.generateur_transactions.emettre_message(contenu_signe, domaine_action, exchanges=[Constantes.SECURITE_PUBLIC])
 
     def emettre_commande_publier_fichier(self, res_fichier: dict, cdn_info: dict):
         type_cdn = cdn_info['type_cdn']
@@ -2055,12 +2051,12 @@ class TriggersPublication:
                 contenu = doc_page.get('contenu')
                 if contenu is None:
                     # Mettre a jour le contenu
-                    doc_page = self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+                    doc_page = self.__cascade.ressources.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
 
                 date_signature = doc_page.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
                 if date_signature is None:
                     # Creer contenu .json.gz
-                    self.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
+                    self.__cascade.ressources.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
 
                 # Transmettre la commande
                 # Compter le fichier meme si on n'a pas envoye de commande: il est encore en traitement
@@ -2079,7 +2075,7 @@ class TriggersPublication:
                 }
                 domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
                 self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
-                self.marquer_ressource_encours(cdn_id, filtre_pages_maj)
+                self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_pages_maj)
 
                 compteur_commandes_emises = compteur_commandes_emises + 1
 
@@ -2095,9 +2091,9 @@ class TriggersPublication:
         date_signature = col_fichiers.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
         if date_signature is None:
             # Creer contenu .json.gz, contenu_signe
-            self.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
+            self.__cascade.ressources.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
 
-        self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
+        self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
 
         # Marquer tous les fichiers associes a cette collection s'ils ne sont pas deja publies
         # pour ce CDN
@@ -2108,7 +2104,7 @@ class TriggersPublication:
             'collections': {'$all': [uuid_col_fichiers]}
             # 'fuuid': {'$in': liste_fuuids}
         }
-        self.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
+        self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
 
         # Publier le contenu sur le CDN
         # Upload avec requests via https://fichiers
@@ -2150,13 +2146,13 @@ class TriggersPublication:
             except KeyError:
                 self.__logger.warning("Progres deploiement de site %s sur cdn %s n'est pas conserve correctement" % (site_id, cdn_id))
             try:
-                self.preparer_siteconfig_publication(cdn_id, site_id)
+                self.__cascade.ressources.preparer_siteconfig_publication(cdn_id, site_id)
 
                 filtre_section = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
                     ConstantesPublication.CHAMP_SITE_ID: site_id,
                 }
-                self.marquer_ressource_encours(cdn_id, filtre_section)
+                self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_section)
 
                 # Publier le contenu sur le CDN
                 # Upload avec requests via https://fichiers
@@ -2203,13 +2199,13 @@ class TriggersPublication:
                 "Progres deploiement de mapping sur cdn %s n'est pas conserve correctement" % cdn_id)
 
         try:
-            doc_res_mapping = self.maj_ressource_mapping()
-            self.sauvegarder_contenu_gzip(doc_res_mapping, filtre_mapping)
+            doc_res_mapping = self.__cascade.ressources.maj_ressource_mapping()
+            self.__cascade.ressources.sauvegarder_contenu_gzip(doc_res_mapping, filtre_mapping)
 
             filtre_section = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
             }
-            self.marquer_ressource_encours(cdn_id, filtre_section)
+            self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_section)
 
             # Publier le contenu sur le CDN
             # Upload avec requests via https://fichiers
@@ -2263,7 +2259,7 @@ class TriggersPublication:
             ipns_id = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_ID)
             cle_chiffree = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
             if ipns_id is not None and cle_chiffree is not None:
-                permission = self.preparer_permission_secretawss3(cle_chiffree)
+                permission = self.__cascade.preparer_permission_secret(cle_chiffree)
                 commande = {
                     'identificateur_document': filtre,
                     'ipns_key': cle_chiffree,
@@ -2283,7 +2279,7 @@ class TriggersPublication:
             }
             commande.update(cdn)
         elif type_cdn == 'awss3':
-            permission = self.preparer_permission_secretawss3(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
+            permission = self.__cascade.preparer_permission_secret(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
             domaine_action = 'commande.fichiers.publierVitrineAwsS3'
             commande = {
                 'identificateur_document': filtre,
@@ -2295,7 +2291,7 @@ class TriggersPublication:
             return 0
 
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
-        self.marquer_ressource_encours(cdn_id, filtre, upsert=True)
+        self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre, upsert=True)
 
         # try:
         #     doc_res_mapping = self.maj_ressource_mapping()

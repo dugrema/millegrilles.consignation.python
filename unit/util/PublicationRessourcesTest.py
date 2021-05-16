@@ -32,6 +32,9 @@ class StubCascade:
     def __init__(self, contexte):
         self.__contexte = contexte
         self.demarrer_processus_calls = list()
+        self.marquer_ressource_complete_calls = list()
+        self.marquer_ressource_encours = list()
+        self.transmettre_commande_calls = list()
 
     @property
     def document_dao(self):
@@ -42,6 +45,23 @@ class StubCascade:
 
     def preparer_permission_secret(self, *args, **kwargs):
         return 'PERMISSION DUMMY'
+
+    def marquer_ressource_complete(self, *args, **kwargs):
+        self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
+
+    def marquer_ressource_encour(self, *args, **kwargs):
+        self.marquer_ressource_encours.append({'args': args, 'kwargs': kwargs})
+
+    def transmettre_commande(self, *args, **kwargs):
+        self.transmettre_commande_calls.append({'args': args, 'kwargs': kwargs})
+
+    @property
+    def invalidateur(self):
+        return self
+
+    @property
+    def generateur_transactions(self):
+        return self
 
 
 class HttpPublicationStub(HttpPublication):
@@ -206,11 +226,33 @@ class TriggersPublicationTest(TestCaseContexte):
         self.cascade = StubCascade(self.contexte)
         self.trigger = TriggersPublication(self.cascade)
 
-    def test_preparer_sitesparcdn(self):
-        pass
+        self.site = {
+            ConstantesPublication.CHAMP_SITE_ID: 'site-DUMMY',
+            ConstantesPublication.CHAMP_LISTE_CDNS: ['CDN-1'],
+        }
 
-    def test_trouver_ressources_manquantes(self):
-        pass
+        self.cdn = {
+            ConstantesPublication.CHAMP_CDN_ID: 'CDN-1',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'CDN DUMMY',
+        }
+
+    def test_preparer_sitesparcdn(self):
+        # Preparer donnees update
+        # Sites
+        self.contexte.document_dao.valeurs_find.append([
+            self.site,
+        ])
+
+        # CDNS
+        self.contexte.document_dao.valeurs_find.append([
+            self.cdn,
+        ])
+
+        # Executer code
+        cdns = self.trigger.preparer_sitesparcdn()
+
+        self.assertEqual(1, len(cdns))
+        self.assertEqual('site-DUMMY', cdns[0]['sites'][0])
 
     def test_demarrer_publication_complete(self):
         pass
@@ -268,13 +310,118 @@ class TriggersPublicationTest(TestCaseContexte):
         self.assertEqual('en_cours', update_calls[0]['args'][1]['$set']['preparation_ressources'])
 
     def test_trigger_publication_fichiers(self):
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_find.append([{
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False}
+        }])
+
         self.trigger.trigger_publication_fichiers()
 
-    def test_trigger_publication_sections(self):
-        pass
+    def test_emettre_commande_publier_fichier_cdn_non_supporte(self):
+        res_fichier = {'fuuid': 'FUUID-DUMMY'}
+        self.assertRaises(Exception, self.trigger.emettre_commande_publier_fichier, res_fichier, self.cdn)
 
-    def test_trigger_commande_publier_uploadfichiers(self):
-        pass
+    def test_emettre_commande_publier_fichier(self):
+        res_fichier = {'fuuid': 'FUUID-DUMMY'}
+        self.cdn['type_cdn'] = 'mq'
+        self.trigger.emettre_commande_publier_fichier(res_fichier, self.cdn)
+
+        marquer_ressource_complete_calls = self.cascade.marquer_ressource_complete_calls
+        self.assertEqual(1, len(marquer_ressource_complete_calls))
+
+        marquer_ressource_args = marquer_ressource_complete_calls[0]['args']
+        self.assertEqual('FUUID-DUMMY', marquer_ressource_args[1]['fuuid'])
+
+    def test_emettre_commande_publier_fichier_sftp(self):
+        res_fichier = {
+            'fuuid': 'fuuid-DUMMY'
+        }
+        self.cdn['host'] = '1.2.3.4'
+        self.cdn['port'] = 22
+        self.cdn['username'] = 'DUMMY'
+        self.cdn['repertoireRemote'] = '/rep/dummy'
+        self.trigger.emettre_commande_publier_fichier_sftp(res_fichier, self.cdn)
+
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        self.assertEqual(1, len(transmettre_commande_calls))
+        transmettre_commande_args = transmettre_commande_calls[0]['args']
+        self.assertEqual('commande.fichiers.publierFichierSftp', transmettre_commande_args[1])
+
+    def test_emettre_commande_publier_fichier_ipfs(self):
+        res_fichier = {
+            'fuuid': 'fuuid-DUMMY'
+        }
+        self.cdn['host'] = '1.2.3.4'
+        self.cdn['port'] = 22
+        self.cdn['username'] = 'DUMMY'
+        self.cdn['repertoireRemote'] = '/rep/dummy'
+        self.trigger.emettre_commande_publier_fichier_ipfs(res_fichier, self.cdn)
+
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        self.assertEqual(1, len(transmettre_commande_calls))
+        transmettre_commande_args = transmettre_commande_calls[0]['args']
+        self.assertEqual('commande.fichiers.publierFichierIpfs', transmettre_commande_args[1])
+
+    def test_emettre_commande_publier_fichier_awss3(self):
+        res_fichier = {
+            'fuuid': 'fuuid-DUMMY'
+        }
+        self.cdn['bucketName'] = 'bucket DUMMY'
+        self.cdn['bucketDirfichier'] = 'dir DUMMY'
+        self.cdn['bucketRegion'] = 'region DUMMY'
+        self.cdn['credentialsAccessKeyId'] = 'ID DUMMY'
+        self.cdn['secretAccessKey_chiffre'] = multibase.encode('base64', b'ID DUMMY').decode('utf-8')
+        self.cdn['repertoireRemote'] = '/rep/dummy'
+        self.trigger.emettre_commande_publier_fichier_awss3(res_fichier, self.cdn)
+
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        self.assertEqual(1, len(transmettre_commande_calls))
+        transmettre_commande_args = transmettre_commande_calls[0]['args']
+        self.assertEqual('commande.fichiers.publierFichierAwsS3', transmettre_commande_args[1])
+
+    def test_emettre_publier_uploadpages_nochange(self):
+        cdn_id = 'DUMMY-CDN'
+        site_id = 'DUMMY-SITE'
+        self.site['securite'] = Constantes.SECURITE_PUBLIC
+        self.contexte.document_dao.valeurs_find.append(self.site)
+        self.contexte.document_dao.valeurs_find.append([{
+            ConstantesPublication.CHAMP_SECTION_ID: 'section-dummy',
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'DUMMY-CDN': True}
+        }])
+
+        compteur_commandes = self.trigger.emettre_publier_uploadpages(cdn_id, site_id)
+        self.assertEqual(0, compteur_commandes)
+
+    def test_emettre_publier_uploadpages_regenerer(self):
+        cdn_id = 'DUMMY-CDN'
+        site_id = 'DUMMY-SITE'
+        self.site['securite'] = Constantes.SECURITE_PUBLIC
+        self.contexte.document_dao.valeurs_find.append(self.site)
+        self.contexte.document_dao.valeurs_find.append([{
+            ConstantesPublication.CHAMP_SECTION_ID: 'section-dummy',
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'DUMMY-CDN': False}
+        }])
+
+        compteur_commandes = self.trigger.emettre_publier_uploadpages(cdn_id, site_id)
+        self.assertEqual(1, compteur_commandes)
+
+    def test_emettre_publier_collectionfichiers(self):
+        cdn_id = 'DUMMY-CDN'
+        securite = Constantes.SECURITE_PUBLIC
+        col_fichiers = {
+            'uuid': 'DUMMY-uuid',
+        }
+        self.trigger.emettre_publier_collectionfichiers(cdn_id, col_fichiers, securite)
+
+    def test_emettre_publier_configuration(self):
+        self.trigger.emettre_publier_configuration()
+
+    def test_emettre_publier_mapping(self):
+        self.trigger.emettre_publier_mapping()
+
+    def test_emettre_publier_webapps(self):
+        self.trigger.emettre_publier_webapps()
 
 
 class HttpPublicationTest(TestCaseContexte):
