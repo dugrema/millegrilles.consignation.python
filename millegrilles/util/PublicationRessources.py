@@ -4,11 +4,13 @@ import multibase
 import gzip
 import json
 import requests
+import datetime
 
 from typing import Union
 from os import path
 from io import BytesIO
 from typing import Union
+from pymongo import ReturnDocument
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
@@ -36,12 +38,17 @@ class GestionnaireCascadePublication:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__gestionnaire_domaine = gestionnaire_domaine
 
+        self.__ressources_publication = RessourcesPublication(self)
+        self.__triggers_publication = TriggersPublication(self)
+        self.__invalidateur = InvalidateurRessources(self)
+        self.__http_publication = HttpPublication(self)
+
     def demarrer_publication_complete(self, params: dict):
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
-        self.trouver_ressources_manquantes()
+        self.__ressources_publication.trouver_ressources_manquantes()
 
-        liste_cdns = self.preparer_sitesparcdn()
+        liste_cdns = self.__ressources_publication.preparer_sitesparcdn()
         compteur_commandes = 0
 
         for cdn in liste_cdns:
@@ -129,7 +136,7 @@ class GestionnaireCascadePublication:
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-            self.put_publier_repertoire([cdn], fichiers, params)
+            self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -160,7 +167,7 @@ class GestionnaireCascadePublication:
 
         date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
         if date_signature is None:
-            res_data = self.sauvegarder_contenu_gzip(res_data, filtre)
+            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
         contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -175,12 +182,12 @@ class GestionnaireCascadePublication:
             type_cdn = cdn['type_cdn']
             if type_cdn in ['ipfs', 'ipfs_gateway']:
                 # Publier avec le IPNS associe a la section
-                self.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
+                self.__http_publication.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.put_publier_repertoire([cdn], fichiers, params)
+                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -209,7 +216,7 @@ class GestionnaireCascadePublication:
 
         date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
         if date_signature is None:
-            res_data = self.sauvegarder_contenu_gzip(res_data, filtre)
+            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
         contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -224,12 +231,12 @@ class GestionnaireCascadePublication:
             type_cdn = cdn['type_cdn']
             if type_cdn in ['ipfs', 'ipfs_gateway', 'mq', 'manuel']:
                 # Rien a faire, le mapping est inclus avec le code ou recu via MQ
-                self.marquer_ressource_complete(cdn_id, filtre)
+                self.__invalidateur.marquer_ressource_complete(cdn_id, filtre)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.put_publier_repertoire([cdn], fichiers, params)
+                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -312,7 +319,7 @@ class GestionnaireCascadePublication:
         fuuids = params.get('fuuids')
 
         collection_uuids = params.get('collections') or list()
-        self.invalider_ressources_sections_fichiers(collection_uuids)
+        self.__invalidateur.invalider_ressources_sections_fichiers(collection_uuids)
         collection_uuids = set(collection_uuids)
 
         # if fuuids is not None:
@@ -356,30 +363,30 @@ class GestionnaireCascadePublication:
         if params is None:
             params = dict()
 
-        compteur_collections_fichiers = self.trigger_traitement_collections_fichiers(params)
+        compteur_collections_fichiers = self.__triggers_publication.trigger_traitement_collections_fichiers(params)
         if compteur_collections_fichiers > 0:
             self.__logger.info("Preparation des collections de fichiers, %d collections en traitement" % compteur_collections_fichiers)
             return
 
-        compteur_fichiers_publies = self.trigger_publication_fichiers(params)
+        compteur_fichiers_publies = self.__triggers_publication.trigger_publication_fichiers(params)
         if compteur_fichiers_publies > 0:
             self.__logger.info("Trigger publication fichiers, %d fichiers a publier" % compteur_fichiers_publies)
             return
 
         # Aucuns fichiers publies, on emet le trigger de publication des sections
-        compteur_commandes_emises = self.trigger_publication_sections(dict())
+        compteur_commandes_emises = self.__triggers_publication.trigger_publication_sections(dict())
         if compteur_commandes_emises > 0:
             self.__logger.info("Trigger publication sections, %d commandes emises" % compteur_commandes_emises)
             return
 
         # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
-        compteur_commandes_emises = self.commande_publication_configuration(dict())
+        compteur_commandes_emises = self.__triggers_publication.commande_publication_configuration(dict())
         if compteur_commandes_emises > 0:
             self.__logger.info("Trigger publication siteconfig et mapping, %d commandes emises" % compteur_commandes_emises)
             return
 
         # Aucunes sections publiees, on transmet le trigger de publication de configuration du site
-        compteur_commandes_emises = self.commande_trigger_publication_webapps(dict())
+        compteur_commandes_emises = self.__triggers_publication.commande_trigger_publication_webapps(dict())
         self.__logger.info("Trigger publication code des webapps, %d commandes emises" % compteur_commandes_emises)
 
     def emettre_evenements_downstream(self, params: dict):
@@ -445,7 +452,7 @@ class GestionnaireCascadePublication:
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
             }
-            prochain_trigger = self.trigger_publication_sections
+            prochain_trigger = self.__triggers_publication.trigger_publication_sections
         elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_FORUM]:
             # C'est une section, on verifie si toutes les sections sont completees
             filtre = {
@@ -455,7 +462,7 @@ class GestionnaireCascadePublication:
                     ConstantesPublication.LIBVAL_SECTION_FORUM,
                 ]}
             }
-            prochain_trigger = self.commande_publication_configuration
+            prochain_trigger = self.__triggers_publication.commande_publication_configuration
         else:
             # Rien a verifier
             return
@@ -491,6 +498,10 @@ class RessourcesPublication:
 
     def __init__(self, cascade: GestionnaireCascadePublication):
         self.__cascade = cascade
+
+    @property
+    def document_dao(self):
+        return self.__cascade.document_dao
 
     def preparer_sitesparcdn(self):
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
@@ -964,7 +975,7 @@ class RessourcesPublication:
         # Lancer processus maj des collections de fichiers
         if maj_section:
             # Invalider les ressources fichiers pour publication
-            self.invalider_ressources_sections_fichiers(list(collections_fichiers_uuids))
+            self.__triggers_publication.invalider_ressources_sections_fichiers(list(collections_fichiers_uuids))
 
             # Publier les ressources fichiers
             for uuid_collection in collections_fichiers_uuids:
@@ -1566,8 +1577,12 @@ class RessourcesPublication:
 
 class TriggersPublication:
 
-    def __init__(self):
-        pass
+    def __init__(self, cascade: GestionnaireCascadePublication):
+        self.__cascade = cascade
+
+    @property
+    def document_dao(self):
+        return self.__cascade.document_dao
 
     def trigger_traitement_collections_fichiers(self, params: dict):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -2068,6 +2083,10 @@ class InvalidateurRessources:
     def __init__(self, cascade: GestionnaireCascadePublication):
         self.__cascade = cascade
 
+    @property
+    def document_dao(self):
+        return self.__cascade.document_dao
+
     def marquer_ressource_encours(self, cdn_id, filtre_ressource, many=False, etat=True, upsert=False):
         date_courante = datetime.datetime.utcnow()
         set_on_insert = {
@@ -2168,7 +2187,7 @@ class InvalidateurRessources:
         :param filtre:
         :return:
         """
-        collection_ressources = self.cascade.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
 
         unset_ops = UNSET_PUBLICATION_RESOURCES.copy()
         unset_ops[ConstantesPublication.CHAMP_CONTENU] = True
@@ -2184,6 +2203,10 @@ class HttpPublication:
 
     def __init__(self, cascade: GestionnaireCascadePublication):
         self.__cascade = cascade
+
+    @property
+    def document_dao(self):
+        return self.__cascade.document_dao
 
     def put_publier_fichier_ipns(self, cdn: dict, res_data: dict, securite: str):
         ipns_id = res_data.get('ipns_id')
