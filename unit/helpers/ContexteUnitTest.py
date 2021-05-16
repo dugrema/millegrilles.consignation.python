@@ -164,6 +164,10 @@ class DocumentDaoStub:
         self.calls_update.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_update.pop(0)
 
+    def update_one(self, *args, **kwargs):
+        self.calls_update.append({'args': args, 'kwargs': kwargs})
+        return self.valeurs_update.pop(0)
+
     def aggregate(self, *args, **kwargs):
         self.calls_aggregate.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_aggregate.pop(0)
