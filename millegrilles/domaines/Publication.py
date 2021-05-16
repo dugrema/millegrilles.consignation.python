@@ -872,6 +872,58 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
+    def sauvegarder_cle_ipns(self, identificateur_document, params):
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+
+        type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        if type_document == ConstantesPublication.LIBVAL_WEBAPPS:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+            filtre = identificateur_document
+            set_on_insert.update(filtre)
+        elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+            filtre = {
+                ConstantesPublication.CHAMP_SITE_ID: identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
+            }
+        elif type_document == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            filtre = {
+                ConstantesPublication.CHAMP_SECTION_ID: identificateur_document['uuid'],
+            }
+            set_on_insert[ConstantesPublication.CHAMP_TYPE_SECTION] = type_document
+        else:
+            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+            filtre = {
+                ConstantesPublication.CHAMP_SECTION_ID: identificateur_document[ConstantesPublication.CHAMP_SECTION_ID],
+            }
+            set_on_insert[ConstantesPublication.CHAMP_TYPE_SECTION] = type_document
+
+        cle_id = params['cleId']
+        cle_chiffree = params['cle_chiffree']
+
+        ops = {
+            '$set': {
+                'ipns_id': cle_id,
+                'ipns_cle_chiffree': cle_chiffree,
+            },
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        # collection_res = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        resultat = collection_doc.update_one(filtre, ops, upsert=True)
+
+        # Sauvegarder dans les ressources aussi (va etre recopiee au besoin)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(identificateur_document)
+        collection_ressources.update_one(identificateur_document, ops, upsert=True)
+
 
 class ProcessusPublication(MGProcessusTransaction):
 

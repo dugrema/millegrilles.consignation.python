@@ -1,9 +1,12 @@
 import json
 import logging
+import multibase
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
+from io import BytesIO
 
-from millegrilles.util.PublicationRessources import InvalidateurRessources, TriggersPublication
+from millegrilles import Constantes
+from millegrilles.util.PublicationRessources import InvalidateurRessources, TriggersPublication, HttpPublication
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
 
 
@@ -20,6 +23,9 @@ class RequestsReponse:
     def text(self):
         return json.dumps(self.json)
 
+    def raise_for_status(self):
+        pass
+
 
 class StubCascade:
 
@@ -34,8 +40,22 @@ class StubCascade:
     def demarrer_processus(self, *args, **kwargs):
         self.demarrer_processus_calls.append({'args': args, 'kwargs': kwargs})
 
-    def preparer_permission_secretawss3(self, *args, **kwargs):
+    def preparer_permission_secret(self, *args, **kwargs):
         return 'PERMISSION DUMMY'
+
+
+class HttpPublicationStub(HttpPublication):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.calls_requests_put = list()
+
+    def requests_put(self, *args, **kwargs):
+        self.calls_requests_put.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+        return RequestsReponse()
 
 
 class InvalidateurRessourcesTest(TestCaseContexte):
@@ -256,3 +276,88 @@ class TriggersPublicationTest(TestCaseContexte):
     def test_trigger_commande_publier_uploadfichiers(self):
         pass
 
+
+class HttpPublicationTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.cascade = StubCascade(self.contexte)
+
+        configuration = self.contexte.configuration
+        self.http_publication = HttpPublicationStub(self.cascade, configuration)
+
+        self.securite = Constantes.SECURITE_PUBLIC
+        self.cdn = {
+            ConstantesPublication.CHAMP_CDN_ID: 'CDN-1',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'CDN DUMMY',
+        }
+
+        self.res_data = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY',
+            ConstantesPublication.CHAMP_SECTION_ID: 'abcd-1234',
+        }
+
+    def test_put_publier_fichier_ipns_nokey(self):
+        self.http_publication.put_publier_fichier_ipns(self.cdn, self.res_data, self.securite)
+
+        # Verifier
+        demarrer_processus_calls = self.cascade.demarrer_processus_calls
+
+        self.assertEqual('millegrilles_domaines_Publication:ProcessusPublierCleEtFichierIpns', demarrer_processus_calls[0]['args'][0])
+        process_arg1 = demarrer_processus_calls[0]['args'][1]
+        self.assertDictEqual({'_mg-libelle': 'DUMMY', 'section_id': 'abcd-1234'}, process_arg1['identificateur_document'])
+        self.assertEqual('abcd-1234', process_arg1['nom_cle'])
+        self.assertEqual('1.public', process_arg1['securite'])
+        self.assertEqual('CDN-1', process_arg1['cdn_id'])
+
+    def test_put_publier_fichier_ipns_keyexist(self):
+        self.res_data['ipns_id'] = 'ma_cle'
+        self.res_data['ipns_cle_chiffree'] = multibase.encode('base64', b'abcd1234').decode('utf-8')
+        self.res_data['contenu_gzip'] = b'mon contenu binaire DUMMY pas gzippe'
+
+        self.http_publication.put_publier_fichier_ipns(self.cdn, self.res_data, self.securite)
+
+        # Verifier
+        calls_requests_put = self.http_publication.calls_requests_put
+        self.assertEqual(1, len(calls_requests_put))
+        request_put_args = calls_requests_put[0]['args']
+        self.assertEqual('/publier/fichierIpns', request_put_args[0])
+
+    def test_put_fichier_ipns(self):
+        identificateur_document = {'doc': 'DUMMY'}
+        ipns_key_name = 'cle IPNS DUMMY'
+        self.res_data['ipns_cle_chiffree'] = multibase.encode('base64', b'abcd1234').decode('utf-8')
+        self.res_data['contenu_gzip'] = b'mon contenu binaire DUMMY pas gzippe'
+
+        self.http_publication.put_fichier_ipns(self.cdn, identificateur_document, ipns_key_name, self.res_data, self.securite)
+
+        # Verifier
+        calls_requests_put = self.http_publication.calls_requests_put
+        self.assertEqual(1, len(calls_requests_put))
+        request_put_args = calls_requests_put[0]['args']
+        self.assertEqual('/publier/fichierIpns', request_put_args[0])
+
+    def test_put_publier_repertoire(self):
+        # identificateur_document = {'doc': 'DUMMY'}
+        # ipns_key_name = 'cle IPNS DUMMY'
+        # self.res_data['ipns_cle_chiffree'] = multibase.encode('base64', b'abcd1234').decode('utf-8')
+        # self.res_data['contenu_gzip'] = b'mon contenu binaire DUMMY pas gzippe'
+
+        cdns = [self.cdn]
+
+        remote_path_fichier = '/mon/path/dummy'
+        file_pointer = BytesIO(b'dummy bytes 01234')
+        mimetype_fichier = 'application/octet-stream'
+        fichiers = [
+            # ('files', (remote_path_fichier, file_pointer, mimetype_fichier))
+            {'remote_path': remote_path_fichier, 'fp': file_pointer, 'mimetype': mimetype_fichier}
+        ]
+        # fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
+
+        self.http_publication.put_publier_repertoire(cdns, fichiers)
+
+        # Verifier
+        calls_requests_put = self.http_publication.calls_requests_put
+        self.assertEqual(1, len(calls_requests_put))
+        request_put_args = calls_requests_put[0]['args']
+        self.assertEqual('/publier/repertoire', request_put_args[0])

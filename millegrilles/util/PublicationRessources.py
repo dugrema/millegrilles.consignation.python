@@ -17,6 +17,7 @@ from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichier
 from millegrilles.MGProcessus import MGProcessus
 from millegrilles.util.Hachage import hacher
 from millegrilles.util.JSONMessageEncoders import JSONHelper
+from millegrilles.dao.Configuration import TransactionConfiguration
 
 
 # Operations pour invalider une ressource
@@ -583,7 +584,7 @@ class GestionnaireCascadePublication:
             self.__logger.debug("Tous les fichiers sont publies, declencher publication sections")
             self.continuer_publication()
 
-    def preparer_permission_secretawss3(self, secret_chiffre):
+    def preparer_permission_secret(self, secret_chiffre):
         secret_bytes = multibase.decode(secret_chiffre)
         secret_hachage = hacher(secret_bytes, encoding='base58btc')
         permission = {
@@ -1988,7 +1989,7 @@ class TriggersPublication:
         credentialsAccessKeyId = cdn_info['credentialsAccessKeyId']
 
         secretAccessKey_chiffre = cdn_info['secretAccessKey_chiffre']
-        permission = self.__cascade.preparer_permission_secretawss3(secretAccessKey_chiffre)
+        permission = self.__cascade.preparer_permission_secret(secretAccessKey_chiffre)
 
         flag_public = res_fichier.get('public') or False
         if flag_public:
@@ -2327,12 +2328,24 @@ class TriggersPublication:
 
 class HttpPublication:
 
-    def __init__(self, cascade: GestionnaireCascadePublication):
+    def __init__(self, cascade: GestionnaireCascadePublication, configuration: TransactionConfiguration):
         self.__cascade = cascade
+        self.__configuration = configuration
 
     @property
     def document_dao(self):
         return self.__cascade.document_dao
+
+    def requests_put(self, path_command: str, data, files):
+        r = requests.put(
+            'https://fichiers:3021/' + path_command,
+            files=files,
+            data=data,
+            verify=self.__configuration.mq_cafile,
+            cert=(self.__configuration.mq_certfile, self.__configuration.mq_keyfile),
+            timeout=120000,  # 2 minutes max
+        )
+        return r
 
     def put_publier_fichier_ipns(self, cdn: dict, res_data: dict, securite: str):
         ipns_id = res_data.get('ipns_id')
@@ -2361,7 +2374,7 @@ class HttpPublication:
                 'securite': securite,
                 'cdn_id': cdn['cdn_id'],
             }
-            self.demarrer_processus(processus, params)
+            self.__cascade.demarrer_processus(processus, params)
         else:
             self.put_fichier_ipns(cdn, identificateur_document, nom_cle, res_data, securite)
 
@@ -2385,7 +2398,7 @@ class HttpPublication:
                 cdn_filtre[key] = value
         cdn_filtre = json.dumps([cdn_filtre])
         cle_chiffree = res_data['ipns_cle_chiffree']
-        permission = json.dumps(self.preparer_permission_secretawss3(cle_chiffree))
+        permission = json.dumps(self.__cascade.preparer_permission_secret(cle_chiffree))
         data = {
             'cdns': cdn_filtre,
             'identificateur_document': json.dumps(identificateur_document),
@@ -2394,14 +2407,7 @@ class HttpPublication:
             'permission': permission,
             'securite': securite,
         }
-        r = requests.put(
-            'https://fichiers:3021/publier/fichierIpns',
-            files=files,
-            data=data,
-            verify=self._contexte.configuration.mq_cafile,
-            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
-            timeout=120000,  # 2 minutes max
-        )
+        r = self.requests_put('/publier/fichierIpns', data, files)
         r.raise_for_status()
 
     def put_publier_repertoire(self, cdns: list, fichiers: list, params: dict = None):
@@ -2412,6 +2418,9 @@ class HttpPublication:
         :param params:
         :return:
         """
+        if params is None:
+            params = dict()
+
         max_age = params.get('max_age')
         content_encoding = params.get('content_encoding')
         securite = params.get('securite') or Constantes.SECURITE_PRIVE
@@ -2438,7 +2447,7 @@ class HttpPublication:
             type_cdn = cdn['type_cdn']
             if type_cdn == 'awss3':
                 secret_chiffre = cdn['secretAccessKey_chiffre']
-                cdn_filtre['permission'] = self.preparer_permission_secretawss3(secret_chiffre)
+                cdn_filtre['permission'] = self.__cascade.preparer_permission_secret(secret_chiffre)
             cdn_filtres.append(cdn_filtre)
 
         data_publier = {
@@ -2454,66 +2463,8 @@ class HttpPublication:
         if params.get('fichier_unique') is True:
             data_publier['fichier_unique'] = True
 
-        r = requests.put(
-            'https://fichiers:3021/publier/repertoire',
-            files=files,
-            data=data_publier,
-            verify=self._contexte.configuration.mq_cafile,
-            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
-        )
+        r = self.requests_put('/publier/repertoire', data_publier, files)
         r.raise_for_status()
-
-    def sauvegarder_cle_ipns(self, identificateur_document, params):
-
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-        }
-
-        type_document = identificateur_document[Constantes.DOCUMENT_INFODOC_LIBELLE]
-        if type_document == ConstantesPublication.LIBVAL_WEBAPPS:
-            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
-            filtre = identificateur_document
-            set_on_insert.update(filtre)
-        elif type_document == ConstantesPublication.LIBVAL_SITE_CONFIG:
-            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-            filtre = {
-                ConstantesPublication.CHAMP_SITE_ID: identificateur_document[ConstantesPublication.CHAMP_SITE_ID]
-            }
-        elif type_document == ConstantesPublication.LIBVAL_COLLECTION_FICHIERS:
-            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-            filtre = {
-                ConstantesPublication.CHAMP_SECTION_ID: identificateur_document['uuid'],
-            }
-            set_on_insert[ConstantesPublication.CHAMP_TYPE_SECTION] = type_document
-        else:
-            collection_doc = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-            filtre = {
-                ConstantesPublication.CHAMP_SECTION_ID: identificateur_document[ConstantesPublication.CHAMP_SECTION_ID],
-            }
-            set_on_insert[ConstantesPublication.CHAMP_TYPE_SECTION] = type_document
-
-        cle_id = params['cleId']
-        cle_chiffree = params['cle_chiffree']
-
-        ops = {
-            '$set': {
-                'ipns_id': cle_id,
-                'ipns_cle_chiffree': cle_chiffree,
-            },
-            '$setOnInsert': set_on_insert,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        }
-
-        # collection_res = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        resultat = collection_doc.update_one(filtre, ops, upsert=True)
-
-        # Sauvegarder dans les ressources aussi (va etre recopiee au besoin)
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: datetime.datetime.utcnow(),
-        }
-        set_on_insert.update(identificateur_document)
-        collection_ressources.update_one(identificateur_document, ops, upsert=True)
 
 
 class ProcessusPublierCollectionGrosFichiers(MGProcessus):
@@ -2760,7 +2711,7 @@ class ProcessusCreerCleIpnsVitrine(MGProcessus):
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         doc_cdn = collection_cdns.find_one({'cdn_id': cdn_id})
 
-        permission = self.controleur.gestionnaire.preparer_permission_secretawss3(cle_chiffree)
+        permission = self.controleur.gestionnaire.preparer_permission_secret(cle_chiffree)
         commande = {
             'identificateur_document': identificateur_document,
             'ipns_key': cle_chiffree,
