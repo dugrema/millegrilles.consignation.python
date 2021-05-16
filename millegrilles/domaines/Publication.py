@@ -112,7 +112,7 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_FICHIERS:
             self.gestionnaire.trigger_publication_fichiers(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SECTIONS:
-            self.gestionnaire.trigger_publication_sections(message_dict)
+            self.gestionnaire.continuer_publication_sections(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_WEBAPPS:
             self.gestionnaire.commande_trigger_publication_webapps(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION:

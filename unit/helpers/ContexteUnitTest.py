@@ -143,6 +143,7 @@ class DocumentDaoStub:
         self.calls_aggregate = list()
         self.calls_find = list()
         self.calls_update = list()
+        self.calls_find_update = list()
 
         # Placeholders pour retourner des valeurs
         self.valeurs_aggregate = list()
@@ -166,6 +167,10 @@ class DocumentDaoStub:
 
     def update_one(self, *args, **kwargs):
         self.calls_update.append({'args': args, 'kwargs': kwargs})
+        return self.valeurs_update.pop(0)
+
+    def find_one_and_update(self, *args, **kwargs):
+        self.calls_find_update.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_update.pop(0)
 
     def aggregate(self, *args, **kwargs):
