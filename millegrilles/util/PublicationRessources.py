@@ -739,67 +739,60 @@ class RessourcesPublication:
             }
             collection_ressources.update_one(filtre_res_update, ops)
 
-            self.preparer_liste_fichiers(res)
+            type_section = res[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            section_id = res[ConstantesPublication.CHAMP_SECTION_ID]
 
-    def preparer_liste_fichiers(self, res: dict):
-        type_section = res[Constantes.DOCUMENT_INFODOC_LIBELLE]
-        section_id = res[ConstantesPublication.CHAMP_SECTION_ID]
-        # collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        # filtre_section = {
-        #     ConstantesPublication.CHAMP_SECTION_ID: section_id
-        # }
-        # doc_section = collection_sections.find_one(filtre_section)
+            if type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
+                self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+            elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
+                self.maj_ressource_avec_fichiers(section_id)
 
-        if type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
-            self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
-        elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
-            collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-            filtre_section = {
-                ConstantesPublication.CHAMP_SECTION_ID: section_id
+    def maj_ressource_avec_fichiers(self, section_id):
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        filtre_section = {
+            ConstantesPublication.CHAMP_SECTION_ID: section_id
+        }
+        doc_section = collection_sections.find_one(filtre_section)
+        collection_uuids = doc_section.get('collections') or list()
+        site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]
+        site = self.__cascade.get_site(site_id)
+        liste_cdns = site[ConstantesPublication.CHAMP_LISTE_CDNS]
+        date_courante = datetime.datetime.utcnow()
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        for collection_uuid in collection_uuids:
+            # Trouver les collections
+            filtre_res_collfichiers = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid': collection_uuid,
             }
-            doc_section = collection_sections.find_one(filtre_section)
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+            }
+            add_to_set = {
+                ConstantesPublication.CHAMP_LISTE_SITES: {'$each': [site_id]},
+            }
+            set_ops = dict()
 
-            collection_uuids = doc_section.get('collections') or list()
-            site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]
-            site = self.__cascade.gestionnaire.get_site(site_id)
-            liste_cdns = site[ConstantesPublication.CHAMP_LISTE_CDNS]
+            res_coll_fichiers = collection_ressources.find_one(filtre_res_collfichiers) or dict()
+            try:
+                distribution_complete = res_coll_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]
+            except KeyError:
+                distribution_complete = list()
 
-            date_courante = datetime.datetime.utcnow()
-            collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-            for collection_uuid in collection_uuids:
-                # Trouver les collections
-                filtre_res_collfichiers = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                    'uuid': collection_uuid,
-                }
-                set_on_insert = {
-                    Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
-                    Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
-                    ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
-                }
-                add_to_set = {
-                    ConstantesPublication.CHAMP_LISTE_SITES: {'$each': [site_id]},
-                }
-                set_ops = dict()
-
-                res_coll_fichiers = collection_ressources.find_one(filtre_res_collfichiers) or dict()
-                try:
-                    distribution_complete = res_coll_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]
-                except KeyError:
-                    distribution_complete = list()
-
-                for cdn_id in liste_cdns:
-                    if cdn_id not in distribution_complete:
-                        set_ops[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id] = False
-                set_on_insert.update(filtre_res_collfichiers)
-                ops = {
-                    # '$set': set_ops,
-                    '$addToSet': add_to_set,
-                    '$setOnInsert': set_on_insert,
-                }
-                if set_ops is not None:
-                    ops['$set'] = set_ops
-                collection_ressources.update_one(filtre_res_collfichiers, ops, upsert=True)
+            for cdn_id in liste_cdns:
+                if cdn_id not in distribution_complete:
+                    set_ops[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id] = False
+            set_on_insert.update(filtre_res_collfichiers)
+            ops = {
+                # '$set': set_ops,
+                '$addToSet': add_to_set,
+                '$setOnInsert': set_on_insert,
+            }
+            if set_ops is not None:
+                ops['$set'] = set_ops
+            collection_ressources.update_one(filtre_res_collfichiers, ops, upsert=True)
 
     def maj_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
         if isinstance(site_ids, str):
@@ -1030,6 +1023,9 @@ class GestionnaireCascadePublication:
         self.__triggers_publication = TriggersPublication(self)
         self.__invalidateur = InvalidateurRessources(self)
         self.__http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
+
+    def get_site(self, site_id: str):
+        return self.__gestionnaire_domaine.get_site(site_id)
 
     def commande_publier_upload_datasection(self, params: dict):
         params = params.copy()

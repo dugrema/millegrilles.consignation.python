@@ -44,7 +44,12 @@ class StubCascade:
         self.preparer_enveloppe_calls = list()
         self.invalider_ressources_sections_fichiers_calls = list()
 
+        self.site = {'site_id': 'DUMMY-site'}
+
         self.ressource_page_retour = None
+
+    def get_site(self, site_id):
+        return self.site
 
     @property
     def document_dao(self):
@@ -1136,13 +1141,106 @@ class RessourcesPublicationTest(TestCaseContexte):
         self.assertEqual('DUMMY-resultat', res_collection)
 
     def test_trouver_ressources_manquantes(self):
+        # Sites
+        self.contexte.document_dao.valeurs_find.append([{
+            ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site'
+        }])
+        # Sections
+        self.contexte.document_dao.valeurs_find.append([{
+            ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section',
+            ConstantesPublication.CHAMP_TYPE_SECTION: 'DUMMY-type-section',
+        }])
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY valeur 1')
+        self.contexte.document_dao.valeurs_update.append('DUMMY valeur 2')
+
         self.ressources_publication.trouver_ressources_manquantes()
 
+        calls_update = self.contexte.document_dao.calls_update
+        self.assertEqual(2, len(calls_update))
+
     def test_identifier_ressources_fichiers(self):
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY-type',
+            ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section',
+            ConstantesPublication.CHAMP_TYPE_SECTION: 'DUMMY-type'
+        }])
+
+        self.contexte.document_dao.valeurs_update.append(None)
+
         self.ressources_publication.identifier_ressources_fichiers()
 
-    def test_preparer_liste_fichiers(self):
-        self.ressources_publication.preparer_liste_fichiers()
+        calls_update = self.contexte.document_dao.calls_update
+        self.assertEqual(1, len(calls_update))
+
+    def test_identifier_ressources_fichiers_page(self):
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'page',
+            ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section',
+            ConstantesPublication.CHAMP_TYPE_SECTION: 'DUMMY-type'
+        }])
+
+        self.contexte.document_dao.valeurs_update.append(None)
+
+        mock_call = dict()
+
+        def mock_maj_ressources_page(*args, **kwargs):
+            mock_call['args'] = args
+            mock_call['kwargs'] = kwargs
+
+        self.ressources_publication.maj_ressources_page = mock_maj_ressources_page
+
+        self.ressources_publication.identifier_ressources_fichiers()
+
+        calls_update = self.contexte.document_dao.calls_update
+        self.assertEqual(1, len(calls_update))
+        self.assertDictEqual({'section_id': 'DUMMY-section'}, mock_call['args'][0])
+
+    def test_identifier_ressources_fichiers_fichiers(self):
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'fichiers',
+            ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section',
+            ConstantesPublication.CHAMP_TYPE_SECTION: 'DUMMY-type'
+        }])
+
+        self.contexte.document_dao.valeurs_update.append(None)
+
+        mock_call = dict()
+
+        def mock_maj_ressources(*args, **kwargs):
+            mock_call['args'] = args
+            mock_call['kwargs'] = kwargs
+
+        self.ressources_publication.maj_ressource_avec_fichiers = mock_maj_ressources
+
+        self.ressources_publication.identifier_ressources_fichiers()
+
+        calls_update = self.contexte.document_dao.calls_update
+        self.assertEqual(1, len(calls_update))
+        self.assertEqual('DUMMY-section', mock_call['args'][0])
+
+    def test_maj_ressource_avec_fichiers(self):
+        section_id = 'DUMMY-section'
+
+        self.cascade.site[ConstantesPublication.CHAMP_LISTE_CDNS] = ''
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site',
+            'collections': ['UUID-collection1']
+        })
+
+        self.contexte.document_dao.valeurs_find.append({
+        })
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY valeur')
+
+        self.ressources_publication.maj_ressource_avec_fichiers(section_id)
+
+        calls_update = self.contexte.document_dao.calls_update
+        self.assertEqual(1, len(calls_update))
+        calls_args = calls_update[0]['args']
+        self.assertDictEqual({'_mg-libelle': 'collection_fichiers', 'uuid': 'UUID-collection1'}, calls_args[0])
+        self.assertDictEqual({'sites': {'$each': ['DUMMY-site']}}, calls_args[1]['$addToSet'])
 
     def test_maj_ressource_collection_fichiers(self):
         site_ids = ['SITE-1']
