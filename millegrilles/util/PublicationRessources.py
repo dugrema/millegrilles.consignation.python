@@ -2044,7 +2044,11 @@ class TriggersPublication:
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
                 ConstantesPublication.CHAMP_SECTION_ID: section_id,
             }
-            valeur_distribution = doc_page[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            try:
+                valeur_distribution = doc_page[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            except KeyError:
+                valeur_distribution = None
+
             if valeur_distribution is False:
 
                 # Generer la page au besoin

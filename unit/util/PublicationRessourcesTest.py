@@ -38,6 +38,9 @@ class StubCascade:
         self.sauvegarder_contenu_gzip_calls = list()
         self.preparer_siteconfig_publication_calls = list()
         self.maj_ressource_mapping_calls = list()
+        self.maj_ressources_page_calls = list()
+
+        self.ressource_page_retour = None
 
     @property
     def document_dao(self):
@@ -69,6 +72,10 @@ class StubCascade:
 
     def maj_ressource_mapping(self, *args, **kwargs):
         self.maj_ressource_mapping_calls.append({'args': args, 'kwargs': kwargs})
+
+    def maj_ressources_page(self, *args, **kwargs):
+        self.maj_ressources_page_calls.append({'args': args, 'kwargs': kwargs})
+        return self.ressource_page_retour
 
     @property
     def invalidateur(self):
@@ -277,7 +284,7 @@ class TriggersPublicationTest(TestCaseContexte):
         self.assertEqual('site-DUMMY', cdns[0]['sites'][0])
 
     def test_demarrer_publication_complete(self):
-        pass
+        raise NotImplementedError('TODO')
 
     def test_trigger_traitement_collections_fichiers_prep_true(self):
         # Preparer donnees update
@@ -415,18 +422,63 @@ class TriggersPublicationTest(TestCaseContexte):
         compteur_commandes = self.trigger.emettre_publier_uploadpages(cdn_id, site_id)
         self.assertEqual(0, compteur_commandes)
 
-    def test_emettre_publier_uploadpages_regenerer(self):
+    def test_emettre_publier_uploadpages_regenerer_progres_false(self):
         cdn_id = 'DUMMY-CDN'
         site_id = 'DUMMY-SITE'
         self.site['securite'] = Constantes.SECURITE_PUBLIC
         self.contexte.document_dao.valeurs_find.append(self.site)
-        self.contexte.document_dao.valeurs_find.append([{
+
+        res_page = {
             ConstantesPublication.CHAMP_SECTION_ID: 'section-dummy',
             ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'DUMMY-CDN': False}
-        }])
+        }
+
+        self.contexte.document_dao.valeurs_find.append([res_page])
+        self.cascade.ressource_page_retour = res_page
 
         compteur_commandes = self.trigger.emettre_publier_uploadpages(cdn_id, site_id)
         self.assertEqual(1, compteur_commandes)
+
+        maj_ressources_page_calls = self.cascade.maj_ressources_page_calls
+        marquer_ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
+        sauvegarder_contenu_gzip_calls = self.cascade.sauvegarder_contenu_gzip_calls
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        calls_find = self.cascade.document_dao.calls_find
+
+        self.assertEqual(2, len(calls_find))
+        self.assertEqual(1, len(maj_ressources_page_calls))
+        self.assertEqual(1, len(marquer_ressource_encours_calls))
+        self.assertEqual(1, len(sauvegarder_contenu_gzip_calls))
+        self.assertEqual(1, len(transmettre_commande_calls))
+
+    def test_emettre_publier_uploadpages_regenerer_progres_pas_false(self):
+        cdn_id = 'DUMMY-CDN'
+        site_id = 'DUMMY-SITE'
+        self.site['securite'] = Constantes.SECURITE_PUBLIC
+        self.contexte.document_dao.valeurs_find.append(self.site)
+
+        res_page = {
+            ConstantesPublication.CHAMP_SECTION_ID: 'section-dummy',
+            # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'DUMMY-CDN': True}
+        }
+
+        self.contexte.document_dao.valeurs_find.append([res_page])
+        self.cascade.ressource_page_retour = res_page
+
+        compteur_commandes = self.trigger.emettre_publier_uploadpages(cdn_id, site_id)
+        self.assertEqual(0, compteur_commandes)
+
+        maj_ressources_page_calls = self.cascade.maj_ressources_page_calls
+        marquer_ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
+        sauvegarder_contenu_gzip_calls = self.cascade.sauvegarder_contenu_gzip_calls
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        calls_find = self.cascade.document_dao.calls_find
+
+        self.assertEqual(2, len(calls_find))
+        self.assertEqual(0, len(maj_ressources_page_calls))
+        self.assertEqual(0, len(marquer_ressource_encours_calls))
+        self.assertEqual(0, len(sauvegarder_contenu_gzip_calls))
+        self.assertEqual(0, len(transmettre_commande_calls))
 
     def test_emettre_publier_collectionfichiers(self):
         cdn_id = 'DUMMY-CDN'
@@ -577,10 +629,6 @@ class TriggersPublicationTest(TestCaseContexte):
         self.contexte.document_dao.valeurs_find.append(self.cdn)
 
         compte_commandes = self.trigger.emettre_publier_webapps(cdn_id)
-
-        ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
-        transmettre_commande_calls = self.cascade.transmettre_commande_calls
-        mapping_calls = self.cascade.maj_ressource_mapping_calls
 
         self.assertEqual(0, compte_commandes)
 
