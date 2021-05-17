@@ -41,6 +41,8 @@ class StubCascade:
         self.maj_ressources_page_calls = list()
         self.trouver_ressources_manquantes_calls = list()
         self.continuer_publication_calls = list()
+        self.preparer_enveloppe_calls = list()
+        self.invalider_ressources_sections_fichiers_calls = list()
 
         self.ressource_page_retour = None
 
@@ -60,6 +62,9 @@ class StubCascade:
 
     def marquer_ressource_encours(self, *args, **kwargs):
         self.marquer_ressource_encours_calls.append({'args': args, 'kwargs': kwargs})
+
+    def invalider_ressources_sections_fichiers(self, *args, **kwargs):
+        self.invalider_ressources_sections_fichiers_calls.append({'args': args, 'kwargs': kwargs})
 
     # MOCK generateur transactions
     def transmettre_commande(self, *args, **kwargs):
@@ -84,6 +89,10 @@ class StubCascade:
 
     def continuer_publication(self, *args, **kwargs):
         self.continuer_publication_calls.append({'args': args, 'kwargs': kwargs})
+
+    def preparer_enveloppe(self, *args, **kwargs):
+        self.preparer_enveloppe_calls.append({'args': args, 'kwargs': kwargs})
+        return args[0]
 
     @property
     def invalidateur(self):
@@ -1084,11 +1093,47 @@ class RessourcesPublicationTest(TestCaseContexte):
     def test_maj_ressources_page(self):
         self.ressources_publication.maj_ressources_page()
 
-    def test_maj_ressources_fuuids(self):
-        self.ressources_publication.maj_ressources_fuuids()
+    def test_maj_ressources_fuuids_vide(self):
+        fuuids_info = {}
+        sites = None
+        public = False
+
+        self.ressources_publication.maj_ressources_fuuids(fuuids_info, sites, public=True)
+
+        invalider_ressources_sections_fichiers_calls = self.cascade.invalider_ressources_sections_fichiers_calls
+        self.assertEqual(1, len(invalider_ressources_sections_fichiers_calls))
+
+    def test_maj_ressources_fuuids_1fichier(self):
+        fuuids_info = {
+            'DUMMY-1': {
+                ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: {
+                    'DUMMY-1': 'DUMMY-MIMETYPE'
+                }
+            }
+        }
+        sites = None
+
+        self.contexte.document_dao.valeurs_update.append({
+            'sites': []
+        })
+
+        self.ressources_publication.maj_ressources_fuuids(fuuids_info, sites, public=True)
+
+        invalider_ressources_sections_fichiers_calls = self.cascade.invalider_ressources_sections_fichiers_calls
+        self.assertEqual(1, len(invalider_ressources_sections_fichiers_calls))
+
+        calls_find_update = self.contexte.document_dao.calls_find_update
+        self.assertDictEqual({'_mg-libelle': 'fichier', 'fuuid': 'DUMMY-1'}, calls_find_update[0]['args'][0])
+        self.assertDictEqual({'collections': [], 'public': True, 'mimetype': 'DUMMY-MIMETYPE'}, calls_find_update[0]['args'][1]['$set'])
 
     def test_get_ressource_collection_fichiers(self):
-        self.ressources_publication.get_ressource_collection_fichiers()
+        uuid_collection = 'DUMMY-uuid'
+
+        self.contexte.document_dao.valeurs_find.append('DUMMY-resultat')
+
+        res_collection = self.ressources_publication.get_ressource_collection_fichiers(uuid_collection)
+
+        self.assertEqual('DUMMY-resultat', res_collection)
 
     def test_trouver_ressources_manquantes(self):
         self.ressources_publication.trouver_ressources_manquantes()
@@ -1100,22 +1145,156 @@ class RessourcesPublicationTest(TestCaseContexte):
         self.ressources_publication.preparer_liste_fichiers()
 
     def test_maj_ressource_collection_fichiers(self):
-        self.ressources_publication.maj_ressource_collection_fichiers()
+        site_ids = ['SITE-1']
+        info_collection = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: 'DUMMY-uuid',
+        }
+        liste_fichiers = []
 
-    def test_trouver_info_fuuid_fichiers(self):
-        self.ressources_publication.trouver_info_fuuid_fichiers()
+        self.contexte.document_dao.valeurs_find.append([])
+        self.contexte.document_dao.valeurs_update.append([])
+
+        self.ressources_publication.maj_ressource_collection_fichiers(site_ids, info_collection, liste_fichiers)
+
+        calls_find_update = self.contexte.document_dao.calls_find_update
+
+        self.assertEqual(1, len(calls_find_update))
+
+    def test_trouver_info_fuuid_fichiers_vide(self):
+        fuuids = list()
+        self.contexte.document_dao.valeurs_find.append([])
+
+        fuuids_info = self.ressources_publication.trouver_info_fuuid_fichiers(fuuids)
+
+        self.assertEqual(0, len(fuuids_info))
+
+    def test_trouver_info_fuuid_fichiers_1fichier(self):
+        fuuids = list()
+        self.contexte.document_dao.valeurs_find.append([
+            {'fuuid': 'FUUID-1'}
+        ])
+
+        fuuids_info = self.ressources_publication.trouver_info_fuuid_fichiers(fuuids)
+
+        self.assertEqual(1, len(fuuids_info))
+        self.assertDictEqual({'public': False, 'mimetype': None}, fuuids_info['FUUID-1'])
+
+    def test_trouver_info_fuuid_fichiers_cid(self):
+        fuuids = list()
+        self.contexte.document_dao.valeurs_find.append([
+            {'fuuid': 'FUUID-1', 'cid': 'CID-1'}
+        ])
+
+        fuuids_info = self.ressources_publication.trouver_info_fuuid_fichiers(fuuids)
+
+        self.assertEqual(1, len(fuuids_info))
+        self.assertDictEqual({'public': False, 'mimetype': None, 'cid': 'CID-1'}, fuuids_info['FUUID-1'])
 
     def test_reset_ressources(self):
-        self.ressources_publication.reset_ressources()
+        params = {}
+        self.contexte.document_dao.update_result.matched_count_value = 1
+
+        resultat = self.ressources_publication.reset_ressources(params)
+
+        self.assertEqual(1, resultat)
+
+        calls_update = self.contexte.document_dao.calls_update
+
+        self.assertEqual(1, len(calls_update))
+
+    def test_reset_ressources_params(self):
+        params = {
+            'inclure': ['DUMMY-1'],
+            'ignorer': ['DUMMY-2'],
+        }
+        self.contexte.document_dao.update_result.matched_count_value = 1
+
+        resultat = self.ressources_publication.reset_ressources(params)
+
+        self.assertEqual(1, resultat)
+
+        calls_update = self.contexte.document_dao.calls_update
+
+        self.assertEqual(1, len(calls_update))
+
+        args_params = calls_update[0]['args'][0]
+        self.assertDictEqual({'_mg-libelle': {'$in': ['DUMMY-1'], '$nin': ['DUMMY-2']}}, args_params)
 
     def test_sauvegarder_contenu_gzip(self):
-        self.ressources_publication.sauvegarder_contenu_gzip()
+        col_fichiers = {
+            'contenu': {'valeur': 'du contenu'}
+        }
+        filtre_res = {'param': 'DUMMY'}
+        self.contexte.document_dao.valeurs_update.append('DUMMY')
+
+        resultat = self.ressources_publication.sauvegarder_contenu_gzip(col_fichiers, filtre_res)
+        self.assertEqual('DUMMY', resultat)
+
+        preparer_enveloppe_calls = self.cascade.preparer_enveloppe_calls
+        calls_find_update = self.contexte.document_dao.calls_find_update
+
+        self.assertEqual(1, len(preparer_enveloppe_calls))
+        self.assertEqual(1, len(calls_find_update))
 
     def test_preparer_json_gzip(self):
-        self.ressources_publication.preparer_json_gzip()
+        contenu_dict = {}
+        resultat = self.ressources_publication.preparer_json_gzip(contenu_dict)
+        self.assertTrue(isinstance(resultat, bytes))
+        self.assertEqual(22, len(resultat))  # Verifier bytes
 
-    def test_preparer_siteconfig_publication(self):
-        self.ressources_publication.preparer_siteconfig_publication()
+    def test_preparer_siteconfig_publication_sansdate(self):
+        site_id = 'DUMMY-site'
+
+        self.contexte.document_dao.valeurs_find.append({})
+
+        # Site
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_LISTE_CDNS: []
+        })
+
+        self.contexte.document_dao.valeurs_find.append({})  # CDNs
+        self.contexte.document_dao.valeurs_find.append([])  # CIDS
+
+        self.contexte.document_dao.valeurs_update.append({'contenu': {'_id': 'DUMMY-contenu'}})  # Site
+
+        self.contexte.document_dao.valeurs_update.append('reponse DUMMY')  # Site
+
+        res_site = self.ressources_publication.preparer_siteconfig_publication(site_id)
+        self.assertEqual('reponse DUMMY', res_site)
+
+        preparer_enveloppe_calls = self.cascade.preparer_enveloppe_calls
+        calls_find_update = self.contexte.document_dao.calls_find_update
+
+        self.assertEqual(1, len(preparer_enveloppe_calls))
+        self.assertEqual(2, len(calls_find_update))
+
+    def test_preparer_siteconfig_publication_avecdate(self):
+        site_id = 'DUMMY-site'
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_DATE_SIGNATURE: 'DUMMY-date'
+        })
+
+        # Site
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_LISTE_CDNS: []
+        })
+
+        self.contexte.document_dao.valeurs_find.append({})  # CDNs
+        self.contexte.document_dao.valeurs_find.append([])  # CIDS
+
+        self.contexte.document_dao.valeurs_update.append({'contenu': {'_id': 'DUMMY-contenu'}})  # Site
+
+        self.contexte.document_dao.valeurs_update.append('reponse DUMMY')  # Site
+
+        res_site = self.ressources_publication.preparer_siteconfig_publication(site_id)
+        self.assertDictEqual({'date_signature': 'DUMMY-date'}, res_site)
+
+        preparer_enveloppe_calls = self.cascade.preparer_enveloppe_calls
+        calls_find_update = self.contexte.document_dao.calls_find_update
+
+        self.assertEqual(0, len(preparer_enveloppe_calls))
+        self.assertEqual(0, len(calls_find_update))
 
     def test_detecter_changement_collection_nouvelle(self):
         contenu_collection = {

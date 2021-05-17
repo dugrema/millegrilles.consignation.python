@@ -559,11 +559,11 @@ class RessourcesPublication:
             }
 
             # Conserver information collections, va servir a invalider les sections 'fichiers'
-            collections_uuids = info['collections']
+            collections_uuids = info.get('collections') or list()
             collections_fichiers_uuids.update(collections_uuids)
 
             set_ops = {
-                'collections': info['collections'],
+                'collections': collections_uuids,
             }
             push_ops = dict()
             add_to_set_ops = dict()
@@ -674,6 +674,7 @@ class RessourcesPublication:
             }
             collection_ressources.update_one(filtre, ops, upsert=True)
 
+        # Verifier s'il manque des sections (pages, collections fichiers)
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
         curseur_sections = collection_sections.find(dict())
         for section in curseur_sections:
@@ -715,9 +716,6 @@ class RessourcesPublication:
                 '$setOnInsert': set_on_insert
             }
             collection_ressources.update_one(filtre, ops, upsert=True)
-
-        # Effectue l'extraction de tous les fichiers et collections de fichiers requis par les sections
-        self.identifier_ressources_fichiers()
 
     def identifier_ressources_fichiers(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -803,51 +801,6 @@ class RessourcesPublication:
                     ops['$set'] = set_ops
                 collection_ressources.update_one(filtre_res_collfichiers, ops, upsert=True)
 
-    # def creer_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
-    #     if isinstance(site_ids, str):
-    #         site_ids = [site_ids]
-    #
-    #     contenu = {}
-    #     contenu.update(info_collection)
-    #     contenu['fichiers'] = liste_fichiers
-    #
-    #     # contenu = self.generateur_transactions.preparer_enveloppe(
-    #     #     contenu, 'Publication.fichiers', ajouter_certificats=True)
-    #
-    #     set_ops = {
-    #         'contenu': contenu,
-    #     }
-    #     set_on_insert = {
-    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-    #         'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
-    #         Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-    #     }
-    #     add_to_set = {
-    #         'sites': {'$each': site_ids},
-    #     }
-    #     filtre = {
-    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-    #         'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
-    #     }
-    #     ops = {
-    #         '$set': set_ops,
-    #         '$setOnInsert': set_on_insert,
-    #         '$addToSet': add_to_set,
-    #         '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-    #     }
-    #     collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-    #     doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
-    #
-    #     # Creer les entrees manquantes de fichiers
-    #     fuuids_dict = dict()
-    #     flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
-    #     for f in liste_fichiers:
-    #         for fuuid in f['fuuids']:
-    #             fuuids_dict[fuuid] = f
-    #     self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public)
-    #
-    #     return doc_fichiers
-
     def maj_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
         if isinstance(site_ids, str):
             site_ids = [site_ids]
@@ -873,7 +826,7 @@ class RessourcesPublication:
                 fuuids_dict[fuuid] = f
         self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public, maj_section=False)
 
-        info_fichiers = self.trouver_info_fuuid_fichiers(uuid_collection, list(set_fuuids))
+        info_fichiers = self.trouver_info_fuuid_fichiers(list(set_fuuids))
         contenu['fuuids'] = info_fichiers
 
         # contenu = self.generateur_transactions.preparer_enveloppe(
@@ -907,7 +860,7 @@ class RessourcesPublication:
 
         return doc_fichiers
 
-    def trouver_info_fuuid_fichiers(self, uuid_collection: str, fuuids: list):
+    def trouver_info_fuuid_fichiers(self, fuuids: list):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre_fichier = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
@@ -996,7 +949,7 @@ class RessourcesPublication:
         contenu_gzip = gzip.compress(contenu)
         return contenu_gzip
 
-    def preparer_siteconfig_publication(self, cdn_id, site_id):
+    def preparer_siteconfig_publication(self, site_id):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
@@ -1725,6 +1678,7 @@ class TriggersPublication:
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
         self.__cascade.ressources.trouver_ressources_manquantes()
+        self.__cascade.ressources.identifier_ressources_fichiers()
 
         liste_cdns = self.preparer_sitesparcdn()
         compteur_commandes = 0
