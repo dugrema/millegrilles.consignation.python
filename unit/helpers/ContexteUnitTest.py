@@ -187,11 +187,14 @@ class DocumentDaoStub:
         self.calls_aggregate = list()
         self.calls_find = list()
         self.calls_update = list()
+        self.calls_find_update = list()
 
         # Placeholders pour retourner des valeurs
         self.valeurs_aggregate = list()
         self.valeurs_find = list()
         self.valeurs_update = list()
+
+        self.update_result = UpdateResult()
 
 
 class UpdateResult:
@@ -206,6 +209,6 @@ class UpdateResult:
 
     @property
     def updated_count(self):
-        return updated_count_value
+        return self.updated_count_value
 
 contexte_instance = ContexteUnitTest()
