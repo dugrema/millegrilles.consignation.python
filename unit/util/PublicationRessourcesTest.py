@@ -6,7 +6,7 @@ from unit.helpers.TestBaseContexte import TestCaseContexte
 from io import BytesIO
 
 from millegrilles import Constantes
-from millegrilles.util.PublicationRessources import InvalidateurRessources, TriggersPublication, HttpPublication
+from millegrilles.util.PublicationRessources import InvalidateurRessources, TriggersPublication, HttpPublication, RessourcesPublication
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
 
 
@@ -1054,3 +1054,71 @@ class HttpPublicationTest(TestCaseContexte):
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
         self.assertEqual('/publier/repertoire', request_put_args[0])
+
+
+class RessourcesPublicationTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.cascade = StubCascade(self.contexte)
+
+        self.ressources_publication = RessourcesPublication(self.cascade)
+
+        # self.securite = Constantes.SECURITE_PUBLIC
+        # self.cdn = {
+        #     ConstantesPublication.CHAMP_CDN_ID: 'CDN-1',
+        #     ConstantesPublication.CHAMP_TYPE_CDN: 'CDN DUMMY',
+        # }
+        #
+        # self.res_data = {
+        #     Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY',
+        #     ConstantesPublication.CHAMP_SECTION_ID: 'abcd-1234',
+        # }
+
+    def test_maj_ressource_mapping(self):
+        self.ressources_publication.maj_ressource_mapping()
+
+    def test_maj_ressources_site(self):
+        self.ressources_publication.maj_ressources_site()
+
+    def test_maj_ressources_page(self):
+        self.ressources_publication.maj_ressources_page()
+
+    def test_maj_ressources_fuuids(self):
+        self.ressources_publication.maj_ressources_fuuids()
+
+    def test_get_ressource_collection_fichiers(self):
+        self.ressources_publication.get_ressource_collection_fichiers()
+
+    def test_trouver_ressources_manquantes(self):
+        self.ressources_publication.trouver_ressources_manquantes()
+
+    def test_identifier_ressources_fichiers(self):
+        self.ressources_publication.identifier_ressources_fichiers()
+
+    def test_preparer_liste_fichiers(self):
+        self.ressources_publication.preparer_liste_fichiers()
+
+    def test_maj_ressource_collection_fichiers(self):
+        self.ressources_publication.maj_ressource_collection_fichiers()
+
+    def test_trouver_info_fuuid_fichiers(self):
+        self.ressources_publication.trouver_info_fuuid_fichiers()
+
+    def test_reset_ressources(self):
+        self.ressources_publication.reset_ressources()
+
+    def test_sauvegarder_contenu_gzip(self):
+        self.ressources_publication.sauvegarder_contenu_gzip()
+
+    def test_preparer_json_gzip(self):
+        self.ressources_publication.preparer_json_gzip()
+
+    def test_preparer_siteconfig_publication(self):
+        self.ressources_publication.preparer_siteconfig_publication()
+
+    def test_detecter_changement_collection(self):
+        self.ressources_publication.detecter_changement_collection()
+
+    def test_ajouter_site_fichiers(self):
+        self.ressources_publication.ajouter_site_fichiers()
