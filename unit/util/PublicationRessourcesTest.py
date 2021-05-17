@@ -39,6 +39,8 @@ class StubCascade:
         self.preparer_siteconfig_publication_calls = list()
         self.maj_ressource_mapping_calls = list()
         self.maj_ressources_page_calls = list()
+        self.trouver_ressources_manquantes_calls = list()
+        self.continuer_publication_calls = list()
 
         self.ressource_page_retour = None
 
@@ -76,6 +78,12 @@ class StubCascade:
     def maj_ressources_page(self, *args, **kwargs):
         self.maj_ressources_page_calls.append({'args': args, 'kwargs': kwargs})
         return self.ressource_page_retour
+
+    def trouver_ressources_manquantes(self, *args, **kwargs):
+        self.trouver_ressources_manquantes_calls.append({'args': args, 'kwargs': kwargs})
+
+    def continuer_publication(self, *args, **kwargs):
+        self.continuer_publication_calls.append({'args': args, 'kwargs': kwargs})
 
     @property
     def invalidateur(self):
@@ -284,7 +292,80 @@ class TriggersPublicationTest(TestCaseContexte):
         self.assertEqual('site-DUMMY', cdns[0]['sites'][0])
 
     def test_demarrer_publication_complete(self):
-        raise NotImplementedError('TODO')
+        params = {
+        }
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_update.append([self.cdn])
+        self.contexte.document_dao.update_result.matched_count_value = 1
+
+        compteur = self.trigger.demarrer_publication_complete(params)
+
+        self.assertEqual(1, compteur)
+
+        continuer_publication_calls = self.cascade.continuer_publication_calls
+        trouver_ressources_manquantes_calls = self.cascade.trouver_ressources_manquantes_calls
+        calls_find = self.cascade.document_dao.calls_find
+        calls_update = self.cascade.document_dao.calls_update
+        valeurs_update = self.cascade.document_dao.valeurs_update
+
+        self.assertEqual(2, len(calls_find))
+        self.assertEqual(1, len(calls_update))
+        self.assertEqual(1, len(trouver_ressources_manquantes_calls))
+        self.assertEqual(1, len(valeurs_update))
+        self.assertEqual(1, len(continuer_publication_calls))
+
+    def test_demarrer_publication_complete_nopublish(self):
+        params = {
+            'nopublish': True,
+        }
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_update.append([self.cdn])
+        self.contexte.document_dao.update_result.matched_count_value = 1
+
+        compteur = self.trigger.demarrer_publication_complete(params)
+
+        self.assertEqual(1, compteur)
+
+        continuer_publication_calls = self.cascade.continuer_publication_calls
+        trouver_ressources_manquantes_calls = self.cascade.trouver_ressources_manquantes_calls
+        calls_find = self.cascade.document_dao.calls_find
+        calls_update = self.cascade.document_dao.calls_update
+        valeurs_update = self.cascade.document_dao.valeurs_update
+
+        self.assertEqual(2, len(calls_find))
+        self.assertEqual(1, len(calls_update))
+        self.assertEqual(1, len(trouver_ressources_manquantes_calls))
+        self.assertEqual(1, len(valeurs_update))
+        self.assertEqual(0, len(continuer_publication_calls))
+
+    def test_demarrer_publication_complete_nomatch(self):
+        params = {
+        }
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_update.append([self.cdn])
+        self.contexte.document_dao.update_result.matched_count_value = 0
+
+        compteur = self.trigger.demarrer_publication_complete(params)
+
+        self.assertEqual(0, compteur)
+
+        continuer_publication_calls = self.cascade.continuer_publication_calls
+        trouver_ressources_manquantes_calls = self.cascade.trouver_ressources_manquantes_calls
+        calls_find = self.cascade.document_dao.calls_find
+        calls_update = self.cascade.document_dao.calls_update
+        valeurs_update = self.cascade.document_dao.valeurs_update
+
+        self.assertEqual(2, len(calls_find))
+        self.assertEqual(1, len(calls_update))
+        self.assertEqual(1, len(trouver_ressources_manquantes_calls))
+        self.assertEqual(1, len(valeurs_update))
+        self.assertEqual(1, len(continuer_publication_calls))
 
     def test_trigger_traitement_collections_fichiers_prep_true(self):
         # Preparer donnees update

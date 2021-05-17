@@ -150,6 +150,8 @@ class DocumentDaoStub:
         self.valeurs_find = list()
         self.valeurs_update = list()
 
+        self.update_result = UpdateResult()
+
     def get_collection(self, nom_collection):
         return self
 
@@ -169,6 +171,10 @@ class DocumentDaoStub:
         self.calls_update.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_update.pop(0)
 
+    def update_many(self, *args, **kwargs):
+        self.calls_update.append({'args': args, 'kwargs': kwargs})
+        return self.update_result
+
     def find_one_and_update(self, *args, **kwargs):
         self.calls_find_update.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_update.pop(0)
@@ -187,5 +193,19 @@ class DocumentDaoStub:
         self.valeurs_find = list()
         self.valeurs_update = list()
 
+
+class UpdateResult:
+
+    def __init__(self):
+        self.matched_count_value = 0
+        self.updated_count_value = 0
+
+    @property
+    def matched_count(self):
+        return self.matched_count_value
+
+    @property
+    def updated_count(self):
+        return updated_count_value
 
 contexte_instance = ContexteUnitTest()
