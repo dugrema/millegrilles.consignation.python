@@ -1037,7 +1037,7 @@ class RessourcesPublication:
         })
         try:
             contenu_signe = res_collection[ConstantesPublication.CHAMP_CONTENU_SIGNE]
-        except KeyError:
+        except (KeyError, TypeError):
             # Contenu jamais publie ou invalide, on va recharger le contenu de la collection
             return True
 

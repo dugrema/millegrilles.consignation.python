@@ -1117,8 +1117,124 @@ class RessourcesPublicationTest(TestCaseContexte):
     def test_preparer_siteconfig_publication(self):
         self.ressources_publication.preparer_siteconfig_publication()
 
-    def test_detecter_changement_collection(self):
-        self.ressources_publication.detecter_changement_collection()
+    def test_detecter_changement_collection_nouvelle(self):
+        contenu_collection = {
+            'collection': {
+                'uuid': 'DUMMY-uuid',
+            },
+            'documents': []
+        }
+        self.contexte.document_dao.valeurs_find.append(None)  # Aucune collection
+
+        resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
+
+        self.assertTrue(resultat)
+
+    def test_detecter_changement_collection_existante_vide(self):
+        contenu_collection = {
+            'collection': {
+                'uuid': 'DUMMY-uuid',
+            },
+            'documents': [],  # Liste documents vide
+        }
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: {
+                'DUMMY-contenu': True,
+                'fuuids': {},
+            }
+        })  # Collection vide
+
+        resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
+
+        self.assertFalse(resultat)
+
+    def test_detecter_changement_collection_existante_identique(self):
+        contenu_collection = {
+            'collection': {
+                'uuid': 'DUMMY-uuid',
+            },
+            'documents': [{
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: [
+                    'DUMMY-fuuid-1'
+                ],
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE: 'DUMMY-fuuid-1',
+            }]
+        }
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: {
+                'DUMMY-contenu': True,
+                'fuuids': {
+                    'DUMMY-fuuid-1': 'contenu-dummy'
+                },
+            }
+        })  # Collection vide
+
+        resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
+
+        self.assertFalse(resultat)
+
+    def test_detecter_changement_collection_existante_nouveau(self):
+        contenu_collection = {
+            'collection': {
+                'uuid': 'DUMMY-uuid',
+            },
+            'documents': [{
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: [
+                    'DUMMY-fuuid-1',
+                    'DUMMY-fuuid-2'
+                ],
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE: 'DUMMY-fuuid-1',
+            }]
+        }
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: {
+                'DUMMY-contenu': True,
+                'fuuids': {
+                    'DUMMY-fuuid-1': 'contenu-dummy'
+                },
+            }
+        })  # Collection vide
+
+        resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
+
+        self.assertTrue(resultat)
+
+    def test_detecter_changement_collection_existante_retire(self):
+        contenu_collection = {
+            'collection': {
+                'uuid': 'DUMMY-uuid',
+            },
+            'documents': [{
+                ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: [
+                    'DUMMY-fuuid-1',
+                ],
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE: 'DUMMY-fuuid-1',
+            }]
+        }
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_SIGNE: {
+                'DUMMY-contenu': True,
+                'fuuids': {
+                    'DUMMY-fuuid-1': 'contenu-dummy',
+                    'DUMMY-fuuid-2': 'contenu-dummy',
+                },
+            }
+        })  # Collection vide
+
+        resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
+
+        self.assertTrue(resultat)
 
     def test_ajouter_site_fichiers(self):
-        self.ressources_publication.ajouter_site_fichiers()
+        uuid_collection = 'DUMMY-uuid'
+        sites = ['DUMMY-site']
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY')
+
+        self.ressources_publication.ajouter_site_fichiers(uuid_collection, sites)
+
+        calls_update = self.contexte.document_dao.calls_update
+
+        self.assertEqual(1, len(calls_update))
+        args_update = calls_update[0]['args']
+        self.assertDictEqual({'$addToSet': {'sites': {'$each': ['DUMMY-site']}}}, args_update[1])
