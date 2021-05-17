@@ -338,14 +338,120 @@ class TriggersPublicationTest(TestCaseContexte):
         self.assertEqual('collection_fichiers', update_calls[0]['args'][0]['_mg-libelle'])
         self.assertEqual('en_cours', update_calls[0]['args'][1]['$set']['preparation_ressources'])
 
-    def test_trigger_publication_fichiers(self):
+    def test_trigger_publication_fichiers_cdndummy(self):
+        res_fichier = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False},
+            'fuuid': 'DUMMY-fuuid'
+        }
+
         self.contexte.document_dao.valeurs_find.append([self.site])
         self.contexte.document_dao.valeurs_find.append([self.cdn])
-        self.contexte.document_dao.valeurs_find.append([{
-            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False}
-        }])
+        self.contexte.document_dao.valeurs_find.append([res_fichier])
 
-        self.trigger.trigger_publication_fichiers()
+        # self.trigger.trigger_publication_fichiers()
+        self.assertRaises(Exception, self.trigger.trigger_publication_fichiers)
+
+    def test_trigger_publication_fichiers_cdn_sftp(self):
+        res_fichier = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False},
+            'fuuid': 'DUMMY-fuuid'
+        }
+        self.cdn[ConstantesPublication.CHAMP_TYPE_CDN] = 'sftp'
+        self.cdn['host'] = 'DUMMY-host'
+        self.cdn['port'] = 22
+        self.cdn['username'] = 'DUMMY-username'
+        self.cdn['repertoireRemote'] = 'DUMMY-remote/folder'
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_find.append([res_fichier])
+
+        compte_fichiers_publies = self.trigger.trigger_publication_fichiers()
+        self.assertEqual(1, compte_fichiers_publies)
+
+        marquer_ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        calls_find = self.cascade.document_dao.calls_find
+
+        self.assertEqual(3, len(calls_find))
+        self.assertEqual(1, len(marquer_ressource_encours_calls))
+        self.assertEqual(1, len(transmettre_commande_calls))
+
+    def test_trigger_publication_fichiers_cdn_ipfs(self):
+        res_fichier = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False},
+            'fuuid': 'DUMMY-fuuid'
+        }
+        self.cdn[ConstantesPublication.CHAMP_TYPE_CDN] = 'ipfs'
+        # self.cdn['repertoireRemote'] = 'DUMMY-remote/folder'
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_find.append([res_fichier])
+
+        compte_fichiers_publies = self.trigger.trigger_publication_fichiers()
+        self.assertEqual(1, compte_fichiers_publies)
+
+        marquer_ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        calls_find = self.cascade.document_dao.calls_find
+
+        self.assertEqual(3, len(calls_find))
+        self.assertEqual(1, len(marquer_ressource_encours_calls))
+        self.assertEqual(1, len(transmettre_commande_calls))
+
+    def test_trigger_publication_fichiers_cdn_awss3(self):
+        res_fichier = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False},
+            'fuuid': 'DUMMY-fuuid'
+        }
+        self.cdn[ConstantesPublication.CHAMP_TYPE_CDN] = 'awss3'
+        self.cdn['bucketName'] = 'DUMMY-bucketName'
+        self.cdn['bucketDirfichier'] = 'DUMMY-remote/folder'
+        self.cdn['bucketRegion'] = 'DUMMY-bucketRegion'
+        self.cdn['credentialsAccessKeyId'] = 'DUMMY-credentialsAccessKeyId'
+        self.cdn['secretAccessKey_chiffre'] = 'DUMMY-secretAccessKey_chiffre'
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_find.append([res_fichier])
+
+        compte_fichiers_publies = self.trigger.trigger_publication_fichiers()
+        self.assertEqual(1, compte_fichiers_publies)
+
+        marquer_ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        calls_find = self.cascade.document_dao.calls_find
+
+        self.assertEqual(3, len(calls_find))
+        self.assertEqual(1, len(marquer_ressource_encours_calls))
+        self.assertEqual(1, len(transmettre_commande_calls))
+
+        args_commande = transmettre_commande_calls[0]['args']
+        self.assertEqual('commande.fichiers.publierFichierAwsS3', args_commande[1])
+        self.assertEqual('2.prive', args_commande[0]['securite'])
+
+    def test_trigger_publication_fichiers_cdn_hiddenService(self):
+        res_fichier = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'CDN-1': False},
+            'fuuid': 'DUMMY-fuuid'
+        }
+        self.cdn[ConstantesPublication.CHAMP_TYPE_CDN] = 'hiddenService'
+
+        self.contexte.document_dao.valeurs_find.append([self.site])
+        self.contexte.document_dao.valeurs_find.append([self.cdn])
+        self.contexte.document_dao.valeurs_find.append([res_fichier])
+
+        compte_fichiers_publies = self.trigger.trigger_publication_fichiers()
+        self.assertEqual(0, compte_fichiers_publies)
+
+        marquer_ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
+        transmettre_commande_calls = self.cascade.transmettre_commande_calls
+        calls_find = self.cascade.document_dao.calls_find
+
+        self.assertEqual(2, len(calls_find))
+        self.assertEqual(0, len(marquer_ressource_encours_calls))
+        self.assertEqual(0, len(transmettre_commande_calls))
 
     def test_emettre_commande_publier_fichier_cdn_non_supporte(self):
         res_fichier = {'fuuid': 'FUUID-DUMMY'}
