@@ -2136,10 +2136,10 @@ class TriggersPublication:
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_siteconfig = collection_ressources.find(filtre_siteconfig)
         compteur_commandes = 0
-        for doc_siteconfig in curseur_siteconfig:
-            site_id = doc_siteconfig[ConstantesPublication.CHAMP_SITE_ID]
+        for res_siteconfig in curseur_siteconfig:
+            site_id = res_siteconfig[ConstantesPublication.CHAMP_SITE_ID]
             try:
-                etat_distribution = doc_siteconfig[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+                etat_distribution = res_siteconfig[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
                 if etat_distribution is True:
                     # Rien a faire
                     continue
@@ -2234,14 +2234,14 @@ class TriggersPublication:
         res_webapps = collection_ressources.find_one(filtre) or dict()
 
         try:
-            if cdn_id in doc_webapps[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]:
+            if cdn_id in res_webapps[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]:
                 # Distribution completee, rien a faire
                 return 0
         except (KeyError, TypeError):
             pass  # OK, on va verifier si le deploiement est en cours
 
         try:
-            etat_distribution = doc_webapps[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+            etat_distribution = res_webapps[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
             if etat_distribution is True:
                 # Rien a faire
                 return 1
@@ -2292,6 +2292,8 @@ class TriggersPublication:
 
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
         self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre, upsert=True)
+
+        return 1
 
         # try:
         #     doc_res_mapping = self.maj_ressource_mapping()
