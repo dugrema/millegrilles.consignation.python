@@ -1032,7 +1032,7 @@ class GestionnaireCascadePublication:
         self.__ressources_publication = RessourcesPublication(self)
         self.__triggers_publication = TriggersPublication(self)
         self.__invalidateur = InvalidateurRessources(self)
-        self.__http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
+        self.http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
 
     def get_site(self, site_id: str):
         return self.__gestionnaire_domaine.get_site(site_id)
@@ -1090,7 +1090,7 @@ class GestionnaireCascadePublication:
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-            self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
+            self.http_publication.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -1136,12 +1136,12 @@ class GestionnaireCascadePublication:
             type_cdn = cdn['type_cdn']
             if type_cdn in ['ipfs', 'ipfs_gateway']:
                 # Publier avec le IPNS associe a la section
-                self.__http_publication.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
+                self.http_publication.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
+                self.http_publication.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -1190,7 +1190,7 @@ class GestionnaireCascadePublication:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-                self.__http_publication.put_publier_repertoire([cdn], fichiers, params)
+                self.http_publication.put_publier_repertoire([cdn], fichiers, params)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)

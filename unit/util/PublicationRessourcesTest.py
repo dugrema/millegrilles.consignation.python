@@ -6,7 +6,8 @@ from unit.helpers.TestBaseContexte import TestCaseContexte
 from io import BytesIO
 
 from millegrilles import Constantes
-from millegrilles.util.PublicationRessources import InvalidateurRessources, TriggersPublication, HttpPublication, RessourcesPublication
+from millegrilles.util.PublicationRessources import InvalidateurRessources, TriggersPublication, HttpPublication, \
+    RessourcesPublication, GestionnaireCascadePublication
 from millegrilles.Constantes import ConstantesPublication, ConstantesGrosFichiers, ConstantesMaitreDesCles
 
 
@@ -113,6 +114,20 @@ class StubCascade:
     def ressources(self):
         # Agit comme mock
         return self
+
+
+class StubGestionnaireDomaine:
+
+    def __init__(self, contexte):
+        self.__contexte = contexte
+
+    @property
+    def contexte(self):
+        return self.__contexte
+
+    @property
+    def document_dao(self):
+        return self.__contexte.document_dao
 
 
 class HttpPublicationStub(HttpPublication):
@@ -1747,3 +1762,141 @@ class RessourcesPublicationTest(TestCaseContexte):
         self.assertEqual(1, len(calls_update))
         args_update = calls_update[0]['args']
         self.assertDictEqual({'$addToSet': {'sites': {'$each': ['DUMMY-site']}}}, args_update[1])
+
+
+class GestionnaireCascadePublicationTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        super().setUp()
+        # self.cascade = StubCascade(self.contexte)
+
+        self.gestionnaire_domaine = StubGestionnaireDomaine(self.contexte)
+        self.cascade = GestionnaireCascadePublication(self.gestionnaire_domaine)
+
+        # Wire stub http publication
+        self.http_publication = HttpPublicationStub(self.cascade, self.contexte.configuration)
+        self.cascade.http_publication = self.http_publication
+
+    def test_commande_publier_upload_datasection_type_invalide(self):
+        params = {
+            'type_section': 'DUMMY-type',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'dummy/type',
+            'securite': Constantes.SECURITE_PUBLIC,
+        }
+
+        resultat = self.cascade.commande_publier_upload_datasection(params)
+        self.assertDictEqual({'err': 'Type section inconnue: DUMMY-type'}, resultat)
+
+    def test_commande_publier_upload_datasection_gzip_paspret(self):
+        params = {
+            'type_section': 'page',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'dummy/type',
+            'securite': Constantes.SECURITE_PUBLIC,
+            'section_id': 'DUMMY-section',
+        }
+
+        self.contexte.document_dao.valeurs_find.append({})
+
+        resultat = self.cascade.commande_publier_upload_datasection(params)
+
+        self.assertDictEqual({'err': "Le contenu gzip de la section n'est pas pret. Section : {'_mg-libelle': 'page', 'section_id': 'DUMMY-section'}"}, resultat)
+
+    def test_commande_publier_upload_datasection_page(self):
+        params = {
+            'type_section': 'page',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'dummy/type',
+            'securite': Constantes.SECURITE_PUBLIC,
+            'section_id': 'DUMMY-section',
+        }
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_GZIP: b'contenu gzip dummy'
+        })
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-cdn',
+        })
+
+        resultat = self.cascade.commande_publier_upload_datasection(params)
+
+        self.assertDictEqual({"ok": True}, resultat)
+
+        http_pub_args = self.http_publication.calls_requests_put[0]['args']
+        self.assertEqual('/publier/repertoire', http_pub_args[0])
+        self.assertDictEqual(
+            {'cdns': '[{"cdn_id": "DUMMY-cdn", "type_cdn": "DUMMY-cdn"}]', 'securite': '1.public',
+             'identificateur_document': '{"_mg-libelle": "page", "section_id": "DUMMY-section"}'},
+            http_pub_args[1]
+        )
+        self.assertEqual('/DUMMY/path', http_pub_args[2][0][1][0])
+
+    def test_commande_publier_upload_datasection_fichiers(self):
+        params = {
+            'type_section': 'collection_fichiers',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'dummy/type',
+            'securite': Constantes.SECURITE_PUBLIC,
+            'uuid_collection': 'DUMMY-uuid',
+        }
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_GZIP: b'contenu gzip dummy'
+        })
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-cdn',
+        })
+
+        resultat = self.cascade.commande_publier_upload_datasection(params)
+
+        self.assertDictEqual({"ok": True}, resultat)
+
+        http_pub_args = self.http_publication.calls_requests_put[0]['args']
+        self.assertEqual('/publier/repertoire', http_pub_args[0])
+        self.assertDictEqual(
+            {'cdns': '[{"cdn_id": "DUMMY-cdn", "type_cdn": "DUMMY-cdn"}]', 'securite': '1.public', 'identificateur_document': '{"_mg-libelle": "collection_fichiers", "uuid": "DUMMY-uuid"}'},
+            http_pub_args[1]
+        )
+        self.assertEqual('/DUMMY/path', http_pub_args[2][0][1][0])
+
+    def test_commande_publier_upload_datasection_ipfs(self):
+        params = {
+            'type_section': 'page',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'dummy/type',
+            'securite': Constantes.SECURITE_PUBLIC,
+            'section_id': 'DUMMY-section',
+        }
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CONTENU_GZIP: b'contenu gzip dummy'
+        })
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'ipfs',
+        })
+
+        resultat = self.cascade.commande_publier_upload_datasection(params)
+
+        self.assertDictEqual({"ok": True}, resultat)
+
+        http_pub_args = self.http_publication.calls_requests_put[0]['args']
+        self.assertEqual('/publier/repertoire', http_pub_args[0])
+        self.assertDictEqual(
+            {'cdns': '[{"cdn_id": "DUMMY-cdn", "type_cdn": "ipfs"}]', 'securite': '1.public',
+             'fichier_unique': True,
+             'identificateur_document': '{"_mg-libelle": "page", "section_id": "DUMMY-section"}'},
+            http_pub_args[1]
+        )
+        self.assertEqual('fichier.bin', http_pub_args[2][0][1][0])
