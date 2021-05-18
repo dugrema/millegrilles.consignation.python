@@ -180,51 +180,37 @@ class RessourcesPublication:
         return self.__cascade.document_dao
 
     def maj_ressource_mapping(self):
-        sites = dict()
-        configuration_par_url = dict()
-        cdns = dict()
-
-        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        curseur_cdn = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS).find()
-        for cdn in curseur_cdn:
-            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
-            filtre_site = {ConstantesPublication.CHAMP_LISTE_CDNS: {'$all': [cdn_id]}}
-            curseur_sites = collection_sites.find(filtre_site)
-            for site in curseur_sites:
-                sites[site[ConstantesPublication.CHAMP_SITE_ID]] = site
+        # Trouver les sites a mapper. On ne va pas mapper les sites avec 0 CDN actif.
+        sites = self.trouver_sites_avec_cdns_actifs()
 
         collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
-        doc_mapping = collection_configuration.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING})
+        doc_mapping = collection_configuration.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING}) or dict()
+        site_id_defaut = doc_mapping.get(ConstantesPublication.CHAMP_SITE_DEFAUT)
 
-        site_defaut = None
-        if len(sites) == 1:
-            # Le site par defaut est le seul disponible
+        if site_id_defaut is not None:
+            pass
+        elif len(sites) == 1:
+            # Un seul site disponible
             site_defaut = list(sites.values())[0]
             site_id_defaut = site_defaut[ConstantesPublication.CHAMP_SITE_ID]
-        elif doc_mapping is not None:
-            site_id_defaut = doc_mapping.get(ConstantesPublication.CHAMP_SITE_DEFAUT)
-        else:
-            site_id_defaut = None
 
-        # if site_id_defaut is not None:
-        #     configuration_par_url[ConstantesPublication.CHAMP_SITE_DEFAUT] = site_id_defaut
-
+        configuration_par_url = dict()
         mapping = {
             'sites': configuration_par_url,
         }
 
-        # Verifier si la ressource du site est prete (contenu)
+        # Creer la liste des siteconfig
+        cdns = dict()
         if len(sites) > 0:
-            # Ok, format simple avec une seule configuration
-            reponse_sites = list()
+            liste_siteconfigs = list()
             for site in sites.values():
                 site_id = site[ConstantesPublication.CHAMP_SITE_ID]
 
                 # Note : La methode genere le contenu uniquement s'il n'est pas deja present
-                doc_res_site = self.preparer_siteconfig_publication(None, site_id)
+                doc_res_site = self.preparer_siteconfig_publication(site_id)
                 contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
 
-                reponse_sites.append(contenu)
+                liste_siteconfigs.append(contenu)
 
                 for cdn_site in contenu['cdns']:
                     cdns[cdn_site[ConstantesPublication.CHAMP_CDN_ID]] = cdn_site
@@ -265,9 +251,33 @@ class RessourcesPublication:
             '$setOnInsert': set_on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
-        doc_mapping = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
+        doc_mapping = collection_ressources.find_one_and_update(
+            filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         return doc_mapping
+
+    def trouver_sites_avec_cdns_actifs(self):
+        """
+        :return: List de sites avec au moins 1 CDN actif
+        """
+        filtre_cdn_actifs = {ConstantesPublication.CHAMP_ACTIVE: True}
+        curseur_cdn = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS).find(filtre_cdn_actifs)
+        cdns = set()
+        for cdn in curseur_cdn:
+            cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+            cdns.add(cdn_id)
+
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        filtre_sites_avec_cdns = {
+            ConstantesPublication.CHAMP_LISTE_CDNS: {'$in': list(cdns)}
+        }
+
+        sites = dict()
+        for site in collection_sites.find(filtre_sites_avec_cdns):
+            site_id = site[ConstantesPublication.CHAMP_SITE_ID]
+            sites[site_id] = site
+
+        return sites
 
     def maj_ressources_site(self, params: dict):
         site_id = params[ConstantesPublication.CHAMP_SITE_ID]

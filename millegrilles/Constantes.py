@@ -1939,6 +1939,8 @@ class ConstantesPublication:
     CHAMP_AWSS3_BUCKET_REGION = 'bucketRegion'
     CHAMP_AWSS3_CREDENTIALS = 'credentialsAccessKeyId'
     CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE = 'secretAccessKey_chiffre'
+    CHAMP_ACTIVE = 'active'
+    CHAMP_ACCESS_POINT_URL = 'access_point_url'
 
     CHAMPS_DONNEES_PAGE = [
         CHAMP_TITRE, CHAMP_DATE_POST, CHAMP_TYPE_PARTIE_PAGE, CHAMP_CSS_PAGE,

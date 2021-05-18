@@ -1090,7 +1090,63 @@ class RessourcesPublicationTest(TestCaseContexte):
         # }
 
     def test_maj_ressource_mapping(self):
-        self.ressources_publication.maj_ressource_mapping()
+        self.contexte.document_dao.valeurs_find.append([])
+        self.contexte.document_dao.valeurs_find.append({})
+        self.contexte.document_dao.valeurs_update.append('DUMMY resultat')
+
+        # Mocks
+        def trouver_sites_avec_cdns_actifs():
+            return {
+                'DUMMY-site': {
+                    ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site',
+                    ConstantesPublication.CHAMP_IPNS_ID: 'DUMMY-ipns',
+                    ConstantesPublication.CHAMP_LISTE_DOMAINES: [
+                        'https://DUMMY-1'
+                    ]
+                }
+            }
+
+        doc_res_sites = [
+            {
+                ConstantesPublication.CHAMP_CONTENU_SIGNE: {
+                    'cdns': [{
+                        ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+                        ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-type',
+                        ConstantesPublication.CHAMP_ACCESS_POINT_URL: 'https://DUMMY',
+                    }],
+                },
+
+            }
+        ]
+
+        def preparer_siteconfig_publication(*args, **kwargs):
+            return doc_res_sites.pop()
+
+        self.ressources_publication.trouver_sites_avec_cdns_actifs = trouver_sites_avec_cdns_actifs
+        self.ressources_publication.preparer_siteconfig_publication = preparer_siteconfig_publication
+
+        doc_mapping = self.ressources_publication.maj_ressource_mapping()
+        self.assertEqual('DUMMY resultat', doc_mapping)
+
+        calls_find_update = self.contexte.document_dao.calls_find_update
+        update_args_1 = calls_find_update[0]['args']
+
+        self.assertDictEqual({'_mg-libelle': 'mapping'}, update_args_1[0])
+
+        self.assertDictEqual(
+            {'https://DUMMY-1': {'site_id': 'DUMMY-site', 'ipns_id': 'DUMMY-ipns'}},
+            update_args_1[1]['$set']['contenu']['sites']
+        )
+
+        self.assertDictEqual(
+            {'site_id': 'DUMMY-site', 'ipns_id': 'DUMMY-ipns'},
+            update_args_1[1]['$set']['contenu']['site_defaut']
+        )
+
+        self.assertDictEqual(
+            {'cdn_id': 'DUMMY-cdn', 'type_cdn': 'DUMMY-type', 'access_point_url': 'https://DUMMY'},
+            update_args_1[1]['$set']['contenu']['cdns'][0]
+        )
 
     def test_maj_ressources_site(self):
         self.ressources_publication.maj_ressources_site()
