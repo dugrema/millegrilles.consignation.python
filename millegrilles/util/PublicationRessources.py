@@ -1029,9 +1029,9 @@ class GestionnaireCascadePublication:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__gestionnaire_domaine = gestionnaire_domaine
 
-        self.__ressources_publication = RessourcesPublication(self)
+        self.ressources_publication = RessourcesPublication(self)
         self.__triggers_publication = TriggersPublication(self)
-        self.__invalidateur = InvalidateurRessources(self)
+        self.invalidateur_ressources = InvalidateurRessources(self)
         self.http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
 
     def get_site(self, site_id: str):
@@ -1121,7 +1121,7 @@ class GestionnaireCascadePublication:
 
         date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
         if date_signature is None:
-            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
+            res_data = self.ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
         contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -1170,7 +1170,7 @@ class GestionnaireCascadePublication:
 
         date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
         if date_signature is None:
-            res_data = self.__ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
+            res_data = self.ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
         contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -1185,7 +1185,7 @@ class GestionnaireCascadePublication:
             type_cdn = cdn['type_cdn']
             if type_cdn in ['ipfs', 'ipfs_gateway', 'mq', 'manuel']:
                 # Rien a faire, le mapping est inclus avec le code ou recu via MQ
-                self.__invalidateur.marquer_ressource_complete(cdn_id, filtre)
+                self.invalidateur_ressources.marquer_ressource_complete(cdn_id, filtre)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
@@ -1273,7 +1273,7 @@ class GestionnaireCascadePublication:
         fuuids = params.get('fuuids')
 
         collection_uuids = params.get('collections') or list()
-        self.__invalidateur.invalider_ressources_sections_fichiers(collection_uuids)
+        self.invalidateur_ressources.invalider_ressources_sections_fichiers(collection_uuids)
         collection_uuids = set(collection_uuids)
 
         # if fuuids is not None:
@@ -1605,11 +1605,11 @@ class GestionnaireCascadePublication:
 
     @property
     def invalidateur(self) -> InvalidateurRessources:
-        return self.__invalidateur
+        return self.invalidateur_ressources
 
     @property
     def ressources(self) -> RessourcesPublication:
-        return self.__ressources_publication
+        return self.ressources_publication
 
     @property
     def document_dao(self):

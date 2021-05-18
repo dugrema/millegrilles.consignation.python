@@ -116,6 +116,24 @@ class StubCascade:
         return self
 
 
+class StubRessourcesPublication:
+
+    def sauvegarder_contenu_gzip(self, *args, **kwargs):
+        res_data = args[0]
+        res_data = res_data.copy()
+        res_data[ConstantesPublication.CHAMP_CONTENU_GZIP] = b'contenu gzip dummy'
+        return res_data
+
+
+class StubInvalidateur:
+
+    def __init__(self):
+        self.marquer_ressource_complete_calls = list()
+
+    def marquer_ressource_complete(self, *args, **kwargs):
+        self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
+
+
 class StubGestionnaireDomaine:
 
     def __init__(self, contexte):
@@ -1773,6 +1791,12 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.gestionnaire_domaine = StubGestionnaireDomaine(self.contexte)
         self.cascade = GestionnaireCascadePublication(self.gestionnaire_domaine)
 
+        self.ressources_publication = StubRessourcesPublication()
+        self.cascade.ressources_publication = self.ressources_publication
+
+        self.invalidateur = StubInvalidateur()
+        self.cascade.invalidateur_ressources = self.invalidateur
+
         # Wire stub http publication
         self.http_publication = HttpPublicationStub(self.cascade, self.contexte.configuration)
         self.cascade.http_publication = self.http_publication
@@ -1900,3 +1924,82 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
             http_pub_args[1]
         )
         self.assertEqual('fichier.bin', http_pub_args[2][0][1][0])
+
+    def test_commande_publier_upload_siteconfiguration(self):
+        self.cascade.commande_publier_upload_siteconfiguration()
+
+    def test_commande_publier_upload_mapping(self):
+        params = {
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'DUMMY/type',
+        }
+
+        # res_data
+        self.contexte.document_dao.valeurs_find.append({})
+
+        # CDN
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-type'
+        })
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY resultat')
+
+        resultat = self.cascade.commande_publier_upload_mapping(params)
+
+        self.assertDictEqual({'ok': True}, resultat)
+
+        call_put_args = self.cascade.http_publication.calls_requests_put[0]['args']
+        self.assertEqual('/publier/repertoire', call_put_args[0])
+        self.assertDictEqual(
+            {'cdns': '[{"type_cdn": "DUMMY-type"}]', 'securite': '2.prive',
+             'identificateur_document': '{"_mg-libelle": "mapping"}'},
+            call_put_args[1]
+        )
+        self.assertEqual('/DUMMY/path', call_put_args[2][0][1][0])
+
+    def test_commande_publier_upload_mapping_ipfs(self):
+        params = {
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'DUMMY/type',
+        }
+
+        # res_data
+        self.contexte.document_dao.valeurs_find.append({})
+
+        # CDN
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_TYPE_CDN: 'ipfs'
+        })
+
+        resultat = self.cascade.commande_publier_upload_mapping(params)
+
+        self.assertDictEqual({'ok': True}, resultat)
+
+        self.assertEqual(0, len(self.cascade.http_publication.calls_requests_put))
+        self.assertEqual(1, len(self.cascade.invalidateur_ressources.marquer_ressource_complete_calls))
+
+    def test_traiter_evenement_publicationfichier(self):
+        self.cascade.traiter_evenement_publicationfichier()
+
+    def test_traiter_evenement_maj_fichier(self):
+        self.cascade.traiter_evenement_maj_fichier()
+
+    def test_trigger_conditionnel_fichiers_completes(self):
+        self.cascade.trigger_conditionnel_fichiers_completes()
+
+    def test_preparer_permission_secret(self):
+        self.cascade.preparer_permission_secret()
+
+    def test_continuer_publication(self):
+        self.cascade.continuer_publication()
+
+    def test_continuer_publication_sections(self):
+        self.cascade.continuer_publication_sections()
+
+    def test_continuer_publication_configuration(self):
+        self.cascade.continuer_publication_configuration()
+
+    def test_continuer_publication_webapps(self):
+        self.cascade.continuer_publication_webapps()
