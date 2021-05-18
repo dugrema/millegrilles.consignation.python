@@ -426,55 +426,18 @@ class RessourcesPublication:
         return mapping_cdns
 
     def maj_ressources_page(self, params: dict):
-        # Charger page
         section_id = params[ConstantesPublication.CHAMP_SECTION_ID]
+
+        # Formatter les parties page, fuuids
         fuuids_info, parties_page_ordonnees, site_id = self.formatter_parties_page(section_id)
+        fuuids = self.formatter_fuuids_page(fuuids_info)
 
         contenu = {
             ConstantesPublication.CHAMP_TYPE_SECTION: ConstantesPublication.LIBVAL_SECTION_PAGE,
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
+            'fuuids': fuuids,
         }
-
-        fuuids = dict()
-        for finfo in fuuids_info.values():
-            fm = finfo.get(ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES)
-            if fm is not None:
-                for fuuid, mimetype in fm.items():
-                    try:
-                        fuuid_info = fuuids[fuuid]
-                    except KeyError:
-                        fuuid_info = dict()
-                        fuuids[fuuid] = fuuid_info
-                    fuuid_info['mimetype'] = mimetype
-
-        # Associer tous les CID (fichiers) aux ressources dans la liste
-        filtre_res_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-            'fuuid': {'$in': list(fuuids.keys())},
-        }
-        projection_res_fichiers = {'fuuid': True, 'public': True, 'cid_public': True, 'cid': True}
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        curseur_res_fichiers = collection_ressources.find(filtre_res_fichiers, projection=projection_res_fichiers)
-        for info_fichier in curseur_res_fichiers:
-            fuuid = info_fichier['fuuid']
-            flag_public = info_fichier.get('public') or False
-            cid_public = info_fichier.get('cid_public')
-            cid = info_fichier.get('cid')
-
-            try:
-                fuuid_info = fuuids[fuuid]
-            except KeyError:
-                fuuid_info = dict()
-                fuuids[fuuid] = fuuid_info
-
-            if flag_public is True and cid_public is not None:
-                fuuid_info['cid'] = cid_public
-                fuuid_info['public'] = True
-            elif cid is not None:
-                fuuid_info['cid'] = cid
-
-        contenu['fuuids'] = fuuids
 
         set_ops = {
             'contenu': contenu,
@@ -504,6 +467,46 @@ class RessourcesPublication:
         self.maj_ressources_fuuids(fuuids_info, sites=[site_id], public=flag_public)
 
         return doc_page
+
+    def formatter_fuuids_page(self, fuuids_info: dict):
+        fuuids = dict()
+        for finfo in fuuids_info.values():
+            fm = finfo.get(ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES)
+            if fm is not None:
+                for fuuid, mimetype in fm.items():
+                    try:
+                        fuuid_info = fuuids[fuuid]
+                    except KeyError:
+                        fuuid_info = dict()
+                        fuuids[fuuid] = fuuid_info
+                    fuuid_info['mimetype'] = mimetype
+        # Associer tous les CID (fichiers) aux ressources dans la liste
+        filtre_res_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': {'$in': list(fuuids.keys())},
+        }
+
+        projection_res_fichiers = {'fuuid': True, 'public': True, 'cid_public': True, 'cid': True}
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        curseur_res_fichiers = collection_ressources.find(filtre_res_fichiers, projection=projection_res_fichiers)
+        for info_fichier in curseur_res_fichiers:
+            fuuid = info_fichier['fuuid']
+            flag_public = info_fichier.get('public') or False
+            cid_public = info_fichier.get('cid_public')
+            cid = info_fichier.get('cid')
+
+            try:
+                fuuid_info = fuuids[fuuid]
+            except KeyError:
+                fuuid_info = dict()
+                fuuids[fuuid] = fuuid_info
+
+            if flag_public is True and cid_public is not None:
+                fuuid_info['cid'] = cid_public
+                fuuid_info['public'] = True
+            elif cid is not None:
+                fuuid_info['cid'] = cid
+        return fuuids
 
     def formatter_parties_page(self, section_id):
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)

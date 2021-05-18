@@ -1186,6 +1186,15 @@ class RessourcesPublicationTest(TestCaseContexte):
 
         self.contexte.document_dao.valeurs_update.append('DUMMY reponse')
 
+        def formatter_parties_page(*args, **kwargs):
+            return {}, 'DUMMY-liste-partiespages', 'DUMMY-site'
+
+        def formatter_fuuids_page(*args, **kwargs):
+            return 'DUMMY-liste-fuuids'
+
+        self.ressources_publication.formatter_parties_page = formatter_parties_page
+        self.ressources_publication.formatter_fuuids_page = formatter_fuuids_page
+
         doc_page = self.ressources_publication.maj_ressources_page(params)
 
         self.assertEqual('DUMMY reponse', doc_page)
@@ -1193,8 +1202,8 @@ class RessourcesPublicationTest(TestCaseContexte):
         calls_find_update = self.contexte.document_dao.calls_find_update[0]['args'][1]
 
         self.assertDictEqual(
-            {'type_section': 'page', 'section_id': 'DUMMY-section', 'parties_pages': [{'partiepage_id': 'DUMMY-pp-1'}, {'partiepage_id': 'DUMMY-pp-2'}], 'fuuids': {'DUMMY-fuuid-1': {}}},
-            calls_find_update['$set']['contenu']
+            {'contenu': {'type_section': 'page', 'section_id': 'DUMMY-section', 'parties_pages': 'DUMMY-liste-partiespages', 'fuuids': 'DUMMY-liste-fuuids'}, 'sites': ['DUMMY-site']},
+            calls_find_update['$set']
         )
 
     def test_formatter_parties_page(self):
@@ -1236,6 +1245,29 @@ class RessourcesPublicationTest(TestCaseContexte):
             {'partiepage_id': 'DUMMY-pp-2', 'media': {'fuuids': ['DUMMY-fuuid-2']}},
             parties_page_ordonnees[1]
         )
+
+    def test_formatter_fuuids_page(self):
+        fuuids_info = {
+            '0': {ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: {
+                'DUMMY-fuuid-1': 'DUMMY-mimetype-1',
+                'DUMMY-fuuid-2': 'DUMMY-mimetype-2',
+            }},
+            '1': {ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: {
+                'DUMMY-fuuid-3': 'DUMMY-mimetype-3',
+            }}
+        }
+
+        self.contexte.document_dao.valeurs_find.append([
+            {'fuuid': 'DUMMY-fuuid-1'},
+            {'fuuid': 'DUMMY-fuuid-2', 'public': True, 'cid_public': 'DUMMY-cid-public'},
+            {'fuuid': 'DUMMY-fuuid-3', 'cid': 'DUMMY-cid'},
+        ])
+
+        fuuids = self.ressources_publication.formatter_fuuids_page(fuuids_info)
+
+        self.assertDictEqual({'mimetype': 'DUMMY-mimetype-1'}, fuuids['DUMMY-fuuid-1'])
+        self.assertDictEqual({'mimetype': 'DUMMY-mimetype-2', 'cid': 'DUMMY-cid-public', 'public': True}, fuuids['DUMMY-fuuid-2'])
+        self.assertDictEqual({'mimetype': 'DUMMY-mimetype-3', 'cid': 'DUMMY-cid'}, fuuids['DUMMY-fuuid-3'])
 
     def test_mapper_cdns_pour_site(self):
         site_id = 'DUMMY-site'
