@@ -129,8 +129,21 @@ class StubInvalidateur:
 
     def __init__(self):
         self.marquer_ressource_complete_calls = list()
+        self.invalider_ressources_sections_fichiers_calls = list()
 
     def marquer_ressource_complete(self, *args, **kwargs):
+        self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
+
+    def invalider_ressources_sections_fichiers(self, *args, **kwargs):
+        self.invalider_ressources_sections_fichiers_calls.append({'args': args, 'kwargs': kwargs})
+
+
+class StubTriggerPublication:
+
+    def __init__(self):
+        self.marquer_ressource_complete_calls = list()
+
+    def emettre_evenements_downstream(self, *args, **kwargs):
         self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
 
 
@@ -1819,6 +1832,9 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.invalidateur = StubInvalidateur()
         self.cascade.invalidateur_ressources = self.invalidateur
 
+        self.trigger = StubTriggerPublication()
+        self.cascade.triggers_publication = self.trigger
+
         # Wire stub http publication
         self.http_publication = HttpPublicationStub(self.cascade, self.contexte.configuration)
         self.cascade.http_publication = self.http_publication
@@ -2041,13 +2057,100 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.assertEqual(1, len(self.cascade.invalidateur_ressources.marquer_ressource_complete_calls))
 
     def test_traiter_evenement_publicationfichier(self):
-        self.cascade.traiter_evenement_publicationfichier()
+        params = {
+            'identificateur_document': {'_id': 'DUMMY-id'},
+            # 'cdn_ids': [],
+            'cdn_id': 'DUMMY-cdn',
+            'complete': True,
+            'cid': 'DUMMY-cid',
+        }
+
+        calls_continuer = list()
+
+        def continuer_publication(*args, **kwargs):
+            calls_continuer.append(True)
+
+        self.cascade.continuer_publication = continuer_publication
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY resultat')
+
+        self.cascade.traiter_evenement_publicationfichier(params)
+
+        calls_update = self.contexte.document_dao.calls_update
+        args_update = calls_update[0]['args']
+
+        self.assertTrue(calls_continuer[0])
+        self.assertDictEqual({'_mg-libelle': 'fichier', '_id': 'DUMMY-id'}, args_update[0])
+        self.assertDictEqual(
+            {'$currentDate': {'_mg-derniere-modification': True, 'ipfs_publication': True},
+             '$set': {'cid': 'DUMMY-cid'},
+             '$unset': {'distribution_encours.DUMMY-cdn': True, 'distribution_progres.DUMMY-cdn': True,
+                        'distribution_erreur.DUMMY-cdn': True}, '$addToSet': {'distribution_complete': 'DUMMY-cdn'}},
+            args_update[1]
+        )
+
+        marquer_ressource_complete_calls = self.trigger.marquer_ressource_complete_calls
+        self.assertEqual(1, len(marquer_ressource_complete_calls))
 
     def test_traiter_evenement_maj_fichier(self):
-        self.cascade.traiter_evenement_maj_fichier()
+        params = {
+            'colections': ['DUMMY-uuid-col']
+        }
+        self.cascade.traiter_evenement_maj_fichier(params)
 
-    def test_trigger_conditionnel_fichiers_completes(self):
-        self.cascade.trigger_conditionnel_fichiers_completes()
+        self.assertEqual(1, len(self.invalidateur.invalider_ressources_sections_fichiers_calls))
+
+    def test_trigger_conditionnel_fichiers_completes_completefalse(self):
+        params = {
+            'complete': False,
+            # 'err': None,
+            'identificateur_document': {'_id': 'DUMMY-doc'}
+        }
+        self.cascade.trigger_conditionnel_fichiers_completes(params)
+
+    def test_trigger_conditionnel_fichiers_completes_completetrue(self):
+        params = {
+            'complete': True,
+            'identificateur_document': {'_id': 'DUMMY-doc'}
+        }
+        self.cascade.trigger_conditionnel_fichiers_completes(params)
+
+    def test_trigger_conditionnel_fichiers_completes_fuuid(self):
+        params = {
+            'complete': True,
+            'identificateur_document': {'fuuid': 'DUMMY-doc'}
+        }
+
+        self.contexte.document_dao.valeurs_aggregate.append([{'en_cours': 0}])
+
+        calls_continuer = list()
+        def continuer_publication(*args, **kwargs):
+            calls_continuer.append(True)
+
+        self.cascade.continuer_publication = continuer_publication
+
+        self.cascade.trigger_conditionnel_fichiers_completes(params)
+
+        self.assertTrue(calls_continuer[0])
+
+    def test_trigger_conditionnel_fichiers_completes_fuuid_encours(self):
+        params = {
+            'complete': True,
+            'identificateur_document': {'fuuid': 'DUMMY-doc'}
+        }
+
+        self.contexte.document_dao.valeurs_aggregate.append([{'en_cours': 1}])
+
+        calls_continuer = list()
+
+        def continuer_publication(*args, **kwargs):
+            calls_continuer.append(True)
+
+        self.cascade.continuer_publication = continuer_publication
+
+        self.cascade.trigger_conditionnel_fichiers_completes(params)
+
+        self.assertEqual(0, len(calls_continuer))
 
     def test_preparer_permission_secret(self):
         secret_chiffre = multibase.encode('base64', b'un secret')

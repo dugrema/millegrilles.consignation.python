@@ -1030,7 +1030,7 @@ class GestionnaireCascadePublication:
         self.__gestionnaire_domaine = gestionnaire_domaine
 
         self.ressources_publication = RessourcesPublication(self)
-        self.__triggers_publication = TriggersPublication(self)
+        self.triggers_publication = TriggersPublication(self)
         self.invalidateur_ressources = InvalidateurRessources(self)
         self.http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
 
@@ -1261,16 +1261,16 @@ class GestionnaireCascadePublication:
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_one(filtre, ops)
 
-        self.__triggers_publication.emettre_evenements_downstream(params)
+        self.triggers_publication.emettre_evenements_downstream(params)
 
         # Voir si on lance un trigger de publication de sections
         # self.trigger_conditionnel_fichiers_completes(params)
         self.continuer_publication()
 
-    def traiter_evenement_maj_fichier(self, params: dict, routing_key: str):
+    def traiter_evenement_maj_fichier(self, params: dict):
         # Verifier si on a une reference au fichier ou une collection avec le fichier
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        fuuids = params.get('fuuids')
+        # collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        # fuuids = params.get('fuuids')
 
         collection_uuids = params.get('collections') or list()
         self.invalidateur_ressources.invalider_ressources_sections_fichiers(collection_uuids)
@@ -1384,12 +1384,12 @@ class GestionnaireCascadePublication:
         if params is None:
             params = dict()
 
-        compteur_collections_fichiers = self.__triggers_publication.trigger_traitement_collections_fichiers()
+        compteur_collections_fichiers = self.triggers_publication.trigger_traitement_collections_fichiers()
         if compteur_collections_fichiers > 0:
             self.__logger.info("Preparation des collections de fichiers, %d collections en traitement" % compteur_collections_fichiers)
             return
 
-        compteur_fichiers_publies = self.__triggers_publication.trigger_publication_fichiers()
+        compteur_fichiers_publies = self.triggers_publication.trigger_publication_fichiers()
         if compteur_fichiers_publies > 0:
             self.__logger.info("Trigger publication fichiers, %d fichiers a publier" % compteur_fichiers_publies)
             return
@@ -1472,7 +1472,7 @@ class GestionnaireCascadePublication:
         Publie les donnes du site (repertoire data/ avec les sections pages et collections de fichiers).
         :return:
         """
-        liste_cdns = self.__triggers_publication.preparer_sitesparcdn()
+        liste_cdns = self.triggers_publication.preparer_sitesparcdn()
         cdn_ids = [c['cdn_id'] for c in liste_cdns]
 
         compteurs_commandes_emises = 0
@@ -1490,7 +1490,7 @@ class GestionnaireCascadePublication:
             # Publier pages
             # repertoire: data/pages
             for site_id in liste_sites:
-                pages_publies = self.__triggers_publication.emettre_publier_uploadpages(cdn_id, site_id)
+                pages_publies = self.triggers_publication.emettre_publier_uploadpages(cdn_id, site_id)
                 compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
 
             # Publier forums
@@ -1503,7 +1503,7 @@ class GestionnaireCascadePublication:
         Publie la configuration d'un site
         :return:
         """
-        liste_cdns = self.__triggers_publication.preparer_sitesparcdn()
+        liste_cdns = self.triggers_publication.preparer_sitesparcdn()
         compteur_commandes_emises = 0
         for cdn in liste_cdns:
             cdn_id = cdn['cdn_id']
@@ -1513,10 +1513,10 @@ class GestionnaireCascadePublication:
             # fichiers: /index.json et /certificat.pem
             for site_id in liste_sites:
                 # self.marquer_ressource_encours(cdn_id, filtre_site)
-                commandes_emises = self.__triggers_publication.emettre_publier_configuration(cdn_id, site_id)
+                commandes_emises = self.triggers_publication.emettre_publier_configuration(cdn_id, site_id)
                 compteur_commandes_emises = compteur_commandes_emises + commandes_emises
 
-            compteur = self.__triggers_publication.emettre_publier_mapping(cdn_id)
+            compteur = self.triggers_publication.emettre_publier_mapping(cdn_id)
             compteur_commandes_emises = compteur_commandes_emises + compteur
 
         return compteur_commandes_emises
@@ -1526,7 +1526,7 @@ class GestionnaireCascadePublication:
         Emet les commandes de publication du code des webapps (vitrine, place)
         :return:
         """
-        liste_cdns = self.__triggers_publication.preparer_sitesparcdn()
+        liste_cdns = self.triggers_publication.preparer_sitesparcdn()
 
         collection_config = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1554,49 +1554,8 @@ class GestionnaireCascadePublication:
                 compteurs_commandes_emises = compteurs_commandes_emises + 1
                 continue
 
-            compteur = self.__triggers_publication.emettre_publier_webapps(cdn_id)
+            compteur = self.triggers_publication.emettre_publier_webapps(cdn_id)
             compteurs_commandes_emises = compteurs_commandes_emises + compteur
-
-            # if type_cdn in ['ipfs', 'ipfs_gateway']:
-            #     domaine_action = 'commande.fichiers.publierVitrineIpfs'
-            #     ipns_id = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_ID)
-            #     cle_chiffree = doc_webapps.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
-            #     if ipns_id is not None and cle_chiffree is not None:
-            #         permission = self.preparer_permission_secretawss3(cle_chiffree)
-            #         commande = {
-            #             'identificateur_document': filtre,
-            #             'ipns_key': cle_chiffree,
-            #             'ipns_key_name': 'vitrine',
-            #             'permission': permission,
-            #         }
-            #         commande.update(cdn)
-            #     else:
-            #         processus = "millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine"
-            #         params = {'cdn_id': cdn['cdn_id']}
-            #         self.demarrer_processus(processus, params)
-            #         continue
-            # elif type_cdn == 'sftp':
-            #     domaine_action = 'commande.fichiers.publierVitrineSftp'
-            #     commande = {
-            #         'identificateur_document': filtre,
-            #     }
-            #     commande.update(cdn)
-            # elif type_cdn == 'awss3':
-            #     permission = self.preparer_permission_secretawss3(cdn[ConstantesPublication.CHAMP_AWSS3_SECRETACCESSKEY_CHIFFRE])
-            #     domaine_action = 'commande.fichiers.publierVitrineAwsS3'
-            #     commande = {
-            #         'identificateur_document': filtre,
-            #         'permission': permission,
-            #     }
-            #     commande.update(cdn)
-            # else:
-            #     # Type non supporte ou rien a faire
-            #     continue
-
-            # self.generateur_transactions.transmettre_commande(commande, domaine_action)
-            # self.marquer_ressource_encours(cdn_id, filtre, upsert=True)
-
-            # compteurs_commandes_emises = compteurs_commandes_emises + 1
 
         return compteurs_commandes_emises
 

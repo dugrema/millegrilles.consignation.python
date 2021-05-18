@@ -13,19 +13,6 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.PublicationRessources import GestionnaireCascadePublication
 
 
-# # Operations pour invalider une ressource
-# UNSET_PUBLICATION_RESOURCES = {
-#     ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
-#     ConstantesPublication.CHAMP_DISTRIBUTION_PUBLIC_COMPLETE: True,
-#     ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True,
-#     ConstantesPublication.CHAMP_DISTRIBUTION_MAJ: True,
-#     # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
-#     # ConstantesPublication.CHAMP_CONTENU_GZIP: True,
-#     # ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
-#     ConstantesPublication.CHAMP_DATE_SIGNATURE: True,
-# }
-
-
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
