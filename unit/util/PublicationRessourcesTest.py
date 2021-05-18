@@ -142,9 +142,22 @@ class StubTriggerPublication:
 
     def __init__(self):
         self.marquer_ressource_complete_calls = list()
+        self.preparer_sitesparcdn_calls = list()
+        self.emettre_publier_webapps_calls = list()
+
+        self.sites_par_cdn = list()
+        self.compteur_publier_webapps = 0
 
     def emettre_evenements_downstream(self, *args, **kwargs):
         self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
+
+    def preparer_sitesparcdn(self, *args, **kwargs):
+        self.preparer_sitesparcdn_calls.append({'args': args, 'kwargs': kwargs})
+        return self.sites_par_cdn.pop()
+
+    def emettre_publier_webapps(self, *args, **kwargs):
+        self.emettre_publier_webapps_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_publier_webapps
 
 
 class StubGestionnaireDomaine:
@@ -2171,4 +2184,55 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.cascade.continuer_publication_configuration()
 
     def test_continuer_publication_webapps(self):
-        self.cascade.continuer_publication_webapps()
+
+        # res
+        self.contexte.document_dao.valeurs_find.append({
+
+        })
+
+        self.cascade.triggers_publication.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn'
+        }])
+
+        self.trigger.compteur_publier_webapps = 1
+
+        compteur = self.cascade.continuer_publication_webapps()
+
+        self.assertEqual(1, compteur)
+        self.assertEqual(1, len(self.trigger.emettre_publier_webapps_calls))
+
+    def test_continuer_publication_webapps_complete(self):
+
+        # res
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: ['DUMMY-cdn']
+        })
+
+        self.cascade.triggers_publication.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn'
+        }])
+
+        self.trigger.compteur_publier_webapps = 1
+
+        compteur = self.cascade.continuer_publication_webapps()
+
+        self.assertEqual(0, compteur)
+        self.assertEqual(0, len(self.trigger.emettre_publier_webapps_calls))
+
+    def test_continuer_publication_webapps_progres(self):
+
+        # res
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'DUMMY-cdn': True}
+        })
+
+        self.cascade.triggers_publication.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn'
+        }])
+
+        self.trigger.compteur_publier_webapps = 1
+
+        compteur = self.cascade.continuer_publication_webapps()
+
+        self.assertEqual(1, compteur)
+        self.assertEqual(0, len(self.trigger.emettre_publier_webapps_calls))

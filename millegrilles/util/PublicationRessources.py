@@ -1533,7 +1533,7 @@ class GestionnaireCascadePublication:
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS}
 
-        doc_webapps = collection_config.find_one(filtre) or dict()
+        # doc_webapps = collection_config.find_one(filtre) or dict()
         res_webapps = collection_ressources.find_one(filtre) or dict()
         distribution_progres = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES) or dict()
         distribution_complete = res_webapps.get(ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE) or list()
