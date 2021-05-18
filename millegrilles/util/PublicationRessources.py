@@ -301,101 +301,30 @@ class RessourcesPublication:
             if key in champs_site:
                 contenu[key] = value
 
-        # Ajouter tous les CDNs pour ce site
-        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
-        liste_cdn_ids = doc_site['listeCdn']
-        filtre_cdns = {'cdn_id': {'$in': liste_cdn_ids}, 'active': True}
-        curseur_cdns = collection_cdns.find(filtre_cdns)
-        mapping_cdns = dict()
-        for cdn in curseur_cdns:
-            mapping = {
-                'type_cdn': cdn['type_cdn'],
-                'cdn_id': cdn['cdn_id'],
-            }
-            access_point_url = cdn.get('accesPointUrl')
-            if access_point_url is not None:
-                mapping['access_point_url'] = access_point_url
-
-            mapping_cdns[cdn['cdn_id']] = mapping
-
-        # Creer une liste ordonnee des CDNs
-        contenu['cdns'] = [mapping_cdns[cdn_id] for cdn_id in liste_cdn_ids if cdn_id in mapping_cdns.keys()]
+        # Ajouter tous les CDNs pour ce site, en ordre de preference
+        contenu['cdns'] = self.mapper_cdns_pour_site(site_id)
 
         # Aller chercher references des sections
         # Chaque section est un fichier accessible via son uuid
         liste_sections_id = doc_site.get(ConstantesPublication.CHAMP_LISTE_SECTIONS)
         if liste_sections_id is not None:
-            filtre_sections = {
-                ConstantesPublication.CHAMP_SECTION_ID: {'$in': liste_sections_id}
-            }
-            collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-            curseur_sections = collection_sections.find(filtre_sections)
-            sections_dict = dict()
-            for s in curseur_sections:
-                sections_dict[s[ConstantesPublication.CHAMP_SECTION_ID]] = s
+            contenu[ConstantesPublication.CHAMP_LISTE_SECTIONS] = self.mapper_sections_pour_site(liste_sections_id)
 
-            # Ajouter sections en ordre
-            sections_liste = list()
-            contenu[ConstantesPublication.CHAMP_LISTE_SECTIONS] = sections_liste
-            uuid_to_map = set()  # Conserver tous les uuid a mapper
-            for section_id in doc_site[ConstantesPublication.CHAMP_LISTE_SECTIONS]:
-                doc_section = sections_dict[section_id]
-                type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
-
-                section = {
-                    ConstantesPublication.CHAMP_TYPE_SECTION: type_section,
-                    ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
-                }
-
-                if type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
-                    uuid_collections = doc_section.get(ConstantesPublication.CHAMP_COLLECTIONS)
-                    if uuid_collections is not None:
-                        section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
-                        uuid_to_map.update(uuid_collections)
-                else:
-                    section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
-                    uuid_to_map.add(section_id)
-
-                sections_liste.append(section)
-
-        set_ops = {
-            'contenu': contenu,
-            'sites': [site_id],
-        }
-
-        # Aller chercher les valeurs ipns pour tous les champs uuid (si applicable)
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        filtre_res_ipns = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                ConstantesPublication.LIBVAL_SECTION_PAGE,
-                ConstantesPublication.LIBVAL_SECTION_FORUM,
-                ConstantesPublication.LIBVAL_SITE_CONFIG,
-            ]},
-            'sites': {'$all': [site_id]},
-            'cid': {'$exists': True},
-        }
-        projection = {'cid': True, 'uuid': True, 'section_id': True, Constantes.DOCUMENT_INFODOC_LIBELLE: True}
-        curseur_res_cid = collection_ressources.find(filtre_res_ipns, projection=projection)
-        uuid_to_ipfs = dict()
-        for elem in curseur_res_cid:
-            type_res = elem[Constantes.DOCUMENT_INFODOC_LIBELLE]
-            cid = elem['cid']
-            if type_res == ConstantesPublication.LIBVAL_SITE_CONFIG:
-                # Le site est conserve separement (meme uuid que sa collection de fichiers)
-                contenu['cid'] = cid
-            else:
-                id_elem = elem.get('uuid') or elem.get('section_id')
-                uuid_to_ipfs[id_elem] = cid
-        contenu['ipfs_map'] = uuid_to_ipfs
-
-        # contenu = self.generateur_transactions.preparer_enveloppe(
-        #     contenu, 'Publication.' + ConstantesPublication.LIBVAL_SITE_CONFIG, ajouter_certificats=True)
+        # Aller chercher les valeurs ipfs (CID) pour tous les champs uuid (si applicable)
+        cid_site, uuid_to_ipfs = self.mapper_site_ipfs(site_id)
+        if cid_site is not None:
+            contenu['cid'] = cid_site
+        if len(uuid_to_ipfs) > 0:
+            contenu['ipfs_map'] = uuid_to_ipfs
 
         set_on_insert = {
             ConstantesPublication.CHAMP_SITE_ID: site_id,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_ops = {
+            'contenu': contenu,
+            'sites': [site_id],
         }
         ops = {
             '$set': set_ops,
@@ -413,57 +342,99 @@ class RessourcesPublication:
 
         return doc_site
 
+    def mapper_site_ipfs(self, site_id):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_res_ipns = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                ConstantesPublication.LIBVAL_SECTION_PAGE,
+                ConstantesPublication.LIBVAL_SECTION_FORUM,
+                ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ]},
+            'sites': {'$all': [site_id]},
+            'cid': {'$exists': True},
+        }
+        projection = {'cid': True, 'uuid': True, 'section_id': True, Constantes.DOCUMENT_INFODOC_LIBELLE: True}
+        curseur_res_cid = collection_ressources.find(filtre_res_ipns, projection=projection)
+        uuid_to_ipfs = dict()
+        cid_site = None
+        for elem in curseur_res_cid:
+            type_res = elem[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            cid = elem['cid']
+            if type_res == ConstantesPublication.LIBVAL_SITE_CONFIG:
+                # Le site est conserve separement (meme uuid que sa collection de fichiers)
+                cid_site = cid
+            else:
+                id_elem = elem.get('uuid') or elem.get('section_id')
+                uuid_to_ipfs[id_elem] = cid
+        return cid_site, uuid_to_ipfs
+
+    def mapper_sections_pour_site(self, liste_sections_id):
+        sections_liste = list()
+        filtre_sections = {
+            ConstantesPublication.CHAMP_SECTION_ID: {'$in': liste_sections_id}
+        }
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        curseur_sections = collection_sections.find(filtre_sections)
+        sections_dict = dict()
+        for s in curseur_sections:
+            sections_dict[s[ConstantesPublication.CHAMP_SECTION_ID]] = s
+        # Ajouter sections en ordre
+        uuid_to_map = set()  # Conserver tous les uuid a mapper
+        for section_id in liste_sections_id:
+            doc_section = sections_dict[section_id]
+            type_section = doc_section[ConstantesPublication.CHAMP_TYPE_SECTION]
+
+            section = {
+                ConstantesPublication.CHAMP_TYPE_SECTION: type_section,
+                ConstantesPublication.CHAMP_ENTETE: doc_section.get(ConstantesPublication.CHAMP_ENTETE),
+            }
+
+            if type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+                                ConstantesPublication.LIBVAL_SECTION_ALBUM]:
+                uuid_collections = doc_section.get(ConstantesPublication.CHAMP_COLLECTIONS)
+                if uuid_collections is not None:
+                    section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
+                    uuid_to_map.update(uuid_collections)
+            else:
+                section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
+                uuid_to_map.add(section_id)
+
+            sections_liste.append(section)
+        return sections_liste
+
+    def mapper_cdns_pour_site(self, site_id: str):
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        doc_site = collection_sites.find_one({ConstantesPublication.CHAMP_SITE_ID: site_id})
+        liste_cdn_ids = doc_site['listeCdn']
+
+        collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
+        filtre_cdns = {'cdn_id': {'$in': liste_cdn_ids}, 'active': True}
+        curseur_cdns = collection_cdns.find(filtre_cdns)
+        mapping_cdns = dict()
+        for cdn in curseur_cdns:
+            mapping = {
+                'type_cdn': cdn['type_cdn'],
+                'cdn_id': cdn['cdn_id'],
+            }
+            access_point_url = cdn.get('accesPointUrl')
+            if access_point_url is not None:
+                mapping['access_point_url'] = access_point_url
+
+            mapping_cdns[cdn['cdn_id']] = mapping
+        mapping_cdns = [mapping_cdns[cdn_id] for cdn_id in liste_cdn_ids if cdn_id in mapping_cdns.keys()]
+        return mapping_cdns
+
     def maj_ressources_page(self, params: dict):
         # Charger page
         section_id = params[ConstantesPublication.CHAMP_SECTION_ID]
-        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        filtre = {
-            ConstantesPublication.CHAMP_SECTION_ID: section_id
-        }
-        section = collection_sections.find_one(filtre)
-        site_id = section[ConstantesPublication.CHAMP_SITE_ID]
-
-        parties_page_ids = section.get(ConstantesPublication.CHAMP_PARTIES_PAGES)
-        parties_page_ordonnees = list()
-        fuuids_info = dict()
-        if parties_page_ids is not None:
-            collection_partiespage = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
-            filtre_partiespage = {
-                ConstantesPublication.CHAMP_PARTIEPAGE_ID: {'$in': parties_page_ids}
-            }
-            curseur_parties = collection_partiespage.find(filtre_partiespage)
-
-            parties_page = dict()
-            for p in curseur_parties:
-                pp = dict()
-                for key, value in p.items():
-                    if not key.startswith('_'):
-                        pp[key] = value
-                if p.get('media'):
-                    fuuids_media = p['media'].get('fuuids')
-                    for fm in fuuids_media:
-                        fuuids_info[fm] = p['media']
-                elif p.get('colonnes'):
-                    for c in p['colonnes']:
-                        media = c.get('media')
-                        if media is not None:
-                            fuuids_media = media.get('fuuids')
-                            for fm in fuuids_media:
-                                fuuids_info[fm] = media
-
-                pp_id = pp[ConstantesPublication.CHAMP_PARTIEPAGE_ID]
-                parties_page[pp_id] = pp
-
-            for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
-                parties_page_ordonnees.append(parties_page[pp_id])
+        fuuids_info, parties_page_ordonnees, site_id = self.formatter_parties_page(section_id)
 
         contenu = {
             ConstantesPublication.CHAMP_TYPE_SECTION: ConstantesPublication.LIBVAL_SECTION_PAGE,
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
         }
-        # contenu = self.generateur_transactions.preparer_enveloppe(
-        #     contenu, 'Publication.' + ConstantesPublication.LIBVAL_PAGE, ajouter_certificats=True)
 
         fuuids = dict()
         for finfo in fuuids_info.values():
@@ -481,10 +452,6 @@ class RessourcesPublication:
         filtre_res_fichiers = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
             'fuuid': {'$in': list(fuuids.keys())},
-            # '$or': {
-            #     'cid_public': {'$exists': True},
-            #     'cid': {'$exists': True},
-            # }
         }
         projection_res_fichiers = {'fuuid': True, 'public': True, 'cid_public': True, 'cid': True}
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -512,8 +479,6 @@ class RessourcesPublication:
         set_ops = {
             'contenu': contenu,
             'sites': [site_id],
-            # 'fuuids': list(fuuids_info.keys()),
-            # ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES: fuuid_mimetypes,
         }
         set_on_insert = {
             ConstantesPublication.CHAMP_SECTION_ID: section_id,
@@ -534,24 +499,56 @@ class RessourcesPublication:
             filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Ajouter les fichiers requis comme ressource pour le site
-        doc_site = self.__cascade.gestionnaire.get_site(site_id)
+        doc_site = self.__cascade.get_site(site_id)
         flag_public = doc_site['securite'] == Constantes.SECURITE_PUBLIC
         self.maj_ressources_fuuids(fuuids_info, sites=[site_id], public=flag_public)
 
-        # Transmettre commande pour s'assurer que les fuuid sont inseres dans la collection du site
-        # uuid_collection = site_id  # Meme ID par definition
-        # domaine_action_associer_collection = 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION
-        # for fuuid in fuuids_info.keys():
-        #     commande_inserer = {
-        #         ConstantesGrosFichiers.CHAMP_UUID_COLLECTION: uuid_collection,
-        #         ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
-        #     }
-        #     self.generateur_transactions.transmettre_commande(commande_inserer, domaine_action_associer_collection)
-
-        # Trigger pour upload de tout le site (commencer par les fichiers)
-        # self.continuer_publication()
-
         return doc_page
+
+    def formatter_parties_page(self, section_id):
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+
+        filtre = {
+            ConstantesPublication.CHAMP_SECTION_ID: section_id
+        }
+
+        section = collection_sections.find_one(filtre)
+        site_id = section[ConstantesPublication.CHAMP_SITE_ID]
+        parties_page_ordonnees = list()
+        fuuids_info = dict()
+
+        parties_page_ids = section.get(ConstantesPublication.CHAMP_PARTIES_PAGES)
+        if parties_page_ids is not None:
+            collection_partiespage = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
+            filtre_partiespage = {
+                ConstantesPublication.CHAMP_PARTIEPAGE_ID: {'$in': parties_page_ids}
+            }
+            curseur_parties = collection_partiespage.find(filtre_partiespage)
+            parties_page = dict()
+            for p in curseur_parties:
+                pp_id = p[ConstantesPublication.CHAMP_PARTIEPAGE_ID]
+                pp = dict()
+                for key, value in p.items():
+                    if not key.startswith('_'):
+                        pp[key] = value
+                if p.get('media'):
+                    fuuids_media = p['media'].get('fuuids')
+                    for fm in fuuids_media:
+                        fuuids_info[fm] = p['media']
+                elif p.get('colonnes'):
+                    for c in p['colonnes']:
+                        media = c.get('media')
+                        if media is not None:
+                            fuuids_media = media.get('fuuids')
+                            for fm in fuuids_media:
+                                fuuids_info[fm] = media
+
+                parties_page[pp_id] = pp
+
+            for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
+                parties_page_ordonnees.append(parties_page[pp_id])
+
+        return fuuids_info, parties_page_ordonnees, site_id
 
     def maj_ressources_fuuids(self, fuuids_info: dict, sites: list = None, public=False, maj_section=True):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)

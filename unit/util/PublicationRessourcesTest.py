@@ -1078,17 +1078,6 @@ class RessourcesPublicationTest(TestCaseContexte):
 
         self.ressources_publication = RessourcesPublication(self.cascade)
 
-        # self.securite = Constantes.SECURITE_PUBLIC
-        # self.cdn = {
-        #     ConstantesPublication.CHAMP_CDN_ID: 'CDN-1',
-        #     ConstantesPublication.CHAMP_TYPE_CDN: 'CDN DUMMY',
-        # }
-        #
-        # self.res_data = {
-        #     Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY',
-        #     ConstantesPublication.CHAMP_SECTION_ID: 'abcd-1234',
-        # }
-
     def test_maj_ressource_mapping(self):
         self.contexte.document_dao.valeurs_find.append([])
         self.contexte.document_dao.valeurs_find.append({})
@@ -1149,10 +1138,167 @@ class RessourcesPublicationTest(TestCaseContexte):
         )
 
     def test_maj_ressources_site(self):
-        self.ressources_publication.maj_ressources_site()
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site'
+        })
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY resultat')
+
+        # Mocks
+        def mapper_cdns_pour_site(*args, **kwargs):
+            return [{'type_cdn': 'DUMMY-type', 'cdn_id': 'DUMMY-cdn', 'access_point_url': 'https://DUMMY'}]
+
+        def mapper_site_ipfs(*args, **kwargs):
+            return 'DUMMY-cid', {'DUMMY-uuid': 'DUMMY-cid-1', 'DUMMY-section': 'DUYYM-cid-2'}
+
+        self.ressources_publication.mapper_cdns_pour_site = mapper_cdns_pour_site
+        self.ressources_publication.mapper_site_ipfs = mapper_site_ipfs
+
+        params = {ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site'}
+
+        doc_site = self.ressources_publication.maj_ressources_site(params)
+        self.assertEqual('DUMMY resultat', doc_site)
+
+        find_update = self.contexte.document_dao.calls_find_update[0]['args'][1]
+
+        self.assertDictEqual(
+            {'distribution_complete': True, 'distribution_public_complete': True, 'distribution_erreur': True,
+             'distribution_maj': True, 'date_signature': True},
+            find_update['$unset']
+        )
+        self.assertDictEqual(
+            {'contenu': {'type_section': 'siteconfig', 'site_id': 'DUMMY-site', 'cdns': [
+                {'type_cdn': 'DUMMY-type', 'cdn_id': 'DUMMY-cdn', 'access_point_url': 'https://DUMMY'}],
+                         'cid': 'DUMMY-cid', 'ipfs_map': {'DUMMY-uuid': 'DUMMY-cid-1', 'DUMMY-section': 'DUYYM-cid-2'}},
+             'sites': ['DUMMY-site']},
+            find_update['$set']
+        )
 
     def test_maj_ressources_page(self):
-        self.ressources_publication.maj_ressources_page()
+        params = {ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section'}
+
+        self.contexte.document_dao.valeurs_find.append([
+            {'fuuid': 'DUMMY-fuuid-1'},
+        ])
+
+        self.cascade.site['securite'] = Constantes.SECURITE_PUBLIC
+
+        self.contexte.document_dao.valeurs_update.append('DUMMY reponse')
+
+        doc_page = self.ressources_publication.maj_ressources_page(params)
+
+        self.assertEqual('DUMMY reponse', doc_page)
+
+        calls_find_update = self.contexte.document_dao.calls_find_update[0]['args'][1]
+
+        self.assertDictEqual(
+            {'type_section': 'page', 'section_id': 'DUMMY-section', 'parties_pages': [{'partiepage_id': 'DUMMY-pp-1'}, {'partiepage_id': 'DUMMY-pp-2'}], 'fuuids': {'DUMMY-fuuid-1': {}}},
+            calls_find_update['$set']['contenu']
+        )
+
+    def test_formatter_parties_page(self):
+        section_id = 'DUMMY-section'
+
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section',
+            ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site',
+            ConstantesPublication.CHAMP_PARTIES_PAGES: ['DUMMY-pp-1', 'DUMMY-pp-2']
+        })
+
+        self.contexte.document_dao.valeurs_find.append([
+            {
+                ConstantesPublication.CHAMP_PARTIEPAGE_ID: 'DUMMY-pp-1',
+                'colonnes': [
+                    {'media': {'fuuids': ['DUMMY-fuuid-1']}}
+                ]
+            },
+            {
+                ConstantesPublication.CHAMP_PARTIEPAGE_ID: 'DUMMY-pp-2',
+                'media': {'fuuids': ['DUMMY-fuuid-2']}
+            },
+        ])
+
+        fuuids_info, parties_page_ordonnees, site_id = self.ressources_publication.formatter_parties_page(section_id)
+
+        self.assertEqual('DUMMY-section', section_id)
+
+        self.assertDictEqual(
+            {'DUMMY-fuuid-1': {'fuuids': ['DUMMY-fuuid-1']}, 'DUMMY-fuuid-2': {'fuuids': ['DUMMY-fuuid-2']}},
+            fuuids_info
+        )
+
+        self.assertDictEqual(
+            {'partiepage_id': 'DUMMY-pp-1', 'colonnes': [{'media': {'fuuids': ['DUMMY-fuuid-1']}}]},
+            parties_page_ordonnees[0]
+        )
+        self.assertDictEqual(
+            {'partiepage_id': 'DUMMY-pp-2', 'media': {'fuuids': ['DUMMY-fuuid-2']}},
+            parties_page_ordonnees[1]
+        )
+
+    def test_mapper_cdns_pour_site(self):
+        site_id = 'DUMMY-site'
+
+        self.contexte.document_dao.valeurs_find.append({
+            'listeCdn': ['DUMMY-cdn']
+        })
+        self.contexte.document_dao.valeurs_find.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-type',
+            'accesPointUrl': 'https://DUMMY',
+        }])
+
+        mapping_cdns = self.ressources_publication.mapper_cdns_pour_site(site_id)
+
+        self.assertDictEqual(
+            {'type_cdn': 'DUMMY-type', 'cdn_id': 'DUMMY-cdn', 'access_point_url': 'https://DUMMY'},
+            mapping_cdns[0]
+        )
+
+    def test_mapper_site_ipfs_cidsite(self):
+        site_id = 'DUMMY-site'
+
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_CID: 'DUMMY-cid',
+        }])
+
+        cid_site, uuid_to_ipfs = self.ressources_publication.mapper_site_ipfs(site_id)
+
+        self.assertEqual('DUMMY-cid', cid_site)
+        self.assertEqual(0, len(uuid_to_ipfs))
+        pass
+
+    def test_mapper_site_ipfs_cid_uuids_byuuid(self):
+        site_id = 'DUMMY-site'
+
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY-type',
+            'uuid': 'DUMMY-uuid',
+            ConstantesPublication.CHAMP_CID: 'DUMMY-cid',
+        }])
+
+        cid_site, uuid_to_ipfs = self.ressources_publication.mapper_site_ipfs(site_id)
+
+        self.assertIsNone(cid_site)
+        self.assertEqual(1, len(uuid_to_ipfs))
+        self.assertDictEqual({'DUMMY-uuid': 'DUMMY-cid'}, uuid_to_ipfs)
+
+    def test_mapper_site_ipfs_cid_uuids_bysectionid(self):
+        site_id = 'DUMMY-site'
+
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY-type',
+            'section_id': 'DUMMY-section',
+            ConstantesPublication.CHAMP_CID: 'DUMMY-cid',
+        }])
+
+        cid_site, uuid_to_ipfs = self.ressources_publication.mapper_site_ipfs(site_id)
+
+        self.assertIsNone(cid_site)
+        self.assertEqual(1, len(uuid_to_ipfs))
+        self.assertDictEqual({'DUMMY-section': 'DUMMY-cid'}, uuid_to_ipfs)
 
     def test_maj_ressources_fuuids_vide(self):
         fuuids_info = {}
@@ -1401,26 +1547,24 @@ class RessourcesPublicationTest(TestCaseContexte):
 
         self.contexte.document_dao.valeurs_find.append({})
 
-        # Site
-        self.contexte.document_dao.valeurs_find.append({
-            ConstantesPublication.CHAMP_LISTE_CDNS: []
-        })
+        calls = list()
 
-        self.contexte.document_dao.valeurs_find.append({})  # CDNs
-        self.contexte.document_dao.valeurs_find.append([])  # CIDS
+        def maj_ressources_site(*args, **kwargs):
+            calls.append('maj_ressources_site')
+            return {}
 
-        self.contexte.document_dao.valeurs_update.append({'contenu': {'_id': 'DUMMY-contenu'}})  # Site
+        def sauvegarder_contenu_gzip(*args, **kwargs):
+            calls.append('sauvegarder_contenu_gzip')
+            return 'reponse DUMMY'
 
-        self.contexte.document_dao.valeurs_update.append('reponse DUMMY')  # Site
+        self.ressources_publication.maj_ressources_site = maj_ressources_site
+        self.ressources_publication.sauvegarder_contenu_gzip = sauvegarder_contenu_gzip
 
         res_site = self.ressources_publication.preparer_siteconfig_publication(site_id)
         self.assertEqual('reponse DUMMY', res_site)
 
-        preparer_enveloppe_calls = self.cascade.preparer_enveloppe_calls
-        calls_find_update = self.contexte.document_dao.calls_find_update
-
-        self.assertEqual(1, len(preparer_enveloppe_calls))
-        self.assertEqual(2, len(calls_find_update))
+        self.assertEqual('maj_ressources_site', calls[0])
+        self.assertEqual('sauvegarder_contenu_gzip', calls[1])
 
     def test_preparer_siteconfig_publication_avecdate(self):
         site_id = 'DUMMY-site'
