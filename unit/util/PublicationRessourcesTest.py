@@ -44,6 +44,7 @@ class StubCascade:
         self.continuer_publication_calls = list()
         self.preparer_enveloppe_calls = list()
         self.invalider_ressources_sections_fichiers_calls = list()
+        self.identifier_ressources_fichiers_calls = list()
 
         self.site = {'site_id': 'DUMMY-site'}
 
@@ -100,6 +101,9 @@ class StubCascade:
         self.preparer_enveloppe_calls.append({'args': args, 'kwargs': kwargs})
         return args[0]
 
+    def identifier_ressources_fichiers(self, *args, **kwargs):
+        self.identifier_ressources_fichiers_calls.append({'args': args, 'kwargs': kwargs})
+
     @property
     def invalidateur(self):
         # Agit comme mock
@@ -144,9 +148,19 @@ class StubTriggerPublication:
         self.marquer_ressource_complete_calls = list()
         self.preparer_sitesparcdn_calls = list()
         self.emettre_publier_webapps_calls = list()
+        self.emettre_publier_uploadpages_calls = list()
+        self.emettre_publier_configuration_calls = list()
+        self.emettre_publier_mapping_calls = list()
+        self.trigger_traitement_collections_fichiers_calls = list()
+        self.trigger_publication_fichiers_calls = list()
 
         self.sites_par_cdn = list()
         self.compteur_publier_webapps = 0
+        self.compteur_publier_uploadpages = 0
+        self.compteur_publier_configuration = 0
+        self.compteur_publier_mapping = 0
+        self.compteur_trigger_collections_fichiers = 0
+        self.compteur_trigger_fichiers = 0
 
     def emettre_evenements_downstream(self, *args, **kwargs):
         self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
@@ -159,11 +173,32 @@ class StubTriggerPublication:
         self.emettre_publier_webapps_calls.append({'args': args, 'kwargs': kwargs})
         return self.compteur_publier_webapps
 
+    def emettre_publier_uploadpages(self, *args, **kwargs):
+        self.emettre_publier_uploadpages_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_publier_uploadpages
+
+    def emettre_publier_configuration(self, *args, **kwargs):
+        self.emettre_publier_configuration_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_publier_configuration
+
+    def emettre_publier_mapping(self, *args, **kwargs):
+        self.emettre_publier_mapping_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_publier_mapping
+
+    def trigger_traitement_collections_fichiers(self, *args, **kwargs):
+        self.trigger_traitement_collections_fichiers_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_trigger_collections_fichiers
+
+    def trigger_publication_fichiers(self, *args, **kwargs):
+        self.trigger_publication_fichiers_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_trigger_fichiers
+
 
 class StubGestionnaireDomaine:
 
     def __init__(self, contexte):
         self.__contexte = contexte
+        self.demarrer_processus_calls = list()
 
     def preparer_enveloppe(self, *args, **kwargs):
         return args[0]
@@ -180,6 +215,9 @@ class StubGestionnaireDomaine:
     def generateur_transactions(self):
         return self
 
+    def demarrer_processus(self, *args, **kwargs):
+        self.demarrer_processus_calls.append({'args': args, 'kwargs': kwargs})
+
 
 class HttpPublicationStub:
 
@@ -187,6 +225,7 @@ class HttpPublicationStub:
         self.calls_requests_put = list()
         self.put_publier_fichier_ipns_calls = list()
         self.put_publier_repertoire_calls = list()
+        self.put_fichier_ipns_calls = list()
 
     def requests_put(self, *args, **kwargs):
         self.calls_requests_put.append({
@@ -197,6 +236,13 @@ class HttpPublicationStub:
 
     def put_publier_fichier_ipns(self, *args, **kwargs):
         self.put_publier_fichier_ipns_calls.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+        return RequestsReponse()
+
+    def put_fichier_ipns(self, *args, **kwargs):
+        self.put_fichier_ipns_calls.append({
             'args': args,
             'kwargs': kwargs,
         })
@@ -764,11 +810,18 @@ class TriggersPublicationTest(TestCaseContexte):
 
     def test_emettre_publier_collectionfichiers(self):
         cdn_id = 'DUMMY-CDN'
-        securite = Constantes.SECURITE_PUBLIC
-        col_fichiers = {
+        site_id = 'DUMMY-site'
+
+        # self.contexte.document_dao.valeurs_find.append({
+        #     'site_id': 'DUMMY-site',
+        # })
+
+        self.contexte.document_dao.valeurs_find.append([{
             'uuid': 'DUMMY-uuid',
-        }
-        self.trigger.emettre_publier_collectionfichiers(cdn_id, col_fichiers, securite)
+            'securite': Constantes.SECURITE_PUBLIC,
+        }])
+
+        self.trigger.emettre_publier_collectionfichiers(cdn_id, site_id)
 
         contenu_gzip_calls = self.cascade.sauvegarder_contenu_gzip_calls
         ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
@@ -1072,7 +1125,8 @@ class HttpPublicationTest(TestCaseContexte):
         self.cascade = StubCascade(self.contexte)
 
         configuration = self.contexte.configuration
-        self.http_publication = HttpPublicationStub(self.cascade, configuration)
+        self.http_publication = HttpPublication(self.cascade, configuration)
+        self.http_publication.requests_put = self.requests_put
 
         self.securite = Constantes.SECURITE_PUBLIC
         self.cdn = {
@@ -1084,6 +1138,15 @@ class HttpPublicationTest(TestCaseContexte):
             Constantes.DOCUMENT_INFODOC_LIBELLE: 'DUMMY',
             ConstantesPublication.CHAMP_SECTION_ID: 'abcd-1234',
         }
+
+        self.calls_requests_put = list()
+
+    def requests_put(self, *args, **kwargs):
+        self.calls_requests_put.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+        return RequestsReponse()
 
     def test_put_publier_fichier_ipns_nokey(self):
         self.http_publication.put_publier_fichier_ipns(self.cdn, self.res_data, self.securite)
@@ -1106,7 +1169,7 @@ class HttpPublicationTest(TestCaseContexte):
         self.http_publication.put_publier_fichier_ipns(self.cdn, self.res_data, self.securite)
 
         # Verifier
-        calls_requests_put = self.http_publication.calls_requests_put
+        calls_requests_put = self.calls_requests_put
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
         self.assertEqual('/publier/fichierIpns', request_put_args[0])
@@ -1120,7 +1183,7 @@ class HttpPublicationTest(TestCaseContexte):
         self.http_publication.put_fichier_ipns(self.cdn, identificateur_document, ipns_key_name, self.res_data, self.securite)
 
         # Verifier
-        calls_requests_put = self.http_publication.calls_requests_put
+        calls_requests_put = self.calls_requests_put
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
         self.assertEqual('/publier/fichierIpns', request_put_args[0])
@@ -1145,7 +1208,7 @@ class HttpPublicationTest(TestCaseContexte):
         self.http_publication.put_publier_repertoire(cdns, fichiers)
 
         # Verifier
-        calls_requests_put = self.http_publication.calls_requests_put
+        calls_requests_put = self.calls_requests_put
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
         self.assertEqual('/publier/repertoire', request_put_args[0])
@@ -2174,14 +2237,221 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.assertEqual('z8VwCDFkrafngguGPikr5pyWe32CiwU8Yqkv6tbBRyuCeHJArkeKLairt3NTHDVTCjmHR5ioMvDkYhHhqNRmyQCP9qX', resultat['liste_hachage_bytes'][0])
         self.assertIsNotNone(secret_chiffre)
 
-    def test_continuer_publication(self):
+    def test_continuer_publication_stop_collectionsfichiers(self):
+        self.trigger.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': [],
+        }])
+
+        # self.contexte.document_dao.valeurs_find.append([
+        #
+        # ])
+
+        self.trigger.compteur_trigger_collections_fichiers = 1
+
         self.cascade.continuer_publication()
 
+        self.assertEqual(1, len(self.trigger.trigger_traitement_collections_fichiers_calls))
+        self.assertEqual(0, len(self.trigger.trigger_publication_fichiers_calls))
+
+    def test_continuer_publication_stop_publication_fichiers(self):
+        self.trigger.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': [],
+        }])
+
+        self.trigger.compteur_trigger_collections_fichiers = 0
+        self.trigger.compteur_trigger_fichiers = 1
+
+        section_calls = list()
+
+        def continuer_publication_sections(*args, **kwargs):
+            section_calls.append(True)
+            return 1
+
+        self.cascade.continuer_publication_sections = continuer_publication_sections
+
+        self.cascade.continuer_publication()
+
+
+        self.assertEqual(1, len(self.trigger.trigger_traitement_collections_fichiers_calls))
+        self.assertEqual(1, len(self.trigger.trigger_publication_fichiers_calls))
+        self.assertEqual(0, len(section_calls))
+
+    def test_continuer_publication_stop_publication_sections(self):
+        self.trigger.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': [],
+        }])
+
+        self.trigger.compteur_trigger_collections_fichiers = 0
+        self.trigger.compteur_trigger_fichiers = 0
+
+        section_calls = list()
+        configuration_calls = list()
+
+        def continuer_publication_sections(*args, **kwargs):
+            section_calls.append(True)
+            return 1
+
+        def continuer_publication_configuration(*args, **kwargs):
+            configuration_calls.append(True)
+            return 1
+
+        self.cascade.continuer_publication_sections = continuer_publication_sections
+        self.cascade.continuer_publication_configuration = continuer_publication_configuration
+
+        self.cascade.continuer_publication()
+
+        self.assertEqual(1, len(self.trigger.trigger_traitement_collections_fichiers_calls))
+        self.assertEqual(1, len(self.trigger.trigger_publication_fichiers_calls))
+        self.assertEqual(1, len(section_calls))
+        self.assertEqual(0, len(configuration_calls))
+
+    def test_continuer_publication_stop_publication_siteconfig(self):
+        self.trigger.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': [],
+        }])
+
+        self.trigger.compteur_trigger_collections_fichiers = 0
+        self.trigger.compteur_trigger_fichiers = 0
+
+        section_calls = list()
+        configuration_calls = list()
+        publication_webapps = list()
+
+        def continuer_publication_sections(*args, **kwargs):
+            section_calls.append(True)
+            return 0
+
+        def continuer_publication_configuration(*args, **kwargs):
+            configuration_calls.append(True)
+            return 1
+
+        def continuer_publication_webapps(*args, **kwargs):
+            publication_webapps.append(True)
+            return 1
+
+        self.cascade.continuer_publication_sections = continuer_publication_sections
+        self.cascade.continuer_publication_configuration = continuer_publication_configuration
+        self.cascade.continuer_publication_webapps = continuer_publication_webapps
+
+        self.cascade.continuer_publication()
+
+        self.assertEqual(1, len(self.trigger.trigger_traitement_collections_fichiers_calls))
+        self.assertEqual(1, len(self.trigger.trigger_publication_fichiers_calls))
+        self.assertEqual(1, len(section_calls))
+        self.assertEqual(1, len(configuration_calls))
+        self.assertEqual(0, len(publication_webapps))
+
+    def test_continuer_publication_stop_publication_webapps(self):
+        self.trigger.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': [],
+        }])
+
+        self.trigger.compteur_trigger_collections_fichiers = 0
+        self.trigger.compteur_trigger_fichiers = 0
+
+        section_calls = list()
+        configuration_calls = list()
+        publication_webapps = list()
+
+        def continuer_publication_sections(*args, **kwargs):
+            section_calls.append(True)
+            return 0
+
+        def continuer_publication_configuration(*args, **kwargs):
+            configuration_calls.append(True)
+            return 0
+
+        def continuer_publication_webapps(*args, **kwargs):
+            publication_webapps.append(True)
+            return 1
+
+        self.cascade.continuer_publication_sections = continuer_publication_sections
+        self.cascade.continuer_publication_configuration = continuer_publication_configuration
+        self.cascade.continuer_publication_webapps = continuer_publication_webapps
+
+        self.cascade.continuer_publication()
+
+        self.assertEqual(1, len(self.trigger.trigger_traitement_collections_fichiers_calls))
+        self.assertEqual(1, len(self.trigger.trigger_publication_fichiers_calls))
+        self.assertEqual(1, len(section_calls))
+        self.assertEqual(1, len(configuration_calls))
+        self.assertEqual(1, len(publication_webapps))
+
+    def test_continuer_publier_uploadfichiers(self):
+
+        liste_res_cdns = []
+
+        # res fichiers
+        self.contexte.document_dao.valeurs_find.append([{
+            'uuid': 'DUMMY-uuid'
+        }])
+
+        calls_processus = list()
+
+        def demarrer_processus(*args, **kwargs):
+            calls_processus.append(True)
+
+        self.cascade.demarrer_processus = demarrer_processus
+
+        self.cascade.continuer_publier_uploadfichiers(liste_res_cdns)
+
+        self.assertEqual(1, len(calls_processus))
+
+        pass
+
     def test_continuer_publication_sections(self):
-        self.cascade.continuer_publication_sections()
+        self.cascade.triggers_publication.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': []
+        }])
+
+        self.contexte.document_dao.valeurs_find.append([{
+            'uuid': 'DUMMY-uuid'
+        }])
+
+        compteur = self.cascade.continuer_publication_sections()
+        self.assertEqual(1, compteur)
+
+    def test_continuer_publication_sections_1site(self):
+        self.cascade.triggers_publication.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': ['DUMMY-site-1']
+        }])
+
+        self.contexte.document_dao.valeurs_find.append([{
+            'uuid': 'DUMMY-uuid'
+        }])
+
+        self.trigger.compteur_publier_uploadpages = 1
+
+        compteur = self.cascade.continuer_publication_sections()
+        self.assertEqual(2, compteur)
 
     def test_continuer_publication_configuration(self):
-        self.cascade.continuer_publication_configuration()
+        self.trigger.sites_par_cdn.append([{
+            ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
+            'sites': ['DUMMY-site-1']
+        }])
+
+        self.trigger.compteur_publier_configuration = 1
+        self.trigger.compteur_publier_mapping = 1
+
+        compteur = self.cascade.continuer_publication_configuration()
+
+        self.assertEqual(2, compteur)
+
+        emettre_publier_configuration_calls = self.trigger.emettre_publier_configuration_calls
+        emettre_publier_mapping_calls = self.trigger.emettre_publier_mapping_calls
+
+        self.assertEqual(1, len(emettre_publier_configuration_calls))
+        self.assertEqual(1, len(emettre_publier_mapping_calls))
+
+        pass
 
     def test_continuer_publication_webapps(self):
 

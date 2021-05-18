@@ -1410,7 +1410,7 @@ class GestionnaireCascadePublication:
         compteur_commandes_emises = self.continuer_publication_webapps()
         self.__logger.info("Trigger publication code des webapps, %d commandes emises" % compteur_commandes_emises)
 
-    def continuer_publier_uploadfichiers(self, liste_res_cdns: list, securite=Constantes.SECURITE_PUBLIC):
+    def continuer_publier_uploadfichiers(self, liste_res_cdns: list):
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
         :param liste_res_cdns:
@@ -1422,48 +1422,44 @@ class GestionnaireCascadePublication:
             liste_sites.update(cdn['sites'])
         liste_sites = list(liste_sites)
 
-        # label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+        expiration_distribution = datetime.datetime.utcnow() - datetime.timedelta(minutes=30)
+
         filtre_fichiers = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'sites': {'$in': liste_sites},
-            # label_champ_distribution: {'$exists': True},
         }
 
         compteur_commandes_emises = 0
 
-        expiration_distribution = datetime.datetime.utcnow() - datetime.timedelta(minutes=30)
-
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_fichiers = collection_ressources.find(filtre_fichiers)
         for col_fichiers in curseur_fichiers:
-            # valeur_distribution = col_fichiers[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
-            distribution_maj = col_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_MAJ) or expiration_distribution
-            # if valeur_distribution is False or (valeur_distribution is True and distribution_maj < expiration_distribution):
-            if distribution_maj <= expiration_distribution:
-                uuid_col_fichiers = col_fichiers['uuid']
-                filtre_fichiers_maj = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                    'uuid': uuid_col_fichiers,
-                }
-                # self.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
+            uuid_col_fichiers = col_fichiers['uuid']
+            filtre_fichiers_maj = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid': uuid_col_fichiers,
+            }
+            for cdn in liste_res_cdns:
+                cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
+                self.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers_maj, upsert=True)
 
-                # La collection n'a pas encore ete preparee pour la publication
-                # contenu = col_fichiers.get('contenu')
-                # if contenu is None:
-                uuid_collection = col_fichiers['uuid']
-                # Demarrer un processus pour la preparation et la publication
-                processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-                params = {
-                    'uuid_collection': uuid_collection,
-                    'site_ids': liste_sites,
-                    'cdn_ids': [c['cdn_id'] for c in liste_res_cdns],
-                    'emettre_commande': True,
-                }
-                self.demarrer_processus(processus, params)
-                # else:
-                #     self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
+            # La collection n'a pas encore ete preparee pour la publication
+            # contenu = col_fichiers.get('contenu')
+            # if contenu is None:
+            uuid_collection = col_fichiers['uuid']
+            # Demarrer un processus pour la preparation et la publication
+            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            params = {
+                'uuid_collection': uuid_collection,
+                'site_ids': liste_sites,
+                'cdn_ids': [c['cdn_id'] for c in liste_res_cdns],
+                'emettre_commande': True,
+            }
+            self.demarrer_processus(processus, params)
+            # else:
+            #     self.emettre_commande_publication_collectionfichiers(cdn_id, col_fichiers, securite)
 
-                compteur_commandes_emises = compteur_commandes_emises + 1
+            compteur_commandes_emises = compteur_commandes_emises + 1
 
         return compteur_commandes_emises
 
@@ -1480,7 +1476,7 @@ class GestionnaireCascadePublication:
         # Publier collections de fichiers
         # repertoire: data/fichiers
         # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
-        fichiers_publies = self.continuer_publier_uploadfichiers(liste_cdns, securite=Constantes.SECURITE_PUBLIC)
+        fichiers_publies = self.continuer_publier_uploadfichiers(liste_cdns)
         compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
 
         for cdn in liste_cdns:
@@ -1491,6 +1487,12 @@ class GestionnaireCascadePublication:
             # repertoire: data/pages
             for site_id in liste_sites:
                 pages_publies = self.triggers_publication.emettre_publier_uploadpages(cdn_id, site_id)
+                compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
+
+            # Publier collections de fichiers (metadata)
+            # repertoire: data/fichiers
+            for site_id in liste_sites:
+                pages_publies = self.triggers_publication.emettre_publier_collectionfichiers(cdn_id, site_id)
                 compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
 
             # Publier forums
@@ -2004,45 +2006,62 @@ class TriggersPublication:
 
         return compteur_commandes_emises
 
-    def emettre_publier_collectionfichiers(self, cdn_id, col_fichiers, securite):
-        uuid_col_fichiers = col_fichiers['uuid']
-        filtre_fichiers_maj = {
+    def emettre_publier_collectionfichiers(self, cdn_id, site_id: str):
+        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
+        # doc_site = collection_sites.find_one(filtre_site)
+        # securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+        label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+
+        filtre_collections = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            'uuid': uuid_col_fichiers,
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            label_champ_distribution: False,
         }
 
-        date_signature = col_fichiers.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
-        if date_signature is None:
-            # Creer contenu .json.gz, contenu_signe
-            self.__cascade.ressources.sauvegarder_contenu_gzip(col_fichiers, filtre_fichiers_maj)
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        curseur_collection_fichiers = collection_ressources.find(filtre_collections)
+        for res_collection_fichiers in curseur_collection_fichiers:
+            uuid_col_fichiers = res_collection_fichiers['uuid']
+            securite_collection = res_collection_fichiers[Constantes.DOCUMENT_INFODOC_SECURITE]
+            filtre_fichiers_maj = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid': uuid_col_fichiers,
+            }
 
-        self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
+            date_signature = res_collection_fichiers.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+            if date_signature is None:
+                # Creer contenu .json.gz, contenu_signe
+                self.__cascade.ressources.sauvegarder_contenu_gzip(res_collection_fichiers, filtre_fichiers_maj)
 
-        # Marquer tous les fichiers associes a cette collection s'ils ne sont pas deja publies
-        # pour ce CDN
-        filtre_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
-            # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {'exists': False},
-            'collections': {'$all': [uuid_col_fichiers]}
-            # 'fuuid': {'$in': liste_fuuids}
-        }
-        self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
+            self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
 
-        # Publier le contenu sur le CDN
-        # Upload avec requests via https://fichiers
-        commande_publier_section = {
-            'type_section': ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            'uuid_collection': uuid_col_fichiers,
-            'cdn_id': cdn_id,
-            'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
-            'mimetype': 'application/json',
-            'content_encoding': 'gzip',  # Header Content-Encoding
-            'max_age': 0,
-            'securite': securite,
-        }
-        domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
-        self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+            # Marquer tous les fichiers associes a cette collection s'ils ne sont pas deja publies
+            # pour ce CDN
+            filtre_fichiers = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
+                # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {'exists': False},
+                'collections': {'$all': [uuid_col_fichiers]}
+                # 'fuuid': {'$in': liste_fuuids}
+            }
+            self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
+
+            # Publier le contenu sur le CDN
+            # Upload avec requests via https://fichiers
+            commande_publier_section = {
+                'type_section': ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid_collection': uuid_col_fichiers,
+                'cdn_id': cdn_id,
+                'remote_path': path.join('data/fichiers', uuid_col_fichiers + '.json.gz'),
+                'mimetype': 'application/json',
+                'content_encoding': 'gzip',  # Header Content-Encoding
+                'max_age': 0,
+                'securite': securite_collection,
+            }
+            domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
+            self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
 
     def emettre_publier_configuration(self, cdn_id: str, site_id: str):
         # collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
