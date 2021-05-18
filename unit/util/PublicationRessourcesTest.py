@@ -139,6 +139,9 @@ class StubGestionnaireDomaine:
     def __init__(self, contexte):
         self.__contexte = contexte
 
+    def preparer_enveloppe(self, *args, **kwargs):
+        return args[0]
+
     @property
     def contexte(self):
         return self.__contexte
@@ -147,15 +150,34 @@ class StubGestionnaireDomaine:
     def document_dao(self):
         return self.__contexte.document_dao
 
+    @property
+    def generateur_transactions(self):
+        return self
 
-class HttpPublicationStub(HttpPublication):
+
+class HttpPublicationStub:
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.calls_requests_put = list()
+        self.put_publier_fichier_ipns_calls = list()
+        self.put_publier_repertoire_calls = list()
 
     def requests_put(self, *args, **kwargs):
         self.calls_requests_put.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+        return RequestsReponse()
+
+    def put_publier_fichier_ipns(self, *args, **kwargs):
+        self.put_publier_fichier_ipns_calls.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+        return RequestsReponse()
+
+    def put_publier_repertoire(self, *args, **kwargs):
+        self.put_publier_repertoire_calls.append({
             'args': args,
             'kwargs': kwargs,
         })
@@ -1852,14 +1874,12 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         self.assertDictEqual({"ok": True}, resultat)
 
-        http_pub_args = self.http_publication.calls_requests_put[0]['args']
-        self.assertEqual('/publier/repertoire', http_pub_args[0])
+        http_pub_args = self.http_publication.put_publier_repertoire_calls[0]['args']
+        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'DUMMY-cdn'}, http_pub_args[0][0])
         self.assertDictEqual(
-            {'cdns': '[{"cdn_id": "DUMMY-cdn", "type_cdn": "DUMMY-cdn"}]', 'securite': '1.public',
-             'identificateur_document': '{"_mg-libelle": "page", "section_id": "DUMMY-section"}'},
-            http_pub_args[1]
+            {'type_section': 'page', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'dummy/type', 'securite': '1.public', 'section_id': 'DUMMY-section', 'identificateur_document': {'_mg-libelle': 'page', 'section_id': 'DUMMY-section'}},
+            http_pub_args[2]
         )
-        self.assertEqual('/DUMMY/path', http_pub_args[2][0][1][0])
 
     def test_commande_publier_upload_datasection_fichiers(self):
         params = {
@@ -1884,13 +1904,12 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         self.assertDictEqual({"ok": True}, resultat)
 
-        http_pub_args = self.http_publication.calls_requests_put[0]['args']
-        self.assertEqual('/publier/repertoire', http_pub_args[0])
+        http_pub_args = self.http_publication.put_publier_repertoire_calls[0]['args']
+        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'DUMMY-cdn'}, http_pub_args[0][0])
         self.assertDictEqual(
-            {'cdns': '[{"cdn_id": "DUMMY-cdn", "type_cdn": "DUMMY-cdn"}]', 'securite': '1.public', 'identificateur_document': '{"_mg-libelle": "collection_fichiers", "uuid": "DUMMY-uuid"}'},
-            http_pub_args[1]
+            {'type_section': 'collection_fichiers', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'dummy/type', 'securite': '1.public', 'uuid_collection': 'DUMMY-uuid', 'identificateur_document': {'_mg-libelle': 'collection_fichiers', 'uuid': 'DUMMY-uuid'}},
+            http_pub_args[2]
         )
-        self.assertEqual('/DUMMY/path', http_pub_args[2][0][1][0])
 
     def test_commande_publier_upload_datasection_ipfs(self):
         params = {
@@ -1915,18 +1934,61 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         self.assertDictEqual({"ok": True}, resultat)
 
-        http_pub_args = self.http_publication.calls_requests_put[0]['args']
-        self.assertEqual('/publier/repertoire', http_pub_args[0])
+        http_pub_args = self.http_publication.put_publier_repertoire_calls[0]['args']
+        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'ipfs'}, http_pub_args[0][0])
         self.assertDictEqual(
-            {'cdns': '[{"cdn_id": "DUMMY-cdn", "type_cdn": "ipfs"}]', 'securite': '1.public',
-             'fichier_unique': True,
-             'identificateur_document': '{"_mg-libelle": "page", "section_id": "DUMMY-section"}'},
-            http_pub_args[1]
+            {'type_section': 'page', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'dummy/type', 'securite': '1.public', 'section_id': 'DUMMY-section', 'identificateur_document': {'_mg-libelle': 'page', 'section_id': 'DUMMY-section'}, 'fichier_unique': True},
+            http_pub_args[2]
         )
-        self.assertEqual('fichier.bin', http_pub_args[2][0][1][0])
 
     def test_commande_publier_upload_siteconfiguration(self):
-        self.cascade.commande_publier_upload_siteconfiguration()
+        params = {
+            ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'DUMMY/mimetype',
+        }
+
+        # res_data
+        self.contexte.document_dao.valeurs_find.append({})
+
+        # CDN
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-type'
+        })
+
+        resultat = self.cascade.commande_publier_upload_siteconfiguration(params)
+
+        self.assertDictEqual({'ok': True}, resultat)
+
+        call_put_args = self.cascade.http_publication.put_publier_repertoire_calls[0]['args']
+        self.assertDictEqual({'type_cdn': 'DUMMY-type'}, call_put_args[0][0])
+        self.assertDictEqual(
+            {'site_id': 'DUMMY-site', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'DUMMY/mimetype', 'identificateur_document': {'_mg-libelle': 'siteconfig', 'site_id': 'DUMMY-site'}},
+            call_put_args[2]
+        )
+
+    def test_commande_publier_upload_siteconfiguration_ipfs(self):
+        params = {
+            ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site',
+            'cdn_id': 'DUMMY-cdn',
+            'remote_path': '/DUMMY/path',
+            'mimetype': 'DUMMY/mimetype',
+        }
+
+        # res_data
+        self.contexte.document_dao.valeurs_find.append({})
+
+        # CDN
+        self.contexte.document_dao.valeurs_find.append({
+            ConstantesPublication.CHAMP_TYPE_CDN: 'ipfs'
+        })
+
+        resultat = self.cascade.commande_publier_upload_siteconfiguration(params)
+
+        self.assertDictEqual({'ok': True}, resultat)
+
+        self.assertEqual(1, len(self.cascade.http_publication.put_publier_fichier_ipns_calls))
 
     def test_commande_publier_upload_mapping(self):
         params = {
@@ -1949,14 +2011,12 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         self.assertDictEqual({'ok': True}, resultat)
 
-        call_put_args = self.cascade.http_publication.calls_requests_put[0]['args']
-        self.assertEqual('/publier/repertoire', call_put_args[0])
+        call_put_args = self.cascade.http_publication.put_publier_repertoire_calls[0]['args']
+        self.assertDictEqual({'type_cdn': 'DUMMY-type'}, call_put_args[0][0])
         self.assertDictEqual(
-            {'cdns': '[{"type_cdn": "DUMMY-type"}]', 'securite': '2.prive',
-             'identificateur_document': '{"_mg-libelle": "mapping"}'},
-            call_put_args[1]
+            {'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'DUMMY/type', 'identificateur_document': {'_mg-libelle': 'mapping'}},
+            call_put_args[2]
         )
-        self.assertEqual('/DUMMY/path', call_put_args[2][0][1][0])
 
     def test_commande_publier_upload_mapping_ipfs(self):
         params = {
@@ -1990,7 +2050,13 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.cascade.trigger_conditionnel_fichiers_completes()
 
     def test_preparer_permission_secret(self):
-        self.cascade.preparer_permission_secret()
+        secret_chiffre = multibase.encode('base64', b'un secret')
+
+        resultat = self.cascade.preparer_permission_secret(secret_chiffre)
+
+        self.assertEqual(1, len(resultat['liste_hachage_bytes']))
+        self.assertEqual('z8VwCDFkrafngguGPikr5pyWe32CiwU8Yqkv6tbBRyuCeHJArkeKLairt3NTHDVTCjmHR5ioMvDkYhHhqNRmyQCP9qX', resultat['liste_hachage_bytes'][0])
+        self.assertIsNotNone(secret_chiffre)
 
     def test_continuer_publication(self):
         self.cascade.continuer_publication()
