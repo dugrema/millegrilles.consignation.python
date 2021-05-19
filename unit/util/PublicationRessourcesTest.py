@@ -547,18 +547,19 @@ class TriggersPublicationTest(TestCaseContexte):
         self.contexte.document_dao.valeurs_update.append({'ok': True})
 
         # Executer code
-        self.trigger.trigger_traitement_collections_fichiers()
+        compteur = self.trigger.trigger_traitement_collections_fichiers()
+        self.assertEqual(1, compteur)
 
         # Verifier resultats
-        update_calls = self.contexte.document_dao.calls_update
-        demarrer_processus_calls = self.cascade.demarrer_processus_calls
-
-        self.assertEqual(1, len(update_calls))
-        self.assertEqual(1, len(demarrer_processus_calls))
-
-        self.assertEqual('abcd-1234', update_calls[0]['args'][0]['uuid'])
-        self.assertEqual('collection_fichiers', update_calls[0]['args'][0]['_mg-libelle'])
-        self.assertEqual('en_cours', update_calls[0]['args'][1]['$set']['preparation_ressources'])
+        # update_calls = self.contexte.document_dao.calls_update
+        # demarrer_processus_calls = self.cascade.demarrer_processus_calls
+        #
+        # self.assertEqual(1, len(update_calls))
+        # self.assertEqual(1, len(demarrer_processus_calls))
+        #
+        # self.assertEqual('abcd-1234', update_calls[0]['args'][0]['uuid'])
+        # self.assertEqual('collection_fichiers', update_calls[0]['args'][0]['_mg-libelle'])
+        # self.assertEqual('en_cours', update_calls[0]['args'][1]['$set']['preparation_ressources'])
 
     def test_trigger_publication_fichiers_cdndummy(self):
         res_fichier = {
@@ -1629,7 +1630,6 @@ class RessourcesPublicationTest(TestCaseContexte):
         self.assertDictEqual({'sites': {'$each': ['DUMMY-site']}}, calls_args[1]['$addToSet'])
 
     def test_maj_ressource_collection_fichiers(self):
-        site_ids = ['SITE-1']
         info_collection = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: 'DUMMY-uuid',
         }
@@ -1638,7 +1638,7 @@ class RessourcesPublicationTest(TestCaseContexte):
         self.contexte.document_dao.valeurs_find.append([])
         self.contexte.document_dao.valeurs_update.append([])
 
-        self.ressources_publication.maj_ressource_collection_fichiers(site_ids, info_collection, liste_fichiers)
+        self.ressources_publication.maj_ressource_collection_fichiers(info_collection, liste_fichiers)
 
         calls_find_update = self.contexte.document_dao.calls_find_update
 
@@ -1885,20 +1885,6 @@ class RessourcesPublicationTest(TestCaseContexte):
         resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
 
         self.assertTrue(resultat)
-
-    def test_ajouter_site_fichiers(self):
-        uuid_collection = 'DUMMY-uuid'
-        sites = ['DUMMY-site']
-
-        self.contexte.document_dao.valeurs_update.append('DUMMY')
-
-        self.ressources_publication.ajouter_site_fichiers(uuid_collection, sites)
-
-        calls_update = self.contexte.document_dao.calls_update
-
-        self.assertEqual(1, len(calls_update))
-        args_update = calls_update[0]['args']
-        self.assertDictEqual({'$addToSet': {'sites': {'$each': ['DUMMY-site']}}}, args_update[1])
 
 
 class GestionnaireCascadePublicationTest(TestCaseContexte):
