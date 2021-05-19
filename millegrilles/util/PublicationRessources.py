@@ -615,6 +615,18 @@ class RessourcesPublication:
         collections_fichiers_uuids = set()
 
         for fuuid, info in fuuids_info.items():
+
+            # Verifier si on a un video - cas d'exception, on n'upload pas la version originale du video
+            # Seules les versions converties sont uploadees
+            try:
+                version_courante = info['version_courante']
+                mimetype = version_courante[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+                if mimetype.startswith('video/'):
+                    if fuuid == version_courante[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]:
+                        continue  # Ignorer le fuuid (original)
+            except KeyError:
+                pass  # OK
+
             set_on_insert = {
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
