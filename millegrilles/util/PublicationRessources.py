@@ -464,7 +464,7 @@ class RessourcesPublication:
         # Ajouter les fichiers requis comme ressource pour le site
         doc_site = self.__cascade.get_site(site_id)
         flag_public = doc_site['securite'] == Constantes.SECURITE_PUBLIC
-        self.maj_ressources_fuuids(fuuids_info, sites=[site_id], public=flag_public)
+        self.maj_ressources_fuuids(fuuids_info, public=flag_public)
 
         return doc_page
 
@@ -805,10 +805,7 @@ class RessourcesPublication:
 
         return list(set_collection_uuids)
 
-    def maj_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
-        if isinstance(site_ids, str):
-            site_ids = [site_ids]
-
+    def maj_ressource_collection_fichiers(self, info_collection: dict, liste_fichiers: list):
         contenu = {
             ConstantesPublication.CHAMP_TYPE_SECTION: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
         }
@@ -828,13 +825,10 @@ class RessourcesPublication:
         for f in liste_fichiers:
             for fuuid in f['fuuids']:
                 fuuids_dict[fuuid] = f
-        self.maj_ressources_fuuids(fuuids_dict, site_ids, public=flag_public, maj_section=False)
+        self.maj_ressources_fuuids(fuuids_dict, public=flag_public)
 
         info_fichiers = self.trouver_info_fuuid_fichiers(list(set_fuuids))
         contenu['fuuids'] = info_fichiers
-
-        # contenu = self.generateur_transactions.preparer_enveloppe(
-        #     contenu, 'Publication.fichiers', ajouter_certificats=True)
 
         set_ops = {
             'contenu': contenu,
@@ -845,9 +839,6 @@ class RessourcesPublication:
             'uuid': uuid_collection,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
-        add_to_set = {
-            'sites': {'$each': site_ids},
-        }
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             'uuid': info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
@@ -856,7 +847,6 @@ class RessourcesPublication:
             '$set': set_ops,
             '$unset': UNSET_PUBLICATION_RESOURCES,
             '$setOnInsert': set_on_insert,
-            '$addToSet': add_to_set,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1012,16 +1002,16 @@ class RessourcesPublication:
 
         return False
 
-    def ajouter_site_fichiers(self, uuid_collection, sites):
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-        }
-        ops = {
-            '$addToSet': {'sites': {'$each': sites}}
-        }
-        collection_ressources.update_one(filtre, ops)
+    # def ajouter_site_fichiers(self, uuid_collection, sites):
+    #     collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+    #     filtre = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+    #         ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+    #     }
+    #     ops = {
+    #         '$addToSet': {'sites': {'$each': sites}}
+    #     }
+    #     collection_ressources.update_one(filtre, ops)
 
 
 class GestionnaireCascadePublication:
@@ -1690,10 +1680,7 @@ class TriggersPublication:
             # Recuperer la liste de ressources qui ne sont pas publies dans tous les CDNs de la liste
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             filtre = {
-                '$or': [
-                    {'sites': {'$in': liste_sites}},
-                    {'site_id': {'$in': liste_sites}},
-                ],
+                'sites': {'$in': liste_sites},
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
             ops = {
@@ -2464,6 +2451,9 @@ class HttpPublication:
 
 
 class ProcessusPublierCollectionGrosFichiers(MGProcessus):
+    """
+    Syncrhonise une collection du domaine GrosFichiers avec une version conservee localement sous Publication.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -2474,118 +2464,42 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
 
         # Verifier si la collection existe deja dans ressources
         uuid_collection = params['uuid_collection']
-        res_collection = self.controleur.gestionnaire.get_ressource_collection_fichiers(uuid_collection)
+        # res_collection = self.controleur.gestionnaire.get_ressource_collection_fichiers(uuid_collection)
 
         requete = {'uuid': uuid_collection}
         domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
         self.set_requete(domaine_action, requete)
 
-        site_id = params.get('site_id')
-        site_ids = params.get('site_ids')
-        set_site_ids = set()
-        if site_id is not None:
-            set_site_ids.add(site_id)
-        if site_ids is not None:
-            set_site_ids.update(site_ids)
-
-        # if res_collection is None:
-        #     # Requete vers grosfichiers pour recuperer le contenu de la collection et initialiser tous les fichiers
-        #     # requete = {'uuid': uuid_collection}
-        #     # domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
-        #     # self.set_requete(domaine_action, requete)
-        #     self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_nouvelle_collection.__name__)
-        # else:
-        if res_collection is not None and res_collection.get('sites'):
-            # S'assurer que la collection a les site_ids
-            self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, res_collection['sites'])
+        # if res_collection is not None and res_collection.get('sites'):
+        #     # S'assurer que la collection a les site_ids
+        #     self.controleur.gestionnaire.ajouter_site_fichiers(uuid_collection, res_collection['sites'])
 
         self.set_etape_suivante(ProcessusPublierCollectionGrosFichiers.traiter_maj_collection.__name__)
 
-        return {'site_ids': list(set_site_ids)}
-
-    # def traiter_nouvelle_collection(self):
-    #     contenu_collection = self.parametres['reponse'][0]
-    #     site_ids = self.parametres['site_ids']
-    #
-    #     info_collection = contenu_collection['collection']
-    #     liste_documents = contenu_collection['documents']
-    #
-    #     col_fichiers = self.controleur.gestionnaire.creer_ressource_collection_fichiers(site_ids, info_collection, liste_documents)
-    #
-    #     self.continuer_publication(col_fichiers)
-    #
-    #     self.set_etape_suivante()  # Termine
+        return {}
 
     def traiter_maj_collection(self):
 
         contenu_collection = self.parametres['reponse'][0]
-        site_ids = self.parametres['site_ids']
         uuid_collection = self.parametres['uuid_collection']
-        cdn_ids = self.parametres.get('cdn_ids') or list()
 
         changement_detecte = self.controleur.gestionnaire.detecter_changement_collection(contenu_collection)
         if changement_detecte is True:
             info_collection = contenu_collection['collection']
             liste_documents = contenu_collection['documents']
 
-            col_fichiers = self.controleur.gestionnaire.maj_ressource_collection_fichiers(site_ids, info_collection, liste_documents)
+            # Ajouter les fichiers (ressources) manquants. Invalide contenu collection_fichiers.
+            self.controleur.gestionnaire.maj_ressource_collection_fichiers(info_collection, liste_documents)
 
-            collection_ressources = self.controleur.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-            filtre_coll_fichiers = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                'uuid': uuid_collection
-            }
+        # Marquer collection_fichiers comme prete. On doit quand meme attendre publication des fichiers avant de
+        # generer le contenu (CID, etc.)
+        self.controleur.gestionnaire.marquer_collection_fichiers_prete(uuid_collection)
 
-            set_ops = {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True}
-            # Ajouter progres = false pour tous les cdn_is
-            for cdn_id in cdn_ids:
-                label_progres = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
-                set_ops[label_progres] = False
-
-            ops = {
-                '$set': set_ops,
-                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            }
-            collection_ressources.update_one(filtre_coll_fichiers, ops)
-
-            self.continuer_publication(col_fichiers)
-
-        else:
-            # Aucun changement a apporter, la version deja signee/gzipee ne change pas
-            col_fichiers = self.controleur.gestionnaire.marquer_collection_fichiers_prete(uuid_collection)
-            self.continuer_publication(col_fichiers)
-
-            # # Continuer la publication
-            # if self.parametres.get('continuer_publication') is True:
-            #     domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
-            #     self.ajouter_commande_a_transmettre(domaine_action, dict())
-
-        self.set_etape_suivante()  # Termine
-
-    def continuer_publication(self, col_fichiers):
-        if self.parametres.get('emettre_commande') is True:
-            try:
-                securite = col_fichiers['contenu']['securite']
-            except KeyError:
-                self.__logger.exception(
-                    "Niveau se securite n'est pas inclus dans collection fichiers %s" % self.parametres[
-                        'uuid_collection'])
-                self.__logger.error("Contenu col fichiers : %s" % str(col_fichiers))
-                securite = Constantes.SECURITE_PRIVE
-
-            cdn_id = self.parametres.get('cdn_id')
-            cdn_ids = self.parametres.get('cdn_ids')
-            cdns = set()
-            if cdn_id is not None:
-                cdns.add(cdn_id)
-            if cdn_ids is not None:
-                cdns.update(cdn_ids)
-
-            for cdn_id_l in cdns:
-                self.controleur.gestionnaire.emettre_publier_collectionfichiers(cdn_id_l, col_fichiers, securite)
-        elif self.parametres.get('continuer_publication') is True:
+        if self.parametres.get('continuer_publication') is True:
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
             self.ajouter_commande_a_transmettre(domaine_action, dict())
+
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusPublierFichierIpfs(MGProcessus):
