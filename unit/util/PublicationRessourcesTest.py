@@ -1488,13 +1488,12 @@ class RessourcesPublicationTest(TestCaseContexte):
 
     def test_maj_ressources_fuuids_vide(self):
         fuuids_info = {}
-        sites = None
         public = False
 
-        self.ressources_publication.maj_ressources_fuuids(fuuids_info, sites, public=True)
+        self.ressources_publication.maj_ressources_fuuids(fuuids_info, public=public)
 
-        invalider_ressources_sections_fichiers_calls = self.cascade.invalider_ressources_sections_fichiers_calls
-        self.assertEqual(1, len(invalider_ressources_sections_fichiers_calls))
+        calls_find_update = self.contexte.document_dao.calls_find_update
+        self.assertEqual(0, len(calls_find_update))
 
     def test_maj_ressources_fuuids_1fichier(self):
         fuuids_info = {
@@ -1504,16 +1503,12 @@ class RessourcesPublicationTest(TestCaseContexte):
                 }
             }
         }
-        sites = None
 
         self.contexte.document_dao.valeurs_update.append({
             'sites': []
         })
 
-        self.ressources_publication.maj_ressources_fuuids(fuuids_info, sites, public=True)
-
-        invalider_ressources_sections_fichiers_calls = self.cascade.invalider_ressources_sections_fichiers_calls
-        self.assertEqual(1, len(invalider_ressources_sections_fichiers_calls))
+        self.ressources_publication.maj_ressources_fuuids(fuuids_info, public=True)
 
         calls_find_update = self.contexte.document_dao.calls_find_update
         self.assertDictEqual({'_mg-libelle': 'fichier', 'fuuid': 'DUMMY-1'}, calls_find_update[0]['args'][0])

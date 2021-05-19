@@ -553,13 +553,10 @@ class RessourcesPublication:
 
         return fuuids_info, parties_page_ordonnees, site_id
 
-    def maj_ressources_fuuids(self, fuuids_info: dict, sites: list = None, public=False, maj_section=True):
+    def maj_ressources_fuuids(self, fuuids_info: dict, public=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
 
         collections_fichiers_uuids = set()
-        sites_id = set()
-        if sites is not None:
-            sites_id.update(sites)
 
         for fuuid, info in fuuids_info.items():
             set_on_insert = {
@@ -580,10 +577,6 @@ class RessourcesPublication:
 
             if public is True:
                 set_ops['public'] = True
-
-            if sites is not None:
-                for s in sites:
-                    add_to_set_ops['sites'] = s
 
             try:
                 fuuid_mimetypes = info[ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES]
@@ -608,27 +601,7 @@ class RessourcesPublication:
                 ops['$push'] = push_ops
             if len(add_to_set_ops) > 0:
                 ops['$addToSet'] = add_to_set_ops
-            doc_collection_fichiers = collection_ressources.find_one_and_update(
-                filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
-
-            sites_coll = doc_collection_fichiers.get('sites')
-            if sites_coll is not None:
-                sites_id.update(sites_coll)
-
-        # Lancer processus maj des collections de fichiers
-        if maj_section:
-            # Invalider les ressources fichiers pour publication
-            self.__cascade.invalidateur.invalider_ressources_sections_fichiers(list(collections_fichiers_uuids))
-
-            # Publier les ressources fichiers
-            for uuid_collection in collections_fichiers_uuids:
-                for site_id in sites_id:
-                    processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-                    params = {
-                        'uuid_collection': uuid_collection,
-                        'site_id': site_id,
-                    }
-                    self.__cascade.demarrer_processus(processus, params)
+            collection_ressources.find_one_and_update(filtre, ops, upsert=True)
 
     def get_ressource_collection_fichiers(self, uuid_collection):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -743,7 +716,9 @@ class RessourcesPublication:
         uuid_collections = set()
         for res in curseur_ressources:
             # Mettre le flag a True immediatement, evite race condition
-            filtre_res_update = {ConstantesPublication.CHAMP_SECTION_ID: res[ConstantesPublication.CHAMP_SECTION_ID]}
+            filtre_res_update = {
+                ConstantesPublication.CHAMP_SECTION_ID: res[ConstantesPublication.CHAMP_SECTION_ID]
+            }
             ops = {
                 '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True},
                 '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
@@ -764,7 +739,6 @@ class RessourcesPublication:
             processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
             params = {
                 'uuid_collection': uuid_collection,
-                'emettre_commande': True,
                 'continuer_publication': True,
             }
             self.__cascade.demarrer_processus(processus, params)
@@ -801,12 +775,13 @@ class RessourcesPublication:
             set_on_insert = {
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
-                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
             }
             add_to_set = {
                 ConstantesPublication.CHAMP_LISTE_SITES: {'$each': [site_id]},
             }
-            set_ops = dict()
+            set_ops = {
+                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+            }
 
             res_coll_fichiers = collection_ressources.find_one(filtre_res_collfichiers) or dict()
             try:
@@ -1738,46 +1713,49 @@ class TriggersPublication:
 
     def trigger_traitement_collections_fichiers(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        # Recuperer ressources qui ne sont pas preparees
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: {'$exists': True},
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
             ConstantesPublication.CHAMP_LISTE_SITES: {'$exists': True},
         }
         curseur_collections_fichiers = collection_ressources.find(filtre)
 
         compteur_collections = 0
         for collection_fichiers in curseur_collections_fichiers:
-            etat_preparation = collection_fichiers[ConstantesPublication.CHAMP_PREPARATION_RESSOURCES]
+            # etat_preparation = collection_fichiers[ConstantesPublication.CHAMP_PREPARATION_RESSOURCES]
+            #
+            # if etat_preparation is True:
+            #     continue  # Rien a faire, collection de fichiers prete
 
-            if etat_preparation is True:
-                continue  # Rien a faire, collection de fichiers prete
-
+            # Compter ressources qui ne sont pas pretes
             compteur_collections = compteur_collections + 1
 
-            if etat_preparation == 'en_cours':
-                continue  # Rien d'autre a faire
-
-            uuid_collection = collection_fichiers['uuid']
-            liste_sites = collection_fichiers[ConstantesPublication.CHAMP_LISTE_SITES]
-            filtre_coll_fichiers = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-                'uuid': uuid_collection
-            }
-            ops = {
-                '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: 'en_cours'},
-                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            }
-            collection_ressources.update_one(filtre_coll_fichiers, ops)
-
-            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
-            params = {
-                'uuid_collection': uuid_collection,
-                'site_ids': liste_sites,
-                # 'cdn_id': cdn_id,
-                'emettre_commande': False,
-                'continuer_publication': True,
-            }
-            self.__cascade.demarrer_processus(processus, params)
+            # if etat_preparation is False:
+            #     continue  # Rien d'autre a faire
+            #
+            # uuid_collection = collection_fichiers['uuid']
+            # liste_sites = collection_fichiers[ConstantesPublication.CHAMP_LISTE_SITES]
+            # filtre_coll_fichiers = {
+            #     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            #     'uuid': uuid_collection
+            # }
+            # ops = {
+            #     '$set': {ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: 'en_cours'},
+            #     '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            # }
+            # collection_ressources.update_one(filtre_coll_fichiers, ops)
+            #
+            # processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            # params = {
+            #     'uuid_collection': uuid_collection,
+            #     'site_ids': liste_sites,
+            #     # 'cdn_id': cdn_id,
+            #     'emettre_commande': False,
+            #     'continuer_publication': True,
+            # }
+            # self.__cascade.demarrer_processus(processus, params)
 
         return compteur_collections
 
