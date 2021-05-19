@@ -1394,9 +1394,6 @@ class GestionnaireCascadePublication:
         :param params:
         :return:
         """
-        if params is None:
-            params = dict()
-
         compteur_collections_fichiers = self.triggers_publication.trigger_traitement_collections_fichiers()
         if compteur_collections_fichiers > 0:
             self.__logger.info("Preparation des collections de fichiers, %d collections en traitement" % compteur_collections_fichiers)
@@ -1482,34 +1479,32 @@ class GestionnaireCascadePublication:
         :return:
         """
         liste_cdns = self.triggers_publication.preparer_sitesparcdn()
-        cdn_ids = [c['cdn_id'] for c in liste_cdns]
 
         compteurs_commandes_emises = 0
 
         # Publier collections de fichiers
         # repertoire: data/fichiers
         # Trouver les collections de fichiers publiques ou privees qui ne sont pas deja publies sur ce CDN
-        fichiers_publies = self.continuer_publier_uploadfichiers(liste_cdns)
-        compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
+        # fichiers_publies = self.continuer_publier_uploadfichiers(liste_cdns)
+        # compteurs_commandes_emises = compteurs_commandes_emises + fichiers_publies
 
         for cdn in liste_cdns:
             cdn_id = cdn['cdn_id']
             liste_sites = cdn['sites']
 
-            # Publier pages
-            # repertoire: data/pages
             for site_id in liste_sites:
-                pages_publies = self.triggers_publication.emettre_publier_uploadpages(cdn_id, site_id)
-                compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
+                # Publier pages
+                # repertoire: data/pages
+                pages_publiees = self.triggers_publication.emettre_publier_uploadpages(cdn_id, site_id)
+                compteurs_commandes_emises = compteurs_commandes_emises + pages_publiees
 
-            # Publier collections de fichiers (metadata)
-            # repertoire: data/fichiers
-            for site_id in liste_sites:
-                pages_publies = self.triggers_publication.emettre_publier_collectionfichiers(cdn_id, site_id)
-                compteurs_commandes_emises = compteurs_commandes_emises + pages_publies
+                # Publier collections de fichiers (metadata)
+                # repertoire: data/fichiers
+                collections_publiees = self.triggers_publication.emettre_publier_collectionfichiers(cdn_id, site_id)
+                compteurs_commandes_emises = compteurs_commandes_emises + collections_publiees
 
-            # Publier forums
-            # repertoire: data/forums
+                # Publier forums
+                # repertoire: data/forums
 
         return compteurs_commandes_emises
 
@@ -1705,7 +1700,6 @@ class TriggersPublication:
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
-            ConstantesPublication.CHAMP_LISTE_SITES: {'$exists': True},
         }
         curseur_collections_fichiers = collection_ressources.find(filtre)
 
