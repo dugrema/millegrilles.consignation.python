@@ -1016,14 +1016,14 @@ class RessourcesPublication:
 
 class GestionnaireCascadePublication:
 
-    def __init__(self, gestionnaire_domaine):
+    def __init__(self, gestionnaire_domaine, contexte):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__gestionnaire_domaine = gestionnaire_domaine
 
         self.ressources_publication = RessourcesPublication(self)
         self.triggers_publication = TriggersPublication(self)
         self.invalidateur_ressources = InvalidateurRessources(self)
-        self.http_publication = HttpPublication(self, gestionnaire_domaine.contexte.configuration)
+        self.http_publication = HttpPublication(self, contexte.configuration)
 
     def get_site(self, site_id: str):
         return self.__gestionnaire_domaine.get_site(site_id)
@@ -1579,6 +1579,10 @@ class GestionnaireCascadePublication:
     @property
     def ressources(self) -> RessourcesPublication:
         return self.ressources_publication
+
+    @property
+    def triggers(self):
+        return self.triggers_publication
 
     @property
     def document_dao(self):

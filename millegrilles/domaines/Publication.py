@@ -91,32 +91,37 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
+        # Extraire differents composants pour acceder aux fonctionnalites
+        cascade: GestionnaireCascadePublication = self.gestionnaire.cascade
+        triggers = cascade.triggers
+        ressources = cascade.ressources
+
         reponse = None
         if domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITE:
-            self.gestionnaire.maj_ressources_site(message_dict)
+            ressources.maj_ressources_site(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_PAGE:
-            self.gestionnaire.maj_ressources_page(message_dict)
+            ressources.maj_ressources_page(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_FICHIERS:
-            self.gestionnaire.trigger_publication_fichiers(message_dict)
+            triggers.trigger_publication_fichiers(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SECTIONS:
-            self.gestionnaire.continuer_publication_sections(message_dict)
+            cascade.continuer_publication_sections()
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_WEBAPPS:
-            self.gestionnaire.commande_trigger_publication_webapps(message_dict)
+            triggers.commande_trigger_publication_webapps(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION:
-            self.gestionnaire.commande_publier_upload_datasection(message_dict)
+            cascade.commande_publier_upload_datasection(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITECONFIGURATION:
-            self.gestionnaire.commande_publication_configuration(message_dict)
+            triggers.emettre_publier_configuration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_MAPPING:
-            self.gestionnaire.commande_publier_upload_mapping(message_dict)
+            triggers.emettre_publier_mapping(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION:
-            self.gestionnaire.commande_publier_upload_siteconfiguration(message_dict)
+            cascade.commande_publier_upload_siteconfiguration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_COMPLET:
-            compte = self.gestionnaire.demarrer_publication_complete(message_dict)
+            compte = triggers.demarrer_publication_complete(message_dict)
             reponse = {'ok': True, 'compte': compte}
         elif domaine_action == ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION:
-            self.gestionnaire.continuer_publication(message_dict)
+            cascade.continuer_publication(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_RESET_RESSOURCES:
-            matched_count = self.gestionnaire.reset_ressources(message_dict)
+            matched_count = ressources.reset_ressources(message_dict)
             reponse = {'ok': True, 'matched_count': matched_count}
         elif domaine_action == ConstantesPublication.COMMANDE_POUSSER_SECTIONS:
             reponse = self.gestionnaire.pousser_sections(message_dict, properties)
@@ -160,7 +165,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         self.__traitement_publication_fichiers = TraitementEvenementsFichiers(self,)
 
-        self.__gestionnaire_cascade = GestionnaireCascadePublication(self)
+        self.__gestionnaire_cascade = GestionnaireCascadePublication(self, contexte)
+
+    @property
+    def cascade(self):
+        return self.__gestionnaire_cascade
 
     def configurer(self):
         super().configurer()
@@ -536,8 +545,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         doc_site = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
-        self.invalider_ressources_siteconfig(site_id)
-        self.invalider_ressource_mapping()
+        self.__gestionnaire_cascade.triggers.invalider_ressources_siteconfig(site_id)
+        self.__gestionnaire_cascade.triggers.invalider_ressource_mapping()
 
         # Retirer champs de contenu publie du site
         filtre_site_ressources = {
@@ -618,7 +627,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             collection_sites.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
         # Invalider la ressource siteconfig pour publication
-        self.invalider_ressources_siteconfig(site_id)
+        self.__gestionnaire_cascade.triggers.invalider_ressources_siteconfig(site_id)
 
         # Declencher publication des collections
         collections_fichiers = doc_section.get('collections') or list()
@@ -708,7 +717,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
 
         # self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
-        self.invalider_ressources_pages([section_id])
+        self.__gestionnaire_cascade.triggers.invalider_ressources_pages([section_id])
 
         # Associer fichier media au post (si applicable)
         # if params.get(ConstantesPublication.CHAMP_MEDIA_UUID):
@@ -764,7 +773,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_mapping = collection_configuration.update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Invalider ressource mapping
-        self.invalider_ressource_mapping()
+        self.__gestionnaire_cascade.triggers.invalider_ressource_mapping()
 
         return doc_mapping
 
@@ -801,8 +810,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_maj = collection_cdns.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Invalider tous les sites - fait regenerer tous les CDNs. Update mapping aussi (pour CDNs)
-        self.invalider_ressources_siteconfig()
-        self.invalider_ressource_mapping()
+        self.__gestionnaire_cascade.triggers.invalider_ressources_siteconfig()
+        self.__gestionnaire_cascade.triggers.invalider_ressource_mapping()
 
         return doc_maj
 

@@ -153,6 +153,7 @@ class StubTriggerPublication:
         self.emettre_publier_mapping_calls = list()
         self.trigger_traitement_collections_fichiers_calls = list()
         self.trigger_publication_fichiers_calls = list()
+        self.emettre_publier_collectionfichiers_calls = list()
 
         self.sites_par_cdn = list()
         self.compteur_publier_webapps = 0
@@ -161,6 +162,7 @@ class StubTriggerPublication:
         self.compteur_publier_mapping = 0
         self.compteur_trigger_collections_fichiers = 0
         self.compteur_trigger_fichiers = 0
+        self.compteur_publier_collectionfichiers = 0
 
     def emettre_evenements_downstream(self, *args, **kwargs):
         self.marquer_ressource_complete_calls.append({'args': args, 'kwargs': kwargs})
@@ -193,6 +195,9 @@ class StubTriggerPublication:
         self.trigger_publication_fichiers_calls.append({'args': args, 'kwargs': kwargs})
         return self.compteur_trigger_fichiers
 
+    def emettre_publier_collectionfichiers(self, *args, **kwargs):
+        self.emettre_publier_collectionfichiers_calls.append({'args': args, 'kwargs': kwargs})
+        return self.compteur_publier_collectionfichiers
 
 class StubGestionnaireDomaine:
 
@@ -1894,7 +1899,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         # self.cascade = StubCascade(self.contexte)
 
         self.gestionnaire_domaine = StubGestionnaireDomaine(self.contexte)
-        self.cascade = GestionnaireCascadePublication(self.gestionnaire_domaine)
+        self.cascade = GestionnaireCascadePublication(self.gestionnaire_domaine, self.contexte)
 
         self.ressources_publication = StubRessourcesPublication()
         self.cascade.ressources_publication = self.ressources_publication
@@ -2408,8 +2413,11 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
             'uuid': 'DUMMY-uuid'
         }])
 
+        self.trigger.compteur_publier_collectionfichiers = 1
+        self.trigger.compteur_publier_uploadpages = 1
+
         compteur = self.cascade.continuer_publication_sections()
-        self.assertEqual(1, compteur)
+        self.assertEqual(0, compteur)
 
     def test_continuer_publication_sections_1site(self):
         self.cascade.triggers_publication.sites_par_cdn.append([{
@@ -2421,6 +2429,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
             'uuid': 'DUMMY-uuid'
         }])
 
+        self.trigger.compteur_publier_collectionfichiers = 1
         self.trigger.compteur_publier_uploadpages = 1
 
         compteur = self.cascade.continuer_publication_sections()
