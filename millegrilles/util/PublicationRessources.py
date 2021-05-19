@@ -152,6 +152,30 @@ class InvalidateurRessources:
 
         collection_ressources.update(filtre, ops)
 
+    def marquer_ressource_erreur(self, filtre_ressource, err_code: str = None, cdn_id: str = None):
+        if cdn_id is not None:
+            unset = {'$unset': {'distribution_progres.' + cdn_id: True}}
+        else:
+            unset = {'$unset': {'distribution_progres': True}}
+
+        if err_code is not None:
+            set_ops = {ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: err_code}
+        else:
+            set_ops = {ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True}
+
+        ops = {
+            '$unset': unset,
+            '$set': set_ops,
+            '$addToSet': {ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: cdn_id},
+            '$currentDate': {
+                'distribution_maj': True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
+        }
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_many(filtre_ressource, ops)
+
     def marquer_collection_fichiers_prete(self, uuid_collection: str):
         set_ops = {
             ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
@@ -173,6 +197,7 @@ class InvalidateurRessources:
             cdns.update(progres.keys())
         except TypeError:
             pass  #OK
+
         try:
             complete = doc_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE)
             cdns.update(complete)
@@ -1169,11 +1194,14 @@ class GestionnaireCascadePublication:
             if type_cdn in ['ipfs', 'ipfs_gateway']:
                 # Publier avec le IPNS associe a la section
                 self.http_publication.put_publier_fichier_ipns(cdn, res_data, Constantes.SECURITE_PRIVE)
-            else:
+            elif type_cdn in ['awss3', 'sftp']:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
                 self.http_publication.put_publier_repertoire([cdn], fichiers, params)
+            else:
+                # Rien a faire, on marque la config comme publiee
+                self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -1531,7 +1559,7 @@ class GestionnaireCascadePublication:
 
                 # Publier collections de fichiers (metadata)
                 # repertoire: data/fichiers
-                collections_publiees = self.triggers_publication.emettre_publier_collectionfichiers(cdn_id, site_id)
+                collections_publiees = self.triggers_publication.emettre_publier_collectionfichiers(cdn_id)
                 compteurs_commandes_emises = compteurs_commandes_emises + collections_publiees
 
                 # Publier forums
@@ -1738,6 +1766,7 @@ class TriggersPublication:
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
             ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'$exists': True},
         }
         curseur_collections_fichiers = collection_ressources.find(filtre)
 
@@ -1795,7 +1824,7 @@ class TriggersPublication:
                 continue  # rien a faire pour ces CDNs
 
             cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
-            liste_sites = cdn['sites']
+            # liste_sites = cdn['sites']
 
             label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
 
@@ -1803,9 +1832,9 @@ class TriggersPublication:
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             filtre_fichiers = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-                'sites': {'$in': liste_sites},
+                # 'sites': {'$in': liste_sites},
                 label_champ_distribution: {'$exists': True},
-                ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': False},
+                # ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': False},
             }
             curseur_res_fichiers = collection_ressources.find(filtre_fichiers)
 
@@ -2025,15 +2054,15 @@ class TriggersPublication:
             if valeur_distribution is False:
 
                 # Generer la page au besoin
-                contenu = doc_page.get('contenu')
-                if contenu is None:
-                    # Mettre a jour le contenu
-                    doc_page = self.__cascade.ressources.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+                # contenu = doc_page.get('contenu')
+                # if contenu is None:
+                # Mettre a jour le contenu - s'assure d'avoir tous les CID
+                doc_page = self.__cascade.ressources.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
 
-                date_signature = doc_page.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
-                if date_signature is None:
-                    # Creer contenu .json.gz
-                    self.__cascade.ressources.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
+                # date_signature = doc_page.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
+                # if date_signature is None:
+                # Creer contenu .json.gz
+                self.__cascade.ressources.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
 
                 # Transmettre la commande
                 # Compter le fichier meme si on n'a pas envoye de commande: il est encore en traitement
@@ -2058,37 +2087,36 @@ class TriggersPublication:
 
         return compteur_commandes_emises
 
-    def emettre_publier_collectionfichiers(self, cdn_id, site_id: str):
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-
-        # Trouver la liste des sections album et fichiers pour ce site (donne list uuid_collection)
-        filtre_collections = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                ConstantesPublication.LIBVAL_SECTION_FICHIERS,
-                ConstantesPublication.LIBVAL_SECTION_ALBUM,
-            ]},
-            ConstantesPublication.CHAMP_SITE_ID: site_id,
-            # label_champ_distribution: False,
-        }
-        projection_section = {ConstantesPublication.CHAMP_COLLECTIONS: True}
-        curseur_sections = collection_ressources.find(filtre_collections, projection=projection_section)
-
-        uuid_collections = set()
-        for section in curseur_sections:
-            try:
-                uuid_collections.update(section[ConstantesPublication.CHAMP_COLLECTIONS])
-            except (KeyError, AttributeError):
-                pass  # OK
-
-        uuid_collections = list(uuid_collections)
+    def emettre_publier_collectionfichiers(self, cdn_id):
+        # collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        #
+        # # Trouver la liste des sections album et fichiers pour ce site (donne list uuid_collection)
+        # filtre_collections = {
+        #     ConstantesPublication.CHAMP_TYPE_SECTION: {'$in': [
+        #         ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+        #         ConstantesPublication.LIBVAL_SECTION_ALBUM,
+        #     ]},
+        #     ConstantesPublication.CHAMP_SITE_ID: site_id,
+        # }
+        # curseur_sections = collection_sections.find(filtre_collections)
+        #
+        # uuid_collections = set()
+        # for section in curseur_sections:
+        #     try:
+        #         uuid_collections.update(section[ConstantesPublication.CHAMP_COLLECTIONS])
+        #     except (KeyError, AttributeError):
+        #         pass  # OK
+        #
+        # uuid_collections = list(uuid_collections)
 
         compteur_commandes = 0
         label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
 
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         # Charger les collection_fichiers identifiees. Seulement traiter celles qui sont flaggees progres=False
         filtre_collections_fichiers = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_collections},
+            # ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_collections},
             label_champ_distribution: False,
         }
         curseur_collection_fichiers = collection_ressources.find(filtre_collections_fichiers)
@@ -2111,14 +2139,14 @@ class TriggersPublication:
 
             # Marquer tous les fichiers associes a cette collection s'ils ne sont pas deja publies
             # pour ce CDN
-            filtre_fichiers = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
-                ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
-                # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {'exists': False},
-                'collections': {'$all': [uuid_col_fichiers]}
-                # 'fuuid': {'$in': liste_fuuids}
-            }
-            self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
+            # filtre_fichiers = {
+            #     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            #     ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
+            #     # ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {'exists': False},
+            #     'collections': {'$all': [uuid_col_fichiers]}
+            #     # 'fuuid': {'$in': liste_fuuids}
+            # }
+            # self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers, many=True, etat=False)
 
             # Publier le contenu sur le CDN
             # Upload avec requests via https://fichiers
@@ -2159,11 +2187,12 @@ class TriggersPublication:
                 etat_distribution = res_siteconfig[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
                 if etat_distribution is True:
                     # Rien a faire
+                    compteur_commandes = compteur_commandes + 1
                     continue
             except KeyError:
                 self.__logger.warning("Progres deploiement de site %s sur cdn %s n'est pas conserve correctement" % (site_id, cdn_id))
             try:
-                self.__cascade.ressources.preparer_siteconfig_publication(cdn_id, site_id)
+                self.__cascade.ressources.preparer_siteconfig_publication(site_id)
 
                 filtre_section = {
                     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
@@ -2422,7 +2451,7 @@ class HttpPublication:
             'permission': permission,
             'securite': securite,
         }
-        r = self.requests_put('/publier/fichierIpns', data, files)
+        r = self.requests_put('publier/fichierIpns', data, files)
         r.raise_for_status()
 
     def put_publier_repertoire(self, cdns: list, fichiers: list, params: dict = None):
@@ -2478,7 +2507,7 @@ class HttpPublication:
         if params.get('fichier_unique') is True:
             data_publier['fichier_unique'] = True
 
-        r = self.requests_put('/publier/repertoire', data_publier, files)
+        r = self.requests_put('publier/repertoire', data_publier, files)
         r.raise_for_status()
 
 
@@ -2520,17 +2549,22 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         ressources = gestionnaire_cascade.ressources
         invalidateur = gestionnaire_cascade.invalidateur
 
-        changement_detecte = ressources.detecter_changement_collection(contenu_collection)
-        if changement_detecte is True:
-            info_collection = contenu_collection['collection']
-            liste_documents = contenu_collection['documents']
+        if contenu_collection.get('err') is True:
+            code_err = contenu_collection.get('code') or 'generique'
+            self.__logger.error("Erreur access collection %s, code %s" % (uuid_collection, code_err))
+            invalidateur.marquer_ressource_erreur(code_err)
+        else:
+            changement_detecte = ressources.detecter_changement_collection(contenu_collection)
+            if changement_detecte is True:
+                info_collection = contenu_collection['collection']
+                liste_documents = contenu_collection['documents']
 
-            # Ajouter les fichiers (ressources) manquants. Invalide contenu collection_fichiers.
-            ressources.maj_ressource_collection_fichiers(info_collection, liste_documents)
+                # Ajouter les fichiers (ressources) manquants. Invalide contenu collection_fichiers.
+                ressources.maj_ressource_collection_fichiers(info_collection, liste_documents)
 
-        # Marquer collection_fichiers comme prete. On doit quand meme attendre publication des fichiers avant de
-        # generer le contenu (CID, etc.)
-        invalidateur.marquer_collection_fichiers_prete(uuid_collection)
+            # Marquer collection_fichiers comme prete. On doit quand meme attendre publication des fichiers avant de
+            # generer le contenu (CID, etc.)
+            invalidateur.marquer_collection_fichiers_prete(uuid_collection)
 
         if self.parametres.get('continuer_publication') is True:
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION

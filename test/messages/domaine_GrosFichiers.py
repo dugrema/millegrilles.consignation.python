@@ -614,7 +614,7 @@ class MessagesSample(BaseCallback):
         # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe = sample.requete_activite()
         # enveloppe = sample.requete_corbeille()
-        # enveloppe = sample.requete_documents_collection()
+        enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
@@ -633,7 +633,7 @@ class MessagesSample(BaseCallback):
         # sample.commande_reset_fichiers_publies()
         # sample.requete_transferts_en_cours()
         # sample.commande_clear_fichier_publie()
-        sample.commande_associer_fichier_collection()
+        # sample.commande_associer_fichier_collection()
 
         # sample.requete_get_collections()
         # sample.requete_get_collection()

@@ -630,7 +630,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         info_collection = collection_domaine.find_one(filtre_collection, hint=hint_collection)
 
         # Verifier si on doit generer une permission (requis pour collection privee ou protegee)
-        securite_collection = info_collection[Constantes.DOCUMENT_INFODOC_SECURITE]
+        try:
+            securite_collection = info_collection[Constantes.DOCUMENT_INFODOC_SECURITE]
+        except TypeError:
+            # Collection inconnue, retourner erreur
+            return {'err': True, 'code': 'NOTFOUND', 'message': 'Collection %s inconnue' % uuid_collection}
+
         if Constantes.SECURITE_PROTEGE in exchanges or Constantes.SECURITE_SECURE in exchanges:
             permission = None  # Certificat donne acces directement, permission non requise
         elif Constantes.SECURITE_PRIVE in exchanges and securite_collection == Constantes.SECURITE_PRIVE:

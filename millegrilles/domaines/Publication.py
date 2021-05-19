@@ -112,7 +112,7 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_SITECONFIGURATION:
             triggers.emettre_publier_configuration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_MAPPING:
-            triggers.emettre_publier_mapping(message_dict)
+            cascade.commande_publier_upload_mapping(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_SITECONFIGURATION:
             cascade.commande_publier_upload_siteconfiguration(message_dict)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_COMPLET:
@@ -141,10 +141,13 @@ class TraitementEvenementsFichiers(TraitementMessageDomaineEvenement):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
+        gestionnaire_publication = self.gestionnaire
+        cascade: GestionnaireCascadePublication = gestionnaire_publication.cascade
+
         if domaine_action == 'publierFichier':
-            self.gestionnaire.traiter_evenement_publicationfichier(message_dict)
+            cascade.traiter_evenement_publicationfichier(message_dict)
         elif domaine_action in ['majFichier', 'associationPoster']:
-            self.gestionnaire.traiter_evenement_maj_fichier(message_dict, routing_key)
+            cascade.traiter_evenement_maj_fichier(message_dict, routing_key)
 
 
 class GestionnairePublication(GestionnaireDomaineStandard):
