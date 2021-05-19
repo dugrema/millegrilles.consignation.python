@@ -167,6 +167,37 @@ class InvalidateurRessources:
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
+        cdns = set()
+        try:
+            progres = doc_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES)
+            cdns.update(progres.keys())
+        except TypeError:
+            pass  #OK
+        try:
+            complete = doc_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE)
+            cdns.update(complete)
+        except TypeError:
+            pass  # OK
+
+        # Ajouter tous les CDN associes a cette collection aux fichiers de la collection (res)
+        for cdn_id in cdns:
+            # Marquer les fichiers de la collection qui n'ont pas ete publies sur le CDN
+            filtre_fichiers = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+                'collections': {'$all': [uuid_collection]},
+                ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}}
+            }
+            label_progres = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+            set_ops = {
+                label_progres: False,
+            }
+            ops = {
+                '$set': set_ops,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+            collection_ressources.update_many(filtre_fichiers, ops)
+
+
         return doc_fichiers
 
 
@@ -736,7 +767,7 @@ class RessourcesPublication:
 
         # Declencher les processus de synchronisation de collections
         for uuid_collection in uuid_collections:
-            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            processus = "millegrilles_util_PublicationRessources:ProcessusPublierCollectionGrosFichiers"
             params = {
                 'uuid_collection': uuid_collection,
                 'continuer_publication': True,
@@ -1679,7 +1710,10 @@ class TriggersPublication:
             # Recuperer la liste de ressources qui ne sont pas publies dans tous les CDNs de la liste
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             filtre = {
-                'sites': {'$in': liste_sites},
+                '$or': [
+                    {'site_id': {'$in': liste_sites}},
+                    {'sites': {'$in': liste_sites}},
+                ],
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
             ops = {
@@ -2481,17 +2515,22 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         contenu_collection = self.parametres['reponse'][0]
         uuid_collection = self.parametres['uuid_collection']
 
-        changement_detecte = self.controleur.gestionnaire.detecter_changement_collection(contenu_collection)
+        gestionnaire_publication = self.controleur.gestionnaire
+        gestionnaire_cascade: GestionnaireCascadePublication = gestionnaire_publication.cascade
+        ressources = gestionnaire_cascade.ressources
+        invalidateur = gestionnaire_cascade.invalidateur
+
+        changement_detecte = ressources.detecter_changement_collection(contenu_collection)
         if changement_detecte is True:
             info_collection = contenu_collection['collection']
             liste_documents = contenu_collection['documents']
 
             # Ajouter les fichiers (ressources) manquants. Invalide contenu collection_fichiers.
-            self.controleur.gestionnaire.maj_ressource_collection_fichiers(info_collection, liste_documents)
+            ressources.maj_ressource_collection_fichiers(info_collection, liste_documents)
 
         # Marquer collection_fichiers comme prete. On doit quand meme attendre publication des fichiers avant de
         # generer le contenu (CID, etc.)
-        self.controleur.gestionnaire.marquer_collection_fichiers_prete(uuid_collection)
+        invalidateur.marquer_collection_fichiers_prete(uuid_collection)
 
         if self.parametres.get('continuer_publication') is True:
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION
