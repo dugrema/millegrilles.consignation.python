@@ -2007,24 +2007,44 @@ class TriggersPublication:
         return compteur_commandes_emises
 
     def emettre_publier_collectionfichiers(self, cdn_id, site_id: str):
-        collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
-        filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
-        # doc_site = collection_sites.find_one(filtre_site)
-        # securite_site = doc_site[Constantes.DOCUMENT_INFODOC_SECURITE]
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
 
+        # Trouver la liste des sections album et fichiers pour ce site (donne list uuid_collection)
+        filtre_collections = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+                ConstantesPublication.LIBVAL_SECTION_ALBUM,
+            ]},
+            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            # label_champ_distribution: False,
+        }
+        projection_section = {ConstantesPublication.CHAMP_COLLECTIONS: True}
+        curseur_sections = collection_ressources.find(filtre_collections, projection=projection_section)
+
+        uuid_collections = set()
+        for section in curseur_sections:
+            try:
+                uuid_collections.update(section[ConstantesPublication.CHAMP_COLLECTIONS])
+            except (KeyError, AttributeError):
+                pass  # OK
+
+        uuid_collections = list(uuid_collections)
+
+        compteur_commandes = 0
         label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
 
-        filtre_collections = {
+        # Charger les collection_fichiers identifiees. Seulement traiter celles qui sont flaggees progres=False
+        filtre_collections_fichiers = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
-            ConstantesPublication.CHAMP_SITE_ID: site_id,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_collections},
             label_champ_distribution: False,
         }
-
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        curseur_collection_fichiers = collection_ressources.find(filtre_collections)
+        curseur_collection_fichiers = collection_ressources.find(filtre_collections_fichiers)
         for res_collection_fichiers in curseur_collection_fichiers:
             uuid_col_fichiers = res_collection_fichiers['uuid']
-            securite_collection = res_collection_fichiers[Constantes.DOCUMENT_INFODOC_SECURITE]
+            contenu = res_collection_fichiers[ConstantesPublication.CHAMP_CONTENU]
+            securite_collection = contenu[Constantes.DOCUMENT_INFODOC_SECURITE]
+
             filtre_fichiers_maj = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
                 'uuid': uuid_col_fichiers,
@@ -2062,6 +2082,9 @@ class TriggersPublication:
             }
             domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_DATASECTION
             self.generateur_transactions.transmettre_commande(commande_publier_section, domaine_action)
+            compteur_commandes = compteur_commandes + 1
+
+        return compteur_commandes
 
     def emettre_publier_configuration(self, cdn_id: str, site_id: str):
         # collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)

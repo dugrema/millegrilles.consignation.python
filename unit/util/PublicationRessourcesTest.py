@@ -816,12 +816,22 @@ class TriggersPublicationTest(TestCaseContexte):
         #     'site_id': 'DUMMY-site',
         # })
 
+        # section fichiers
         self.contexte.document_dao.valeurs_find.append([{
-            'uuid': 'DUMMY-uuid',
-            'securite': Constantes.SECURITE_PUBLIC,
+            'section_id': 'DUMMY-section',
+            'collections': ['DUMMY-uuid'],
         }])
 
-        self.trigger.emettre_publier_collectionfichiers(cdn_id, site_id)
+        # collection_fichiers
+        self.contexte.document_dao.valeurs_find.append([{
+            'uuid': 'DUMMY-uuid',
+            'contenu': {
+                'securite': Constantes.SECURITE_PUBLIC,
+            },
+        }])
+
+        compteur = self.trigger.emettre_publier_collectionfichiers(cdn_id, site_id)
+        self.assertEqual(1, compteur)
 
         contenu_gzip_calls = self.cascade.sauvegarder_contenu_gzip_calls
         ressource_encours_calls = self.cascade.marquer_ressource_encours_calls
