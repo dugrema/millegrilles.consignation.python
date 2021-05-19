@@ -1598,14 +1598,17 @@ class RessourcesPublicationTest(TestCaseContexte):
         def mock_maj_ressources(*args, **kwargs):
             mock_call['args'] = args
             mock_call['kwargs'] = kwargs
+            return ['uuid-1']
 
         self.ressources_publication.maj_ressource_avec_fichiers = mock_maj_ressources
 
         self.ressources_publication.identifier_ressources_fichiers()
 
         calls_update = self.contexte.document_dao.calls_update
+        demarrer_processus_calls = self.cascade.demarrer_processus_calls
         self.assertEqual(1, len(calls_update))
         self.assertEqual('DUMMY-section', mock_call['args'][0])
+        self.assertEqual(1, len(demarrer_processus_calls))
 
     def test_maj_ressource_avec_fichiers(self):
         section_id = 'DUMMY-section'

@@ -641,7 +641,7 @@ class RessourcesPublication:
 
     def trouver_ressources_manquantes(self):
         """
-        Identifie et ajoute toutes les ressources manquantes
+        Identifie et ajoute toutes les ressources manquantes a partir des siteconfigs et sections.
         :return:
         """
         date_courante = datetime.datetime.utcnow()
@@ -736,10 +736,11 @@ class RessourcesPublication:
                 ConstantesPublication.LIBVAL_SECTION_ALBUM,
                 ConstantesPublication.LIBVAL_SECTION_FORUM,
             ]},
-            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+            # ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
         }
 
         curseur_ressources = collection_ressources.find(filtre_res)
+        uuid_collections = set()
         for res in curseur_ressources:
             # Mettre le flag a True immediatement, evite race condition
             filtre_res_update = {ConstantesPublication.CHAMP_SECTION_ID: res[ConstantesPublication.CHAMP_SECTION_ID]}
@@ -755,21 +756,43 @@ class RessourcesPublication:
             if type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
                 self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
             elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
-                self.maj_ressource_avec_fichiers(section_id)
+                uuids = self.maj_ressource_avec_fichiers(section_id)
+                uuid_collections.update(uuids)
 
-    def maj_ressource_avec_fichiers(self, section_id):
+        # Declencher les processus de synchronisation de collections
+        for uuid_collection in uuid_collections:
+            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            params = {
+                'uuid_collection': uuid_collection,
+                'emettre_commande': True,
+                'continuer_publication': True,
+            }
+            self.__cascade.demarrer_processus(processus, params)
+
+    def maj_ressource_avec_fichiers(self, section_id) -> list:
+        """
+        Insere ou maj les collections_fichiers associes a des sections (fichiers ou albums)
+        :param section_id:
+        :return: Liste des uuid de collection
+        """
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        filtre_section = {
-            ConstantesPublication.CHAMP_SECTION_ID: section_id
-        }
+
+        filtre_section = {ConstantesPublication.CHAMP_SECTION_ID: section_id}
         doc_section = collection_sections.find_one(filtre_section)
+
         collection_uuids = doc_section.get('collections') or list()
         site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]
         site = self.__cascade.get_site(site_id)
         liste_cdns = site[ConstantesPublication.CHAMP_LISTE_CDNS]
         date_courante = datetime.datetime.utcnow()
+
+        set_collection_uuids = set()
+
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         for collection_uuid in collection_uuids:
+            # Conserver le uuid pour generer les processus de synchronisation
+            set_collection_uuids.add(collection_uuid)
+
             # Trouver les collections
             filtre_res_collfichiers = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
@@ -802,7 +825,10 @@ class RessourcesPublication:
             }
             if set_ops is not None:
                 ops['$set'] = set_ops
+
             collection_ressources.update_one(filtre_res_collfichiers, ops, upsert=True)
+
+        return list(set_collection_uuids)
 
     def maj_ressource_collection_fichiers(self, site_ids, info_collection: dict, liste_fichiers: list):
         if isinstance(site_ids, str):
@@ -1038,6 +1064,11 @@ class GestionnaireCascadePublication:
         return self.__gestionnaire_domaine.get_site(site_id)
 
     def commande_publier_upload_datasection(self, params: dict):
+        """
+        Upload le contenu (gzippe) d'une section
+        :param params:
+        :return:
+        """
         params = params.copy()
         type_section = params['type_section']
         cdn_id = params['cdn_id']
@@ -1099,6 +1130,11 @@ class GestionnaireCascadePublication:
         return {'ok': True}
 
     def commande_publier_upload_siteconfiguration(self, params: dict):
+        """
+        Upload le contenu (gzippe) de siteconfig
+        :param params:
+        :return:
+        """
         params = params.copy()
         site_id = params[ConstantesPublication.CHAMP_SITE_ID]
         cdn_id = params['cdn_id']
@@ -1150,6 +1186,11 @@ class GestionnaireCascadePublication:
         return {'ok': True}
 
     def commande_publier_upload_mapping(self, params: dict):
+        """
+        Upload le contenu (gzippe) du mapping de tous les sites (index.json.gz)
+        :param params:
+        :return:
+        """
         params = params.copy()
         cdn_id = params['cdn_id']
         remote_path = params['remote_path']
@@ -1199,6 +1240,13 @@ class GestionnaireCascadePublication:
         return {'ok': True}
 
     def traiter_evenement_publicationfichier(self, params: dict):
+        """
+        Traite un evenement recu de consignation fichiers durant le processus de publication.
+        Permet de continuer la publication.
+        :param params:
+        :return:
+        """
+
         identificateur_document = params['identificateur_document']
         cdn_ids = params.get('cdn_ids') or list()
         cdn_id_unique = params.get('cdn_id')
@@ -1644,12 +1692,18 @@ class TriggersPublication:
     def demarrer_publication_complete(self, params: dict):
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
+
+        # Generer toutes les ressources derivant de siteconfig et sections
         self.__cascade.ressources.trouver_ressources_manquantes()
+
+        # Generer les ressources collection_fichiers et le contenu de sections pages pour extraire fichiers (fuuids)
+        # Va aussi generer les entrees res fichiers associees aux pages
         self.__cascade.ressources.identifier_ressources_fichiers()
 
-        liste_cdns = self.preparer_sitesparcdn()
         compteur_commandes = 0
 
+        # Traiter les ressources par CDN actif
+        liste_cdns = self.preparer_sitesparcdn()
         for cdn in liste_cdns:
             type_cdn = cdn[ConstantesPublication.CHAMP_TYPE_CDN]
             if type_cdn in ['hiddenService', 'manuel']:
@@ -1658,7 +1712,7 @@ class TriggersPublication:
             cdn_id = cdn[ConstantesPublication.CHAMP_CDN_ID]
             liste_sites = cdn['sites']
 
-            # Recuperer la liste de fichiers qui ne sont pas publies dans tous les CDNs de la liste
+            # Recuperer la liste de ressources qui ne sont pas publies dans tous les CDNs de la liste
             collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
             filtre = {
                 '$or': [
@@ -1775,6 +1829,7 @@ class TriggersPublication:
     def emettre_evenements_downstream(self, params: dict):
         """
         Emet des evenements de changement sur les echanges appropries
+        Utilise pour recevoir les changements sur noeuds prives et publics (update via MQ)
         :param params:
         :return:
         """
