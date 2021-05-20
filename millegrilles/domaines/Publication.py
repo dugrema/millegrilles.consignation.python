@@ -649,7 +649,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             collection_sites.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
         # Invalider la ressource siteconfig pour publication
-        self.__gestionnaire_cascade.triggers.invalider_ressources_siteconfig(site_id)
+        self.__gestionnaire_cascade.invalidateur.invalider_ressources_siteconfig(site_id)
 
         # Declencher publication des collections
         collections_fichiers = doc_section.get('collections') or list()
@@ -739,7 +739,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
 
         # self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
-        self.__gestionnaire_cascade.triggers.invalider_ressources_pages([section_id])
+        self.__gestionnaire_cascade.invalidateur.invalider_ressources_pages([section_id])
 
         # Associer fichier media au post (si applicable)
         # if params.get(ConstantesPublication.CHAMP_MEDIA_UUID):
@@ -795,7 +795,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_mapping = collection_configuration.update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Invalider ressource mapping
-        self.__gestionnaire_cascade.triggers.invalider_ressource_mapping()
+        self.__gestionnaire_cascade.invalidateur.invalider_ressource_mapping()
 
         return doc_mapping
 
@@ -832,8 +832,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         doc_maj = collection_cdns.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Invalider tous les sites - fait regenerer tous les CDNs. Update mapping aussi (pour CDNs)
-        self.__gestionnaire_cascade.triggers.invalider_ressources_siteconfig()
-        self.__gestionnaire_cascade.triggers.invalider_ressource_mapping()
+        self.__gestionnaire_cascade.invalidateur.invalider_ressources_siteconfig()
+        self.__gestionnaire_cascade.invalidateur.invalider_ressource_mapping()
 
         return doc_maj
 
