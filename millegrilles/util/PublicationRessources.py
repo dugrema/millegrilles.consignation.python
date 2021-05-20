@@ -60,6 +60,20 @@ class InvalidateurRessources:
         else:
             collection_ressources.update_many(filtre_ressource, ops, upsert=upsert)
 
+    def reset_ressources_encours(self):
+        ops = {
+            '$unset': {ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True},
+            '$currentDate': {
+                'distribution_maj': True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
+        }
+        filtre = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'$exists': True}
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        collection_ressources.update_many(filtre, ops)
+
     def marquer_ressource_complete(self, cdn_id, filtre_ressource, many=False):
         date_courante = datetime.datetime.utcnow()
         set_on_insert = {
@@ -1151,10 +1165,14 @@ class GestionnaireCascadePublication:
                 # Aucune structure de repertoire, uniquement uploader le fichier
                 fichiers = [{'remote_path': 'fichier.bin', 'fp': fp_bytesio, 'mimetype': mimetype}]
                 params['fichier_unique'] = True
-            else:
+                self.http_publication.put_publier_repertoire([cdn], fichiers, params)
+            elif type_cdn in ['awss3', 'sftp']:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
-            self.http_publication.put_publier_repertoire([cdn], fichiers, params)
+                self.http_publication.put_publier_repertoire([cdn], fichiers, params)
+            else:
+                # Rien a faire, on marque la config comme publiee
+                self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -1728,6 +1746,9 @@ class TriggersPublication:
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
 
+        # Reset le progres de toutes les ressources - permet de liberer ressources bloquees en progres = true
+        self.__cascade.invalidateur.reset_ressources_encours()
+
         # Generer toutes les ressources derivant de siteconfig et sections
         self.__cascade.ressources.trouver_ressources_manquantes()
 
@@ -1754,6 +1775,11 @@ class TriggersPublication:
                     {'site_id': {'$in': liste_sites}},
                     {'sites': {'$in': liste_sites}},
                 ],
+                # Sections fichiers et albums ne sont pas publies sous forme de ressources, ils sont inclus dans siteconfig
+                Constantes.DOCUMENT_INFODOC_LIBELLE: {'$nin': [
+                    ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+                    ConstantesPublication.LIBVAL_SECTION_ALBUM,
+                ]},
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
             ops = {

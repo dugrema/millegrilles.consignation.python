@@ -74,7 +74,7 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_partie_pages(message_dict)
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_ETAT_PUBLICATION:
-            reponse = self.gestionnaire.get_etat_publication(message_dict)
+            reponse = self.gestionnaire.get_etat_publication()
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -418,31 +418,48 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return reponse
 
-    def get_etat_publication(self, params: dict):
+    def get_etat_publication(self):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        aggregation_pipe = [
-            {'$match': {
-                ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {
-                    '$exists': True,
-                    '$ne': dict()
-                },
-                ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {
-                    '$exists': False
-                }
-            }},
-            {'$group': {
-                '_id': '$_mg-libelle',
-                'count': {'$sum': 1},
-            }}
-        ]
-        curseur = collection_ressources.aggregate(aggregation_pipe)
+        projection = {ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES}
+        filtre = {ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'$exists': True}}
+        curseur_progres = collection_ressources.find(filtre, projection=projection)
+
+        cdn_sets = set()
+        for cp in curseur_progres:
+            progres = cp[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES]
+            cdn_sets.update(progres.keys())
 
         en_cours = dict()
-        for resultat in curseur:
-            self.__logger.debug("Resultat : %s" % str(resultat))
-            type_section = resultat['_id']
-            count_section = resultat['count']
-            en_cours[type_section] = count_section
+
+        for cdn_id in cdn_sets:
+            types_res = dict()
+
+            aggregation_pipe = [
+                {'$match': {
+                    ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {
+                        '$exists': True,
+                        '$ne': dict()
+                    },
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: {'$nin': [
+                        ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+                        ConstantesPublication.LIBVAL_SECTION_ALBUM,
+                    ]}
+                }},
+                {'$group': {
+                    '_id': '$_mg-libelle',
+                    'count': {'$sum': 1},
+                }}
+            ]
+            curseur = collection_ressources.aggregate(aggregation_pipe)
+
+            for resultat in curseur:
+                self.__logger.debug("Resultat : %s" % str(resultat))
+                type_section = resultat['_id']
+                count_section = resultat['count']
+                types_res[type_section] = count_section
+
+            if len(types_res) > 0:
+                en_cours[cdn_id] = types_res
 
         filtre_erreurs = {
             ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': True}
@@ -460,6 +477,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         reponse = {
             'erreurs': erreurs,
             'en_cours': en_cours,
+            'cdns': list(cdn_sets),
         }
 
         return reponse

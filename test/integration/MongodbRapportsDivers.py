@@ -45,14 +45,17 @@ class TestRapports:
 
         for cdn_id in cdn_sets:
             types_res = dict()
-            en_cours[cdn_id] = types_res
 
             aggregation_pipe = [
                 {'$match': {
                     ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id: {
                         '$exists': True,
                         '$ne': dict()
-                    }
+                    },
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: {'$nin': [
+                        ConstantesPublication.LIBVAL_SECTION_FICHIERS,
+                        ConstantesPublication.LIBVAL_SECTION_ALBUM,
+                    ]}
                 }},
                 {'$group': {
                     '_id': '$_mg-libelle',
@@ -66,6 +69,9 @@ class TestRapports:
                 type_section = resultat['_id']
                 count_section = resultat['count']
                 types_res[type_section] = count_section
+
+            if len(types_res) > 0:
+                en_cours[cdn_id] = types_res
 
         filtre_erreurs = {
             ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': True}
