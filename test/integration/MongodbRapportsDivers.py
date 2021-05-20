@@ -81,7 +81,8 @@ class TestRapports:
             Constantes.DOCUMENT_INFODOC_LIBELLE: True,
             ConstantesPublication.CHAMP_SITE_ID: True,
             ConstantesPublication.CHAMP_SECTION_ID: True,
-            'uuid': True
+            'uuid': True,
+            'fuuid': True,
         }
         curseur_erreurs = collection_ressources.find(filtre_erreurs, projection=projection_erreurs, limit=1000)
         erreurs = [e for e in curseur_erreurs]

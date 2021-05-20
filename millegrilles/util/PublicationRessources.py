@@ -62,14 +62,20 @@ class InvalidateurRessources:
 
     def reset_ressources_encours(self):
         ops = {
-            '$unset': {ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True},
+            '$unset': {
+                ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
+                ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: True,
+            },
             '$currentDate': {
                 'distribution_maj': True,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
             }
         }
         filtre = {
-            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'$exists': True}
+            '$or': [
+                {ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'$exists': True}},
+                {ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': True}},
+            ]
         }
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_many(filtre, ops)
@@ -1652,6 +1658,9 @@ class GestionnaireCascadePublication:
                 # Distribution deja en cours
                 compteurs_commandes_emises = compteurs_commandes_emises + 1
                 continue
+            elif distribution_progres.get(cdn_id) is not False:
+                self.__logger.warning("Deploiement webapp sur cdn_id:%s, aucun flag en place" % cdn_id)
+                return
 
             compteur = self.triggers_publication.emettre_publier_webapps(cdn_id)
             compteurs_commandes_emises = compteurs_commandes_emises + compteur
@@ -2229,6 +2238,8 @@ class TriggersPublication:
                     continue
             except KeyError:
                 self.__logger.warning("Progres deploiement de site %s sur cdn %s n'est pas conserve correctement" % (site_id, cdn_id))
+                continue
+
             try:
                 self.__cascade.ressources.preparer_siteconfig_publication(site_id)
 
@@ -2419,8 +2430,16 @@ class HttpPublication:
         return self.__cascade.document_dao
 
     def requests_put(self, path_command: str, data, files):
+
+        # Preparer URL de connexion a consignationfichiers
+        configuration = self.__configuration
+        url_consignationfichiers = 'https://%s:%s/' % (
+            configuration.serveur_consignationfichiers_host,
+            configuration.serveur_consignationfichiers_port
+        )
+
         r = requests.put(
-            'https://fichiers:3021/' + path_command,
+            url_consignationfichiers + path_command,
             files=files,
             data=data,
             verify=self.__configuration.mq_cafile,
