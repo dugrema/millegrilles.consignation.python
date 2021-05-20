@@ -567,8 +567,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         doc_site = collection_site.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
 
-        self.__gestionnaire_cascade.triggers.invalider_ressources_siteconfig(site_id)
-        self.__gestionnaire_cascade.triggers.invalider_ressource_mapping()
+        self.__gestionnaire_cascade.invalidateur.invalider_ressources_siteconfig(site_id)
+        self.__gestionnaire_cascade.invalidateur.invalider_ressource_mapping()
 
         # Retirer champs de contenu publie du site
         filtre_site_ressources = {
