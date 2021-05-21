@@ -3251,7 +3251,7 @@ class ProcessusTransactionDecricreCollection(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
 
-        self.evenement_maj_collection_publique(uuid_collection)
+        # self.evenement_maj_collection_publique(uuid_collection)
 
         return {'uuid_collection': uuid_collection}
 
