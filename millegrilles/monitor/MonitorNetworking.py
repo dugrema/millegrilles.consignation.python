@@ -2,14 +2,12 @@ import logging
 import os
 import datetime
 
-from os import path, environ
+from os import path
 from base64 import b64decode
-# from typing import Union
 
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.monitor import MonitorConstantes
-# from millegrilles.monitor.ServiceMonitor import ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal
 
 
 class GestionnaireWeb:
@@ -202,13 +200,6 @@ proxy_pass $upstream_installation;
         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
             fichier.write(proxypass_installation)
 
-        proxypass_vitrine = """
-set $upstream_vitrine https://vitrine:443;
-proxy_pass $upstream_vitrine;
-        """
-        with open(path.join(self.__repertoire_modules, 'proxypass_vitrine.include'), 'w') as fichier:
-                fichier.write(proxypass_vitrine)
-
         resolver = """
 resolver 127.0.0.11 valid=30s;
         """
@@ -274,21 +265,6 @@ location = / {
   return 307 https://$http_host/%s;
 }
         """ % redirect_defaut
-
-        location_data_vitrine = """
-location /vitrine/sites {
-  alias /var/opt/millegrilles/nginx/data/vitrine/sites;
-}
-location /vitrine/posts {
-  alias /var/opt/millegrilles/nginx/data/vitrine/posts;
-}
-location /vitrine/collections {
-  alias /var/opt/millegrilles/nginx/data/vitrine/collections;
-}
-location /vitrine/section {
-  rewrite ^(.*)$ /vitrine/index.html;
-}
-        """
 
         location_fichiers_public = """
 location /fichiers {
@@ -370,18 +346,6 @@ location /fichiers/public {
         elif securite is not None:
             location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
 
-        location_public_component = """
-location %s {
-    include /etc/nginx/conf.d/modules/proxypass_vitrine.include;
-    include /etc/nginx/conf.d/component_base.include;
-}
-        """
-        location_priv_prot_component = """
-location %s {
-    include /etc/nginx/conf.d/modules/proxypass_%s.include;
-    include /etc/nginx/conf.d/component_base_auth.include;
-}
-        """
         location_installation_component = """
 location %s {
     include /etc/nginx/conf.d/modules/proxypass_installation.include;
@@ -393,9 +357,6 @@ location %s {
             "/installation",
             "/administration",
         ]
-        location_public_paths = [
-            "/vitrine",
-        ]
 
         certificats = """
 location /certs {
@@ -406,10 +367,8 @@ location /certs {
         locations_list = list()
 
         locations_list.append(location_redirect_installation)
-        locations_list.append(location_data_vitrine)
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
-        locations_list.extend([location_public_component % loc for loc in location_public_paths])
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
 
         locations_content = '\n'.join(locations_list)
