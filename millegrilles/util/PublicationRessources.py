@@ -215,7 +215,7 @@ class InvalidateurRessources:
         try:
             progres = doc_fichiers.get(ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES)
             cdns.update(progres.keys())
-        except TypeError:
+        except (AttributeError, TypeError):
             pass  #OK
 
         try:
@@ -241,7 +241,6 @@ class InvalidateurRessources:
                 '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             }
             collection_ressources.update_many(filtre_fichiers, ops)
-
 
         return doc_fichiers
 
@@ -782,6 +781,36 @@ class RessourcesPublication:
                 ConstantesPublication.CHAMP_SECTION_ID: section[ConstantesPublication.CHAMP_SECTION_ID],
             }
 
+            ops = {
+                '$set': set_ops,
+                '$setOnInsert': set_on_insert
+            }
+            collection_ressources.update_one(filtre, ops, upsert=True)
+
+        collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+        filtre_configuration = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesPublication.LIBVAL_WEBAPPS]}
+        }
+        curseur_configurations = collection_configuration.find(filtre_configuration)
+        for configuration in curseur_configurations:
+            type_configuration = configuration[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            ipns_id = configuration.get(ConstantesPublication.CHAMP_IPNS_ID)
+            ipns_cle_chiffree = configuration.get(ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE)
+
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: type_configuration,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+            }
+            set_ops = {
+                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
+            }
+            if ipns_id and ipns_cle_chiffree:
+                set_ops[ConstantesPublication.CHAMP_IPNS_ID] = ipns_id
+                set_ops[ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE] = ipns_cle_chiffree
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: type_configuration,
+            }
             ops = {
                 '$set': set_ops,
                 '$setOnInsert': set_on_insert
@@ -1660,7 +1689,7 @@ class GestionnaireCascadePublication:
                 continue
             elif distribution_progres.get(cdn_id) is not False:
                 self.__logger.warning("Deploiement webapp sur cdn_id:%s, aucun flag en place" % cdn_id)
-                return
+                continue
 
             compteur = self.triggers_publication.emettre_publier_webapps(cdn_id)
             compteurs_commandes_emises = compteurs_commandes_emises + compteur
@@ -1783,6 +1812,7 @@ class TriggersPublication:
                 '$or': [
                     {'site_id': {'$in': liste_sites}},
                     {'sites': {'$in': liste_sites}},
+                    {Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesPublication.LIBVAL_WEBAPPS]}}
                 ],
                 # Sections fichiers et albums ne sont pas publies sous forme de ressources, ils sont inclus dans siteconfig
                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$nin': [
@@ -2383,40 +2413,13 @@ class TriggersPublication:
             commande.update(cdn)
         else:
             # Type non supporte ou rien a faire
+            self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre)
             return 0
 
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
         self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre, upsert=True)
 
         return 1
-
-        # try:
-        #     doc_res_mapping = self.maj_ressource_mapping()
-        #     self.sauvegarder_contenu_gzip(doc_res_mapping, filtre_mapping)
-        #
-        #     filtre_section = {
-        #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
-        #     }
-        #     self.marquer_ressource_encours(cdn_id, filtre_section)
-        #
-        #     # Publier le contenu sur le CDN
-        #     # Upload avec requests via https://fichiers
-        #     remote_siteconfig = path.join('index.json.gz')
-        #     commande_publier_mapping = {
-        #         'cdn_id': cdn_id,
-        #         'remote_path': remote_siteconfig,
-        #         'mimetype': 'application/json',
-        #         'content_encoding': 'gzip',  # Header Content-Encoding
-        #         'max_age': 0,
-        #     }
-        #
-        #     domaine_action = 'commande.Publication.' + ConstantesPublication.COMMANDE_PUBLIER_UPLOAD_MAPPING
-        #     self.generateur_transactions.transmettre_commande(commande_publier_mapping, domaine_action)
-        #
-        #     return 1
-        # except Exception:
-        #     self.__logger.exception("Erreur preparation traitement mapping")
-        #     return 0
 
 
 class HttpPublication:

@@ -177,6 +177,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     def configurer(self):
         super().configurer()
         self.creer_index()  # Creer index dans MongoDB
+        self.preparer_documents()
 
     def demarrer(self):
         super().demarrer()
@@ -187,6 +188,19 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         # Index _mg-libelle
         collection_sites.create_index([(ConstantesPublication.CHAMP_SITE_ID, 1)], name='site_id')
         collection_sites.create_index([(ConstantesPublication.CHAMP_NOEUDS_URLS, 1)], name='noeuds_urls')
+
+    def preparer_documents(self):
+        # S'assurer d'avoir une configuration pour webapps
+        filtre_webapps = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS}
+        maintenant = datetime.datetime.utcnow()
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: maintenant,
+        }
+        collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+        ops_webapps = {'$setOnInsert': set_on_insert}
+        collection_configuration.update(filtre_webapps, ops_webapps, upsert=True)
 
     def identifier_processus(self, domaine_transaction):
         domaine_action = domaine_transaction.split('.').pop()
@@ -891,7 +905,6 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         return {'ok': True}
 
     def sauvegarder_cle_ipns(self, identificateur_document, params):
-
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
