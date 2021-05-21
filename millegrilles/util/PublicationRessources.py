@@ -936,12 +936,32 @@ class RessourcesPublication:
             if fuuids_fichier:
                 set_fuuids.update(fuuids_fichier)
 
+        # Recuperer toutes les ressources associees a cette collection pour trouver les CID
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_res_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': {'$in': list(set_fuuids)},
+            'cid': {'$exists': True}
+        }
+        projection_fichiers = {'fuuid': True, 'cid': True}
+        curseur_fichiers = collection_ressources.find(filtre_res_fichiers, projection=projection_fichiers)
+        map_cid = dict()
+        for fichier in curseur_fichiers:
+            cid = fichier['cid']
+            fuuid = fichier['fuuid']
+            map_cid[fuuid] = cid
+
         # Creer les entrees manquantes de fichiers  # ATTENTION, potentiel boucle (flag maj_section=False important)
         fuuids_dict = dict()
         flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
         for f in liste_fichiers:
             for fuuid in f['fuuids']:
                 fuuids_dict[fuuid] = f
+                try:
+                    f['cid'] = map_cid[fuuid]
+                except KeyError:
+                    pass  # OK, pas de CID
+
         self.maj_ressources_fuuids(fuuids_dict, public=flag_public)
 
         info_fichiers = self.trouver_info_fuuid_fichiers(list(set_fuuids))
@@ -966,7 +986,6 @@ class RessourcesPublication:
             '$setOnInsert': set_on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         doc_fichiers = collection_ressources.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         return doc_fichiers
@@ -1002,8 +1021,11 @@ class RessourcesPublication:
         """
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         unset_opts = {
+            ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
             ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
             ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
+            ConstantesPublication.CHAMP_CONTENU: True,
+            # ConstantesPublication.CHAMP_DATE_SIGNATURE: True,
         }
         unset_opts.update(UNSET_PUBLICATION_RESOURCES)
         ops = {
@@ -1104,6 +1126,13 @@ class RessourcesPublication:
         except (KeyError, TypeError):
             # Contenu jamais publie ou invalide, on va recharger le contenu de la collection
             return True
+
+        try:
+            preparation_ressource = res_collection[ConstantesPublication.CHAMP_PREPARATION_RESSOURCES]
+            if preparation_ressource is False:
+                return True  # On a mis le flag a false, forcer regeneration
+        except KeyError:
+            return True  # Champ manquant
 
         # Generer un dict des donnees mutables et verifier si elles ont changees
         fuuids_recus = set()
