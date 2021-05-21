@@ -75,6 +75,8 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_ETAT_PUBLICATION:
             reponse = self.gestionnaire.get_etat_publication()
+        elif domaine_action == ConstantesPublication.REQUETE_ETAT_SITE:
+            reponse = self.gestionnaire.get_ressource_site(message_dict)
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -342,6 +344,25 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         noeud_config = collection_site.find_one(filtre, hint=hints)
 
         return noeud_config
+
+    def get_ressource_site(self, params: dict):
+        site_id = params['site_id']
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_SITE_ID: site_id
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        res_site = collection_ressources.find_one(filtre)
+
+        filtre_webapp = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS}
+        res_webapps = collection_ressources.find_one(filtre_webapp)
+
+        resultat = {
+            'site': res_site,
+            'webapp': res_webapps,
+        }
+
+        return resultat
 
     def get_configuration_sites_par_noeud(self, params: dict):
         # noeud_id = params.get('noeud_id')

@@ -1851,6 +1851,7 @@ class ConstantesPublication:
     REQUETE_POSTS = 'posts'
     REQUETE_PARTIES_PAGE = 'partiesPages'
     REQUETE_ETAT_PUBLICATION = 'etatPublication'
+    REQUETE_ETAT_SITE = 'etatSite'
 
     TRANSACTION_CREER_SITE = 'creerSite'
     TRANSACTION_MAJ_SITE = 'majSite'
