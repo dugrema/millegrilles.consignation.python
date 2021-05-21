@@ -1582,7 +1582,7 @@ class GestionnaireCascadePublication:
             # if contenu is None:
             uuid_collection = col_fichiers['uuid']
             # Demarrer un processus pour la preparation et la publication
-            processus = "millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers"
+            processus = "millegrilles_util_PublicationRessources:ProcessusPublierCollectionGrosFichiers"
             params = {
                 'uuid_collection': uuid_collection,
                 'site_ids': liste_sites,
@@ -2393,7 +2393,7 @@ class TriggersPublication:
                 }
                 commande.update(cdn)
             else:
-                processus = "millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine"
+                processus = "millegrilles_util_PublicationRessources:ProcessusCreerCleIpnsVitrine"
                 params = {'cdn_id': cdn['cdn_id']}
                 self.__cascade.demarrer_processus(processus, params)
                 return 1
@@ -2471,7 +2471,7 @@ class HttpPublication:
 
         if ipns_id is None:
             # Utiliser un processus pour creer la cle et deployer la ressource
-            processus = "millegrilles_domaines_Publication:ProcessusPublierCleEtFichierIpns"
+            processus = "millegrilles_util_PublicationRessources:ProcessusPublierCleEtFichierIpns"
             params = {
                 'identificateur_document': identificateur_document,
                 'nom_cle': nom_cle,
@@ -2700,7 +2700,11 @@ class ProcessusPublierCleEtFichierIpns(MGProcessus):
         res_data = collection_ressources.find_one(identificateur_document)
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         doc_cdn = collection_cdns.find_one({'cdn_id': cdn_id})
-        self.controleur.gestionnaire.put_fichier_ipns(doc_cdn, identificateur_document, nom_cle, res_data, securite)
+
+        cascade: GestionnaireCascadePublication = self.controleur.gestionnaire.cascade
+        http_publication = cascade.http_publication
+
+        http_publication.put_fichier_ipns(doc_cdn, identificateur_document, nom_cle, res_data, securite)
 
         self.set_etape_suivante()  # Termine
 
@@ -2752,7 +2756,9 @@ class ProcessusCreerCleIpnsVitrine(MGProcessus):
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         doc_cdn = collection_cdns.find_one({'cdn_id': cdn_id})
 
-        permission = self.controleur.gestionnaire.preparer_permission_secret(cle_chiffree)
+        cascade: GestionnaireCascadePublication = self.controleur.gestionnaire.cascade
+
+        permission = cascade.preparer_permission_secret(cle_chiffree)
         commande = {
             'identificateur_document': identificateur_document,
             'ipns_key': cle_chiffree,
