@@ -283,8 +283,8 @@ location /fichiers {
   proxy_headers_hash_bucket_size 64;
 
   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
-
   include /etc/nginx/conf.d/component_base.include;
+  include /etc/nginx/conf.d/component_cors.include;
 }
         """
 
@@ -319,6 +319,7 @@ location /fichiers {
 
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
+  include /etc/nginx/conf.d/component_cors.include;
 }
         """
         with open(path.join(self.__repertoire_modules, 'fichiers_protege.include'), 'w') as fichier:
@@ -333,6 +334,8 @@ location /fichiers/public {
     rewrite ^/fichiers/(public/[0-9a-f\-]+).*$ https://${HOST}/${IDMG}/$1_video_$arg_video? redirect;
   }
   rewrite ^/fichiers/(public/.*)$ https://${HOST}/${IDMG}/$1 redirect;
+  
+  include /etc/nginx/conf.d/component_cors.include;
 }
         """
         with open(path.join(self.__repertoire_modules, 'fichiers_redirect.include'), 'w') as fichier:
@@ -361,6 +364,7 @@ location %s {
         certificats = """
 location /certs {
   root /usr/share/nginx/files;
+  include /etc/nginx/conf.d/component_cors.include;
 }
         """
 
