@@ -982,7 +982,7 @@ class ServiceMonitor:
 
         # Aller chercher le certificat SSL de LetsEncrypt
         domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
-        mode_test = self._args.dev or params.get('modeTest')
+        mode_test = params.get('modeTest') or False # self._args.dev or params.get('modeTest')
 
         params_environnement = list()
         params_secrets = list()
