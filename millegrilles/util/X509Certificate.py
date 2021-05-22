@@ -393,6 +393,18 @@ class EnveloppeCleCert:
         # subject_list.reverse()  # Plus necessaire depuis upgrade deps
         return ','.join(subject_list)
 
+    @property
+    def is_valid_at_current_time(self):
+        now = pytz.utc.localize(datetime.datetime.utcnow())
+
+        # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+        #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+        #        https://en.wikipedia.org/wiki/Year_2038_problem
+        is_valid_from = (now > pytz.utc.localize(self.cert.not_valid_before))
+        is_valid_to = (now < pytz.utc.localize(self.cert.not_valid_after))
+
+        return is_valid_from and is_valid_to
+
 
 class GenerateurCertificat:
 

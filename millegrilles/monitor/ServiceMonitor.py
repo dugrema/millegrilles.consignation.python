@@ -1122,7 +1122,7 @@ class ServiceMonitor:
 
     def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
         """
-        Initialise un noeud protege avec un certificat
+        Initialise un noeud public avec un certificat
         :param commande:
         :return:
         """
@@ -1138,10 +1138,6 @@ class ServiceMonitor:
         # gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
         #     self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
         role = self.role
-
-        # Faire correspondre et sauvegarder certificat de noeud
-        # secret_intermediaire = gestionnaire_docker.trouver_secret('pki.monitor.key')
-        # secret_date = secret_intermediaire['date']
 
         certificat_pem = params.get('certificatPem') or params['cert']
         chaine = params.get('chainePem') or params['fullchain']
@@ -1177,19 +1173,6 @@ class ServiceMonitor:
             self.__logger.error("Commande CSR en ereur : %s" % str(params))
             raise e
 
-        # if not self._args.dev:
-        #     nom_fichier_key = 'pki.monitor.key.pem'
-        # else:
-        #     nom_fichier_key = 'pki.monitor.key.%s' % secret_date
-        #
-        # with open(os.path.join(self._args.secrets, nom_fichier_key), 'rb') as fichier:
-        #     intermediaire_key_pem = fichier.read()
-        # with open(os.path.join(self._args.secrets, nom_fichier_passwd), 'rb') as fichier:
-        #     intermediaire_passwd_pem = fichier.read()
-        # certificat_pem = params['certificatPem']
-        # certificat_millegrille = params['chainePem'][-1]
-        # chaine = params['chainePem']
-
         # Extraire IDMG
         self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
         clecert_millegrille = EnveloppeCleCert()
@@ -1201,17 +1184,6 @@ class ServiceMonitor:
 
         if certificat_millegrille_present is False:
             self.gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
-
-        # clecert_recu = EnveloppeCleCert()
-        # clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'))
-        # if not clecert_recu.cle_correspondent():
-        #         raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
-
-        # Verifier si on doit generer un certificat web SSL
-        # domaine_web = params.get('domaine')
-        # if domaine_web is not None:
-        #     self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
-        #     self.initialiser_domaine(commande)
 
         cert_subject = clecert_recu.formatter_subject()
 
@@ -1226,15 +1198,6 @@ class ServiceMonitor:
         if type_certificat_recu != role:
             raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
 
-        # Comencer sauvegarde
-        # try:
-        #     gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
-        # except APIError as apie:
-        #     if apie.status_code == 400:
-        #         self.__logger.info("pki.millegrille.cert deja present, on ne le change pas : " + str(apie))
-        #     else:
-        #         raise apie
-
         self.__logger.debug("Sauvegarde certificat recu et cle comme cert/cle de monitor %s" % self.role)
         clecert_recu.password = None
 
@@ -1247,11 +1210,6 @@ class ServiceMonitor:
             # Mode securitaire/production. Faire correspondre le nouveau cert a la cle existante
             date_key = date_csr
 
-        # if self._args.dev:
-        #     nom_key = ConstantesServiceMonitor.PKI_MONITOR_KEY + date_key
-        #     with open(os.path.join(self._args.secrets, nom_key), 'w') as fichier:
-        #         fichier.write(cle_monitor)
-
         gestionnaire_docker.sauvegarder_config(
             'pki.monitor.cert.' + date_key,
             '\n'.join(chaine)
@@ -1262,15 +1220,6 @@ class ServiceMonitor:
             gestionnaire_docker.supprimer_config('pki.monitor.csr.%s' % date_csr)
         except docker.errors.NotFound:
             pass
-        # try:
-        #     gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
-        # except docker.errors.NotFound:
-        #     pass
-
-        # Terminer configuration swarm docker
-        # gestionnaire_docker.initialiser_noeud(idmg=idmg)
-
-        # self.sauvegarder_config_millegrille(idmg, securite)
 
         # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
         # Redemarrage est implicite (fait a la fin de la prep)
@@ -1997,6 +1946,9 @@ class ServiceMonitorPublic(ServiceMonitor):
             # Entretien web
             self._gestionnaire_web.entretien()
 
+            # Entretien certificats
+            self._gestionnaire_certificats.entretien_certificat()
+
     def connecter_middleware(self):
         """
         Genere un contexte et se connecte a MQ et MongoDB.
@@ -2130,6 +2082,16 @@ class ServiceMonitorPublic(ServiceMonitor):
 
     def ajouter_compte(self, certificat: str):
         raise NotImplementedError("Ajouter compte PEM (**non implemente pour public**): %s" % certificat)
+
+    def initialiser_noeud(self, commande: CommandeMonitor):
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            try:
+                self.__logger.debug("Commande initialiser noeud : %s", json.dumps(commande.contenu, indent=2))
+            except Exception:
+                self.__logger.debug("Commande initialiser noeud : %s", commande.contenu)
+
+        params = commande.contenu
+        self._renouveller_certificat_monitor(commande)
 
     @property
     def securite(self):

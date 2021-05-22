@@ -4,6 +4,8 @@ import logging
 import os
 import secrets
 import tempfile
+import pytz
+
 from base64 import b64decode, b64encode
 from os import path, environ
 from typing import cast
@@ -255,12 +257,26 @@ class GestionnaireCertificats:
     def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None, liste_dns: list = None) -> EnveloppeCleCert:
         raise GenerationCertificatNonSupporteeException()
 
+    def verifier_eligibilite_renouvellement(self, clecert: EnveloppeCleCert):
+        not_valid_after = clecert.not_valid_after
+        not_valid_before = clecert.not_valid_before
+
+        # Calculer 2/3 de la duree du certificat
+        delta_2tiers = not_valid_after - not_valid_before
+        delta_2tiers = delta_2tiers * 0.67
+        date_eligible = not_valid_before + delta_2tiers
+        if date_eligible < pytz.utc.localize(datetime.datetime.utcnow()):
+            return True
+
+        return False
+
 
 class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
 
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         super().__init__(docker_client, service_monitor, **kwargs)
         self._passwd_mq: str = cast(str, None)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
@@ -271,19 +287,23 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
             cert_pem = self._charger_certificat_docker('pki.monitor.cert')
         except AttributeError:
             # Le certificat est introuvable - probablement un reset manuel (config supprimee manuellement)
-            # On doit creer nouveau CSR, attente connexion manuelle
-            pass
+            self.generer_csr_public()  # Creer CSR si pas deja fait
         else:
             with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
                 key_pem = fichiers.read()
             clecert_monitor = EnveloppeCleCert()
             clecert_monitor.from_pem_bytes(key_pem, cert_pem)
-            self.clecert_monitor = clecert_monitor
 
-            # Conserver reference au cert monitor pour middleware
-            self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-            self.certificats[
-                GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
+            if not clecert_monitor.is_valid_at_current_time:
+                self.__logger.error("Certificat de monitor est expire")
+                self.generer_csr_public()  # Creer CSR si pas deja fait
+            else:
+                self.clecert_monitor = clecert_monitor
+
+                # Conserver reference au cert monitor pour middleware
+                self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
+                self.certificats[
+                    GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
 
             # Charger le certificat de millegrille
             self._charger_certificat_docker('pki.millegrille.cert')
@@ -294,6 +314,52 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
         :return:
         """
         pass  # Aucun mot de passe prive
+
+    def generer_csr_public(self):
+        try:
+            # Eviter de creer des doublons - on utilise le CSR deja genere si disponible
+            csr_bytes = self._charger_certificat_docker('pki.monitor.csr')
+            csr = csr_bytes.decode('utf-8')
+        except AttributeError:
+            # On doit creer nouveau CSR, attente connexion manuelle
+            self.__logger.warning("Generer un nouveau CSR pour le renouvellement du certificat de monitor")
+            info_cle = self.generer_csr(ConstantesGenerateurCertificat.ROLE_MONITOR)
+            csr = info_cle['request']
+
+        return csr
+
+    def entretien_certificat(self):
+        try:
+            if self.clecert_monitor is not None:
+                eligible = self.verifier_eligibilite_renouvellement(self.clecert_monitor)
+                if eligible is True:
+                    self.__logger.info("Certificat monitor eligible pour renouvellement, demande via MQ")
+
+                    # Creer CSR si pas deja fait
+                    csr = self.generer_csr_public()
+
+                    # Demander un renouvellement via MQ
+                    # Generer message a transmettre au monitor pour renouvellement
+                    commande = {
+                        'csr': csr,
+                        'securite': Constantes.SECURITE_PUBLIC,
+                    }
+
+                    try:
+                        self._service_monitor.connexion_middleware.generateur_transactions.transmettre_commande(
+                            commande,
+                            'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                            exchange=Constantes.SECURITE_PUBLIC,
+                            correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
+                            reply_to=self._service_monitor.connexion_middleware.reply_q
+                        )
+                    except AttributeError:
+                        self.__logger.warning("Connexion MQ pas prete, on ne peut pas renouveller le certificat de monitor")
+                        if self.__logger.isEnabledFor(logging.DEBUG):
+                            self.__logger.exception("Connexion MQ pas prete")
+
+        except Exception:
+            self.__logger.exception("Erreur entretien certificat monitor")
 
 
 class GestionnaireCertificatsNoeudPrive(GestionnaireCertificatsNoeudPublic):
