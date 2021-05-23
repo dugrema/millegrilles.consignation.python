@@ -1903,10 +1903,11 @@ class ServiceMonitorPublic(ServiceMonitor):
             self._gestionnaire_certificats.entretien_certificat()
 
             # Entretien des certificats du monitor, services
+            date_now = datetime.datetime.utcnow()
             if self._certificats_entretien_date is None or \
                     self._certificats_entretien_date + self._certificats_entretien_frequence < date_now:
 
-                self._entretien_certificats()
+                # self._entretien_certificats()
                 self._entretien_secrets_pki()
 
     def connecter_middleware(self):
@@ -1941,6 +1942,9 @@ class ServiceMonitorPublic(ServiceMonitor):
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
             self.preparer_web_api()
+
+            # Forcer entretien des applications avec certificat monitor
+            self._gestionnaire_docker.maj_services_avec_certificat('monitor')
 
             while not self._fermeture_event.is_set():
                 self._attente_event.clear()
@@ -2053,38 +2057,38 @@ class ServiceMonitorPublic(ServiceMonitor):
         params = commande.contenu
         self._renouveller_certificat_monitor(commande)
 
-    def _entretien_certificats(self):
-        """
-        Entretien certificats des services/modules et du monitor
-        :return:
-        """
-        clecert_monitor = self._gestionnaire_certificats.clecert_monitor
-
-        try:
-            not_valid_before = clecert_monitor.not_valid_before
-            not_valid_after = clecert_monitor.not_valid_after
-            self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
-
-            # Calculer 2/3 de la duree du certificat
-            delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
-            epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
-        except AttributeError:
-            self.__logger.warning("Certificat monitor inexistant, on le fait renouveller")
-            date_renouvellement = None
-
-        if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
-            self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
-
-            # # MAJ date pour creation de certificats
-            # self._gestionnaire_certificats.maj_date()
-            #
-            # self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
-            # self._gestionnaire_docker.configurer_monitor()
-            # raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
-        else:
-            # Verifier si on doit reconfigurer les applications avec le certificat de monitor le plus recent
-            self._gestionnaire_docker.maj_services_avec_certificat('monitor')
+    # def _entretien_certificats(self):
+    #     """
+    #     Entretien certificats des services/modules et du monitor
+    #     :return:
+    #     """
+    #     clecert_monitor = self._gestionnaire_certificats.clecert_monitor
+    #
+    #     try:
+    #         not_valid_before = clecert_monitor.not_valid_before
+    #         not_valid_after = clecert_monitor.not_valid_after
+    #         self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
+    #
+    #         # Calculer 2/3 de la duree du certificat
+    #         delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
+    #         epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+    #         date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+    #     except AttributeError:
+    #         self.__logger.warning("Certificat monitor inexistant, on le fait renouveller")
+    #         date_renouvellement = None
+    #
+    #     if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
+    #         self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
+    #
+    #         # # MAJ date pour creation de certificats
+    #         # self._gestionnaire_certificats.maj_date()
+    #         #
+    #         # self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
+    #         # self._gestionnaire_docker.configurer_monitor()
+    #         # raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
+    #     else:
+    #         # Verifier si on doit reconfigurer les applications avec le certificat de monitor le plus recent
+    #         self._gestionnaire_docker.maj_services_avec_certificat('monitor')
 
     @property
     def securite(self):
