@@ -2002,8 +2002,12 @@ class TriggersPublication:
 
         if identificateur_document:
             type_document = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+            collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+            doc_ressource = collection_ressources.find_one(identificateur_document)
+            contenu_signe = doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_SIGNE)
         else:
             type_document = params.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+            contenu_signe = params.get(ConstantesPublication.CHAMP_CONTENU_SIGNE)
 
         # message = {
         #     ConstantesPublication.CHAMP_TYPE_EVENEMENT: type_document,
@@ -2024,9 +2028,6 @@ class TriggersPublication:
             # Rien a faire
             return
 
-        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        doc_ressource = collection_ressources.find_one(identificateur_document)
-        contenu_signe = doc_ressource.get(ConstantesPublication.CHAMP_CONTENU_SIGNE)
         if contenu_signe is not None:
             # On a le contenu signe (genere en meme temps que le contenu GZIP)
             self.generateur_transactions.emettre_message(contenu_signe, domaine_action, exchanges=[Constantes.SECURITE_PUBLIC])
