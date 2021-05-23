@@ -19,6 +19,7 @@ from certvalidator.errors import PathValidationError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
+from millegrilles.dao.MessageDAO import CertificatInconnu
 from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
 # from millegrilles.monitor.ServiceMonitor import DOCKER_LABEL_TIME, GestionnaireModulesDocker
 from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat, \
@@ -753,6 +754,12 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         except PathValidationError as pve:
             self.__logger.error("Refuser signature certificat noeud, erreur de validation de la commande : %s" % pve)
             raise pve  # Va transmettre un message d'erreur comme reponse
+        except CertificatInconnu as ce:
+            self.__logger.error("commande_signer_noeud Certificat inconnu : %s" % str(ce))
+            return {
+                'autorise': False,
+                'description': 'certificat du demande inconnu'
+            }
 
         idmg = self._service_monitor.idmg
         roles_cert = enveloppe_cert.get_roles
