@@ -438,52 +438,6 @@ class ServiceMonitor:
         except KeyError:
             domaine_noeud = fqdn_noeud
 
-        # prefixe_certificats = 'pki.'
-        # filtre = {'name': prefixe_certificats}
-        #
-        # # Generer tous les certificas qui peuvent etre utilises
-        # roles = dict()
-        # for role in [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]:
-        #     roles[role] = dict()
-        #
-        # date_courante = datetime.datetime.utcnow()
-        #
-        # for config in self._docker.configs.list(filters=filtre):
-        #     self.__logger.debug("Config : %s", str(config))
-        #     nom_config = config.name.split('.')
-        #     nom_role = nom_config[1]
-        #     if nom_config[2] == 'cert' and nom_role in roles.keys():
-        #         role_info = roles[nom_role]
-        #         self.__logger.debug("Verification cert %s date %s", nom_role, nom_config[3])
-        #         pem = b64decode(config.attrs['Spec']['Data'])
-        #         clecert = EnveloppeCleCert()
-        #         clecert.cert_from_pem_bytes(pem)
-        #         date_expiration = clecert.not_valid_after
-        #
-        #         if date_expiration:
-        #             role_info['expiration'] = date_expiration
-        #
-        #             # Calculer 2/3 de la duree du certificat
-        #             not_valid_before = clecert.not_valid_before
-        #             delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
-        #             epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-        #             date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
-        #
-        #             # Verifier si on renouvelle
-        #             if date_renouvellement < date_courante:
-        #                 role_info['est_expire'] = True
-        #             else:
-        #                 role_info['est_expire'] = False
-        #
-        #             # Verifier si on supprime
-        #             if date_expiration < date_courante:
-        #                 # Le certificat n'est plus valide, on le supprime immediatement
-        #                 try:
-        #                     config.remove()
-        #                     self.__logger.info("Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
-        #                 except Exception:
-        #                     self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (date_expiration, config.name))
-
         # Entretien des certificats services
         roles = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
         resultat_entretien_certificats = self._supprimer_certificats_expires(roles)
@@ -508,7 +462,6 @@ class ServiceMonitor:
                     self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
 
         # Entretien certificat nginx - s'assurer que le certificat d'installation est remplace
-
 
         # Nettoyer certificats monitor
         self._supprimer_certificats_expires(['monitor'])
@@ -1949,6 +1902,13 @@ class ServiceMonitorPublic(ServiceMonitor):
             # Entretien certificats
             self._gestionnaire_certificats.entretien_certificat()
 
+            # Entretien des certificats du monitor, services
+            if self._certificats_entretien_date is None or \
+                    self._certificats_entretien_date + self._certificats_entretien_frequence < date_now:
+
+                self._entretien_certificats()
+                self._entretien_secrets_pki()
+
     def connecter_middleware(self):
         """
         Genere un contexte et se connecte a MQ et MongoDB.
@@ -2092,6 +2052,39 @@ class ServiceMonitorPublic(ServiceMonitor):
 
         params = commande.contenu
         self._renouveller_certificat_monitor(commande)
+
+    def _entretien_certificats(self):
+        """
+        Entretien certificats des services/modules et du monitor
+        :return:
+        """
+        clecert_monitor = self._gestionnaire_certificats.clecert_monitor
+
+        try:
+            not_valid_before = clecert_monitor.not_valid_before
+            not_valid_after = clecert_monitor.not_valid_after
+            self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
+
+            # Calculer 2/3 de la duree du certificat
+            delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
+            epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+        except AttributeError:
+            self.__logger.warning("Certificat monitor inexistant, on le fait renouveller")
+            date_renouvellement = None
+
+        if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
+            self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
+
+            # # MAJ date pour creation de certificats
+            # self._gestionnaire_certificats.maj_date()
+            #
+            # self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
+            # self._gestionnaire_docker.configurer_monitor()
+            # raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
+        else:
+            # Verifier si on doit reconfigurer les applications avec le certificat de monitor le plus recent
+            self._gestionnaire_docker.maj_services_avec_certificat('monitor')
 
     @property
     def securite(self):
