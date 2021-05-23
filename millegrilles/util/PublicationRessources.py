@@ -1237,6 +1237,11 @@ class GestionnaireCascadePublication:
             else:
                 # Rien a faire, on marque la config comme publiee
                 self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
+
+                # Continuer publication
+                self.generateur_transactions.transmettre_commande(
+                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -1296,6 +1301,11 @@ class GestionnaireCascadePublication:
             else:
                 # Rien a faire, on marque la config comme publiee
                 self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
+
+                # Continuer publication
+                self.generateur_transactions.transmettre_commande(
+                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
             self.__logger.exception(msg)
@@ -2020,6 +2030,10 @@ class TriggersPublication:
         elif type_cdn in ['hiddenService', 'manuel', 'mq']:
             # Rien a faire
             self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre_fichier_update)
+
+            # Continuer publication
+            self.generateur_transactions.transmettre_commande(
+                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             return
         else:
             raise Exception("Type cdn non supporte %s" % type_cdn)
@@ -2443,6 +2457,11 @@ class TriggersPublication:
         else:
             # Type non supporte ou rien a faire
             self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre)
+
+            # Continuer publication
+            self.generateur_transactions.transmettre_commande(
+                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+
             return 0
 
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
