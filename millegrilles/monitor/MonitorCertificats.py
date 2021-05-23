@@ -264,7 +264,7 @@ class GestionnaireCertificats:
 
         # Calculer 2/3 de la duree du certificat
         delta_2tiers = not_valid_after - not_valid_before
-        delta_2tiers = delta_2tiers * 0.67
+        delta_2tiers = delta_2tiers * 0.1
         date_eligible = not_valid_before + delta_2tiers
         if date_eligible < pytz.utc.localize(datetime.datetime.utcnow()):
             return True
@@ -352,7 +352,8 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
                             'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
                             exchange=Constantes.SECURITE_PUBLIC,
                             correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
-                            reply_to=self._service_monitor.connexion_middleware.reply_q
+                            reply_to=self._service_monitor.connexion_middleware.reply_q,
+                            ajouter_certificats=True
                         )
                     except AttributeError:
                         self.__logger.warning("Connexion MQ pas prete, on ne peut pas renouveller le certificat de monitor")

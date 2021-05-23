@@ -185,13 +185,16 @@ class GenerateurTransaction:
 
     def transmettre_commande(self, commande_dict, routing_key, channel=None, encoding=DateFormatEncoder,
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None,
-                             reply_to=None, correlation_id=None):
+                             reply_to=None, correlation_id=None, ajouter_certificats=False):
 
         enveloppe = self.preparer_enveloppe(commande_dict, domaine=routing_key, idmg_destination=idmg_destination)
 
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+
+        if ajouter_certificats:
+            enveloppe['_certificat'] = self.__formatteur_message.chaine_certificat
 
         self._contexte.message_dao.transmettre_commande(
             enveloppe, routing_key, channel=channel, encoding=encoding, exchange=exchange,

@@ -542,11 +542,16 @@ class GestionnaireModulesDocker:
 
         configuration = self.__formatter_configuration_service(service_name)
 
+        try:
+            list_env = service_inst.attrs['Spec']['TaskTemplate']['ContainerSpec']['Env']
+        except KeyError:
+            list_env = configuration.get('env') or list()
+
         if kwargs.get('env'):
             # Ajouter toutes les variables d'environnement. Doit etre une liste format ['KEY=VAL', ...]
-            list_env = configuration.get('env') or list()
-            configuration['env'] = list_env
             list_env.extend(kwargs.get('env'))
+
+        configuration['env'] = list_env
 
         # command = configuration_service.get('command')
         constraints = configuration.get('constraints')
