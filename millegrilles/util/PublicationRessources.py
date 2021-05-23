@@ -1234,6 +1234,15 @@ class GestionnaireCascadePublication:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
                 self.http_publication.put_publier_repertoire([cdn], fichiers, params)
+            elif type_cdn == 'mq':
+                self.triggers_publication.emettre_evenements_downstream(res_data)
+
+                # Rien a faire, on marque la config comme publiee
+                self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
+
+                # Continuer publication
+                self.generateur_transactions.transmettre_commande(
+                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             else:
                 # Rien a faire, on marque la config comme publiee
                 self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
@@ -1298,6 +1307,15 @@ class GestionnaireCascadePublication:
                 fp_bytesio = BytesIO(contenu_gzip)
                 fichiers = [{'remote_path': remote_path, 'fp': fp_bytesio, 'mimetype': mimetype}]
                 self.http_publication.put_publier_repertoire([cdn], fichiers, params)
+            elif type_cdn == 'mq':
+                self.triggers_publication.emettre_evenements_downstream(res_data)
+
+                # Rien a faire, on marque la config comme publiee
+                self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
+
+                # Continuer publication
+                self.generateur_transactions.transmettre_commande(
+                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             else:
                 # Rien a faire, on marque la config comme publiee
                 self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
@@ -1352,9 +1370,14 @@ class GestionnaireCascadePublication:
 
         try:
             type_cdn = cdn['type_cdn']
-            if type_cdn in ['ipfs', 'ipfs_gateway', 'mq', 'manuel']:
+            if type_cdn in ['ipfs', 'ipfs_gateway', 'manuel']:
                 # Rien a faire, le mapping est inclus avec le code ou recu via MQ
                 self.invalidateur_ressources.marquer_ressource_complete(cdn_id, filtre)
+            elif type_cdn == 'mq':
+                self.triggers_publication.emettre_evenements_downstream(res_data)
+
+                # Rien a faire, on marque la config comme publiee
+                self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
             else:
                 # Methode simple d'upload de fichier avec structure de repertoire
                 fp_bytesio = BytesIO(contenu_gzip)
@@ -1980,7 +2003,7 @@ class TriggersPublication:
         if identificateur_document:
             type_document = identificateur_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
         else:
-            type_document = None
+            type_document = params.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
 
         # message = {
         #     ConstantesPublication.CHAMP_TYPE_EVENEMENT: type_document,
@@ -2027,7 +2050,14 @@ class TriggersPublication:
             self.emettre_commande_publier_fichier_ipfs(res_fichier, cdn_info)
         elif type_cdn == 'awss3':
             self.emettre_commande_publier_fichier_awss3(res_fichier, cdn_info)
-        elif type_cdn in ['hiddenService', 'manuel', 'mq']:
+        elif type_cdn == 'mq':
+            # Emettre document (surtout utile pour MQ)
+            self.__cascade.triggers_publication.emettre_evenements_downstream(res_fichier)
+            # Continuer publication
+            self.generateur_transactions.transmettre_commande(
+                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+            return
+        elif type_cdn in ['hiddenService', 'manuel']:
             # Rien a faire
             self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre_fichier_update)
 
@@ -2454,6 +2484,18 @@ class TriggersPublication:
                 'permission': permission,
             }
             commande.update(cdn)
+        elif type_cdn == 'mq':
+            # Emettre document
+            self.__cascade.triggers_publication.emettre_evenements_downstream(res_webapps)
+
+            # Type non supporte ou rien a faire
+            self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre)
+
+            # Continuer publication
+            self.generateur_transactions.transmettre_commande(
+                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+
+            return 1
         else:
             # Type non supporte ou rien a faire
             self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre)
