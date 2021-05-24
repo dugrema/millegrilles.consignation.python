@@ -2054,6 +2054,10 @@ class TriggersPublication:
         elif type_cdn == 'mq':
             # Emettre document (surtout utile pour MQ)
             self.__cascade.triggers_publication.emettre_evenements_downstream(res_fichier)
+
+            # Rien a faire
+            self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre_fichier_update)
+
             # Continuer publication
             self.generateur_transactions.transmettre_commande(
                 dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
