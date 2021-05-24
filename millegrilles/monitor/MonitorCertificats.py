@@ -264,7 +264,7 @@ class GestionnaireCertificats:
 
         # Calculer 2/3 de la duree du certificat
         delta_2tiers = not_valid_after - not_valid_before
-        delta_2tiers = delta_2tiers * 0.1
+        delta_2tiers = delta_2tiers * 0.67
         date_eligible = not_valid_before + delta_2tiers
         if date_eligible < pytz.utc.localize(datetime.datetime.utcnow()):
             return True
