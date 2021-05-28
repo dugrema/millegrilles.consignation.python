@@ -6,7 +6,7 @@ import pytz
 import gc
 import requests
 
-from typing import cast
+from typing import cast, Optional
 from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure
 from bson import ObjectId
@@ -20,6 +20,7 @@ from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitem
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
+from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.BackupModule import HandlerBackupDomaine
 from millegrilles.util.X509Certificate import EnveloppeCleCert
@@ -570,6 +571,11 @@ class GestionnaireDomaine:
         self.__message_presence: dict = cast(dict, None)
         self.__confirmation_setup_transaction = False  # Vrai si la collection de transactions est prete
 
+        self.__requetes_blocking: Optional[TraitementMQRequetesBlocking] = None
+
+        # Cache des enveloppes de rechiffrage (maitre des cles, millegrille, etc)
+        self.__enveloppes_rechiffrage = None
+
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
@@ -632,6 +638,8 @@ class GestionnaireDomaine:
 
             # Lance le processus de regeneration des rapports sur cedule pour s'assurer d'avoir les donnees a jour
             self.regenerer_rapports_sur_cedule()
+
+        self.__requetes_blocking = TraitementMQRequetesBlocking(self.__contexte, self._stop_event)
 
     def verifier_collection_transactions(self):
         """
@@ -1085,6 +1093,13 @@ class GestionnaireDomaine:
         reponse.update(resultat)
 
         return reponse
+
+    def requete_bloquante(self, domaine_action: str, params: dict = None):
+        """
+        Effectue une requete MQ sur thread separee.
+        :return:
+        """
+        return self.__requetes_blocking.requete(domaine_action, params)
 
     @property
     def configuration(self):

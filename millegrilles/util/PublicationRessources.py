@@ -17,6 +17,8 @@ from millegrilles.MGProcessus import MGProcessus
 from millegrilles.util.Hachage import hacher
 from millegrilles.util.JSONMessageEncoders import JSONHelper
 from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.util.Chiffrage import CipherMsg2Chiffrer
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 # Operations pour invalider une ressource
@@ -284,9 +286,10 @@ class RessourcesPublication:
 
                 # Note : La methode genere le contenu uniquement s'il n'est pas deja present
                 doc_res_site = self.preparer_siteconfig_publication(site_id)
-                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
+                contenu = doc_res_site[ConstantesPublication.CHAMP_CONTENU]
+                contenu_signe = doc_res_site[ConstantesPublication.CHAMP_CONTENU_SIGNE]
 
-                liste_siteconfigs.append(contenu)
+                liste_siteconfigs.append(contenu_signe)
 
                 for cdn_site in contenu['cdns']:
                     cdns[cdn_site[ConstantesPublication.CHAMP_CDN_ID]] = cdn_site
@@ -1053,11 +1056,31 @@ class RessourcesPublication:
 
         return resultat.matched_count
 
-    def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, chiffrer=False):
+    def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, enveloppes_rechiffrage=None):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         contenu = col_fichiers['contenu']
-        contenu_signe = self.__cascade.generateur_transactions.preparer_enveloppe(contenu, 'Publication', ajouter_certificats=True)
-        contenu_gzippe = self.preparer_json_gzip(contenu_signe, chiffrer)
+
+        if enveloppes_rechiffrage is not None:
+            # Preparer un identificateur de document pour la cle
+            identificateurs_document = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: 'Publication',
+                'collection': 'ressource',
+                'type': col_fichiers[Constantes.DOCUMENT_INFODOC_LIBELLE],
+            }
+            champs_id = ('uuid', 'section_id', 'site_id')
+            for type_id in champs_id:
+                if col_fichiers.get(type_id):
+                    identificateurs_document[type_id] = col_fichiers[type_id]
+
+            # Generer une cle et chiffrer le contenu
+            contenu_chiffre, hachage_bytes = self.chiffrer_contenu(contenu, enveloppes_rechiffrage, identificateurs_document)
+
+            # Override du contenu
+            contenu = {'contenu_chiffre': contenu_chiffre}
+
+        contenu_signe = self.__cascade.generateur_transactions.preparer_enveloppe(
+            contenu, 'Publication', ajouter_certificats=True)
+        contenu_gzippe = self.preparer_json_gzip(contenu_signe)
 
         # Conserver contenu pour la ressource
         ops = {
@@ -1076,9 +1099,52 @@ class RessourcesPublication:
 
         return doc_res
 
-    def preparer_json_gzip(self, contenu_dict: dict, chiffrer=False) -> bytes:
-        if chiffrer is True:
-            raise NotImplementedError("Chiffrage pas implemente, TODO")
+    def chiffrer_contenu(self, contenu, enveloppes_rechiffrage, identificateurs_documents):
+        """
+        Chiffre le contenu, emet la cle pour le MaitreDesCles et retourne le contenu chiffre.
+        :param contenu:
+        :param enveloppes_rechiffrage:
+        :param identificateurs_documents:
+        :return: tuple(contenu_chiffre, hachage_bytes)
+        """
+        json_helper = JSONHelper()
+
+        # Preparer et compresser le contenu a chiffrer
+        contenu = json_helper.dict_vers_json(contenu)
+        contenu = gzip.compress(contenu)
+
+        cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
+        cipher.start_encrypt()
+        contenu = cipher.update(contenu)
+        contenu += cipher.finalize()
+        hachage_bytes = cipher.digest
+
+        # Chiffrer la cle secrete pour chaque enveloppe
+        cles = dict()
+
+        for fingerprint, enveloppe in enveloppes_rechiffrage.items():
+            cle_chiffree = cipher.chiffrer_motdepasse_enveloppe(enveloppe)
+            cle_chiffree = multibase.encode('base64', cle_chiffree).decode('utf-8')
+            cles[fingerprint] = cle_chiffree
+
+        commande_maitrecles = {
+            'domaine': 'Publication',
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_documents,
+            'format': 'mgs2',
+            'cles': cles,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+        }
+        commande_maitrecles.update(cipher.get_meta())
+
+        # Transmettre commande de sauvegarde de cle
+        self.__cascade.generateur_transactions.transmettre_commande(
+            commande_maitrecles, 'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
+
+        contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
+
+        return contenu_chiffre, hachage_bytes
+
+    def preparer_json_gzip(self, contenu_dict: dict) -> bytes:
         json_helper = JSONHelper()
         contenu = json_helper.dict_vers_json(contenu_dict)
         contenu_gzip = gzip.compress(contenu)
@@ -1096,7 +1162,15 @@ class RessourcesPublication:
 
         if date_signature is None:
             res_site = self.maj_ressources_site({'site_id': site_id})
-            res_site = self.sauvegarder_contenu_gzip(res_site, filtre)
+            securite_site = res_site[ConstantesPublication.CHAMP_CONTENU].get(Constantes.DOCUMENT_INFODOC_SECURITE)
+
+            if securite_site == Constantes.SECURITE_PRIVE:
+                # On doit chiffrer le contenu du site
+                enveloppes_rechiffrage = self.preparer_enveloppes_rechiffrage()
+            else:
+                enveloppes_rechiffrage = None
+
+            res_site = self.sauvegarder_contenu_gzip(res_site, filtre, enveloppes_rechiffrage)
 
         return res_site
 
@@ -1160,6 +1234,21 @@ class RessourcesPublication:
     #         '$addToSet': {'sites': {'$each': sites}}
     #     }
     #     collection_ressources.update_one(filtre, ops)
+
+    def preparer_enveloppes_rechiffrage(self):
+        certs_maitredescles = self.__cascade.requete_bloquante('MaitreDesCles.' + ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES)
+
+        certificat = '\n'.join(certs_maitredescles['certificat'])
+        cert_millegrille = certs_maitredescles['certificat_millegrille']
+        certs = [certificat, cert_millegrille]
+
+        enveloppes_rechiffrage = dict()
+        for cert in certs:
+            enveloppe = EnveloppeCertificat(certificat_pem=cert)
+            fp = enveloppe.fingerprint
+            enveloppes_rechiffrage[fp] = enveloppe
+
+        return enveloppes_rechiffrage
 
 
 class GestionnaireCascadePublication:
@@ -1763,6 +1852,9 @@ class GestionnaireCascadePublication:
     def demarrer_processus(self, processus: str, params: dict):
         self.__gestionnaire_domaine.demarrer_processus(processus, params)
 
+    def requete_bloquante(self, domaine_action: str, params: dict = None):
+        return self.__gestionnaire_domaine.requete_bloquante(domaine_action, params)
+
     @property
     def invalidateur(self) -> InvalidateurRessources:
         return self.invalidateur_ressources
@@ -1782,6 +1874,7 @@ class GestionnaireCascadePublication:
     @property
     def generateur_transactions(self):
         return self.__gestionnaire_domaine.generateur_transactions
+
 
 
 class TriggersPublication:

@@ -1670,8 +1670,11 @@ class TraitementMQRequetesBlocking(BaseCallback):
     Permet de recevoir des reponses sur MQ pour le traitement des commandes
     """
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, stop_event):
         super().__init__(contexte)
+
+        self.__connexion = ConnexionWrapper(contexte.configuration, stop_event)
+
         self.__channel = None
         self.queue_name = None
 
@@ -1681,7 +1684,12 @@ class TraitementMQRequetesBlocking(BaseCallback):
         self.__reponse = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        contexte.message_dao.register_channel_listener(self)
+
+        lock_init = Barrier(2)
+        self.__connexion.connecter(lock_init=lock_init)
+        lock_init.wait(30)
+        # contexte.message_dao.register_channel_listener(self)
+        self.__connexion.register_channel_listener(self)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
