@@ -45,6 +45,8 @@ class StubCascade:
         self.preparer_enveloppe_calls = list()
         self.invalider_ressources_sections_fichiers_calls = list()
         self.identifier_ressources_fichiers_calls = list()
+        self.reset_ressources_encours_calls = list()
+        self.emettre_evenements_downstream_calls = list()
 
         self.site = {'site_id': 'DUMMY-site'}
 
@@ -104,6 +106,12 @@ class StubCascade:
     def identifier_ressources_fichiers(self, *args, **kwargs):
         self.identifier_ressources_fichiers_calls.append({'args': args, 'kwargs': kwargs})
 
+    def reset_ressources_encours(self, *args, **kwargs):
+        self.reset_ressources_encours_calls.append({'args': args, 'kwargs': kwargs})
+
+    def emettre_evenements_downstream(self, *args, **kwargs):
+        self.emettre_evenements_downstream_calls.append({'args': args, 'kwargs': kwargs})
+
     @property
     def invalidateur(self):
         # Agit comme mock
@@ -117,6 +125,11 @@ class StubCascade:
     @property
     def ressources(self):
         # Agit comme mock
+        return self
+
+    @property
+    def triggers_publication(self):
+        # Mock
         return self
 
 
@@ -199,14 +212,19 @@ class StubTriggerPublication:
         self.emettre_publier_collectionfichiers_calls.append({'args': args, 'kwargs': kwargs})
         return self.compteur_publier_collectionfichiers
 
+
 class StubGestionnaireDomaine:
 
     def __init__(self, contexte):
         self.__contexte = contexte
         self.demarrer_processus_calls = list()
+        self.transmettre_commande_calls = list()
 
     def preparer_enveloppe(self, *args, **kwargs):
         return args[0]
+
+    def transmettre_commande(self, *args, **kwargs):
+        self.transmettre_commande_calls.append({'args': args, 'kwargs': kwargs})
 
     @property
     def contexte(self):
@@ -822,11 +840,11 @@ class TriggersPublicationTest(TestCaseContexte):
         #     'site_id': 'DUMMY-site',
         # })
 
-        # section fichiers
-        self.contexte.document_dao.valeurs_find.append([{
-            'section_id': 'DUMMY-section',
-            'collections': ['DUMMY-uuid'],
-        }])
+        # # section fichiers
+        # self.contexte.document_dao.valeurs_find.append([{
+        #     'section_id': 'DUMMY-section',
+        #     'collections': ['DUMMY-uuid'],
+        # }])
 
         # collection_fichiers
         self.contexte.document_dao.valeurs_find.append([{
@@ -836,7 +854,7 @@ class TriggersPublicationTest(TestCaseContexte):
             },
         }])
 
-        compteur = self.trigger.emettre_publier_collectionfichiers(cdn_id, site_id)
+        compteur = self.trigger.emettre_publier_collectionfichiers(cdn_id)
         self.assertEqual(1, compteur)
 
         contenu_gzip_calls = self.cascade.sauvegarder_contenu_gzip_calls
@@ -844,20 +862,20 @@ class TriggersPublicationTest(TestCaseContexte):
         transmettre_commande_calls = self.cascade.transmettre_commande_calls
 
         self.assertEqual(1, len(contenu_gzip_calls))
-        self.assertEqual(2, len(ressource_encours_calls))
+        self.assertEqual(1, len(ressource_encours_calls))
         self.assertEqual(1, len(transmettre_commande_calls))
 
         gzip_call_args1 = contenu_gzip_calls[0]['args']
         self.assertEqual('DUMMY-uuid', gzip_call_args1[0]['uuid'])
 
         ressource_args1 = ressource_encours_calls[0]['args']
-        ressource_args2 = ressource_encours_calls[1]['args']
+        # ressource_args2 = ressource_encours_calls[1]['args']
 
         self.assertEqual('DUMMY-CDN', ressource_args1[0])
         self.assertDictEqual({'_mg-libelle': 'collection_fichiers', 'uuid': 'DUMMY-uuid'}, ressource_args1[1])
 
-        self.assertEqual('DUMMY-CDN', ressource_args2[0])
-        self.assertDictEqual({'_mg-libelle': 'fichier', 'distribution_complete': {'$not': {'$all': ['DUMMY-CDN']}}, 'collections': {'$all': ['DUMMY-uuid']}}, ressource_args2[1])
+        # self.assertEqual('DUMMY-CDN', ressource_args2[0])
+        # self.assertDictEqual({'_mg-libelle': 'fichier', 'distribution_complete': {'$not': {'$all': ['DUMMY-CDN']}}, 'collections': {'$all': ['DUMMY-uuid']}}, ressource_args2[1])
 
         transmettre_commande_args1 = transmettre_commande_calls[0]['args']
         self.assertEqual('commande.Publication.publierUploadDataSection', transmettre_commande_args1[1])
@@ -875,18 +893,21 @@ class TriggersPublicationTest(TestCaseContexte):
         transmettre_commande_calls = self.cascade.transmettre_commande_calls
         siteconfig_calls = self.cascade.preparer_siteconfig_publication_calls
 
-        resource_args1 = ressource_encours_calls[0]['args']
-        transmettre_commande_args1 = transmettre_commande_calls[0]['args']
+        self.assertEqual(0, len(ressource_encours_calls))
+        self.assertEqual(0, len(transmettre_commande_calls))
 
-        self.assertEqual(1, compte_commandes)
-        self.assertEqual('commande.Publication.publierUploadSiteConfiguration', transmettre_commande_args1[1])
-        self.assertDictEqual({'site_id': 'site-DUMMY', 'cdn_id': 'DUMMY-CDN', 'remote_path': 'data/sites/site-DUMMY.json.gz', 'mimetype': 'application/json', 'content_encoding': 'gzip', 'max_age': 0}, transmettre_commande_args1[0])
+        # resource_args1 = ressource_encours_calls[0]['args']
+        # transmettre_commande_args1 = transmettre_commande_calls[0]['args']
 
-        self.assertEqual(1, len(siteconfig_calls))
-        self.assertDictEqual({'args': ('DUMMY-CDN', 'site-DUMMY'), 'kwargs': {}}, siteconfig_calls[0])
+        self.assertEqual(0, compte_commandes)
+        # self.assertEqual('commande.Publication.publierUploadSiteConfiguration', transmettre_commande_args1[1])
+        # self.assertDictEqual({'site_id': 'site-DUMMY', 'cdn_id': 'DUMMY-CDN', 'remote_path': 'data/sites/site-DUMMY.json.gz', 'mimetype': 'application/json', 'content_encoding': 'gzip', 'max_age': 0}, transmettre_commande_args1[0])
 
-        self.assertEqual('DUMMY-CDN', resource_args1[0])
-        self.assertDictEqual({'_mg-libelle': 'siteconfig', 'site_id': 'site-DUMMY'}, resource_args1[1])
+        self.assertEqual(0, len(siteconfig_calls))
+        # self.assertDictEqual({'args': ('DUMMY-CDN', 'site-DUMMY'), 'kwargs': {}}, siteconfig_calls[0])
+
+        # self.assertEqual('DUMMY-CDN', resource_args1[0])
+        # self.assertDictEqual({'_mg-libelle': 'siteconfig', 'site_id': 'site-DUMMY'}, resource_args1[1])
 
     def test_emettre_publier_configuration_site_dist_encours(self):
         cdn_id = 'DUMMY-CDN'
@@ -901,7 +922,7 @@ class TriggersPublicationTest(TestCaseContexte):
         transmettre_commande_calls = self.cascade.transmettre_commande_calls
         siteconfig_calls = self.cascade.preparer_siteconfig_publication_calls
 
-        self.assertEqual(0, compte_commandes)
+        self.assertEqual(1, compte_commandes)
         self.assertEqual(0, len(ressource_encours_calls))
         self.assertEqual(0, len(transmettre_commande_calls))
         self.assertEqual(0, len(siteconfig_calls))
@@ -1006,7 +1027,7 @@ class TriggersPublicationTest(TestCaseContexte):
         self.assertEqual(1, len(processus_calls))
 
         self.assertDictEqual({'cdn_id': 'CDN-1'}, processus_calls[0]['args'][1])
-        self.assertEqual('millegrilles_domaines_Publication:ProcessusCreerCleIpnsVitrine', processus_calls[0]['args'][0])
+        self.assertEqual('millegrilles_util_PublicationRessources:ProcessusCreerCleIpnsVitrine', processus_calls[0]['args'][0])
 
     def test_emettre_publier_webapps_pas_encours_cdn_ipfs_aveccle(self):
         cdn_id = 'DUMMY-CDN'
@@ -1170,7 +1191,7 @@ class HttpPublicationTest(TestCaseContexte):
         # Verifier
         demarrer_processus_calls = self.cascade.demarrer_processus_calls
 
-        self.assertEqual('millegrilles_domaines_Publication:ProcessusPublierCleEtFichierIpns', demarrer_processus_calls[0]['args'][0])
+        self.assertEqual('millegrilles_util_PublicationRessources:ProcessusPublierCleEtFichierIpns', demarrer_processus_calls[0]['args'][0])
         process_arg1 = demarrer_processus_calls[0]['args'][1]
         self.assertDictEqual({'_mg-libelle': 'DUMMY', 'section_id': 'abcd-1234'}, process_arg1['identificateur_document'])
         self.assertEqual('abcd-1234', process_arg1['nom_cle'])
@@ -1188,7 +1209,7 @@ class HttpPublicationTest(TestCaseContexte):
         calls_requests_put = self.calls_requests_put
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
-        self.assertEqual('/publier/fichierIpns', request_put_args[0])
+        self.assertEqual('publier/fichierIpns', request_put_args[0])
 
     def test_put_fichier_ipns(self):
         identificateur_document = {'doc': 'DUMMY'}
@@ -1202,7 +1223,7 @@ class HttpPublicationTest(TestCaseContexte):
         calls_requests_put = self.calls_requests_put
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
-        self.assertEqual('/publier/fichierIpns', request_put_args[0])
+        self.assertEqual('publier/fichierIpns', request_put_args[0])
 
     def test_put_publier_repertoire(self):
         # identificateur_document = {'doc': 'DUMMY'}
@@ -1227,7 +1248,7 @@ class HttpPublicationTest(TestCaseContexte):
         calls_requests_put = self.calls_requests_put
         self.assertEqual(1, len(calls_requests_put))
         request_put_args = calls_requests_put[0]['args']
-        self.assertEqual('/publier/repertoire', request_put_args[0])
+        self.assertEqual('publier/repertoire', request_put_args[0])
 
 
 class RessourcesPublicationTest(TestCaseContexte):
@@ -1539,14 +1560,19 @@ class RessourcesPublicationTest(TestCaseContexte):
             ConstantesPublication.CHAMP_SECTION_ID: 'DUMMY-section',
             ConstantesPublication.CHAMP_TYPE_SECTION: 'DUMMY-type-section',
         }])
+        # Webapps
+        self.contexte.document_dao.valeurs_find.append([{
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_WEBAPPS,
+        }])
 
         self.contexte.document_dao.valeurs_update.append('DUMMY valeur 1')
         self.contexte.document_dao.valeurs_update.append('DUMMY valeur 2')
+        self.contexte.document_dao.valeurs_update.append('DUMMY valeur 3')
 
         self.ressources_publication.trouver_ressources_manquantes()
 
         calls_update = self.contexte.document_dao.calls_update
-        self.assertEqual(2, len(calls_update))
+        self.assertEqual(3, len(calls_update))
 
     def test_identifier_ressources_fichiers(self):
         self.contexte.document_dao.valeurs_find.append([{
@@ -1640,8 +1666,9 @@ class RessourcesPublicationTest(TestCaseContexte):
         }
         liste_fichiers = []
 
-        self.contexte.document_dao.valeurs_find.append([])
-        self.contexte.document_dao.valeurs_update.append([])
+        self.contexte.document_dao.valeurs_find.append([])      # Liste fichiers avec CID
+        self.contexte.document_dao.valeurs_update.append([])    # Creer fichiers manquants (liste info_collection)
+        self.contexte.document_dao.valeurs_find.append([])      # Recharger tous les fichiers (existants et crees, avec CID et mimetype)
 
         self.ressources_publication.maj_ressource_collection_fichiers(info_collection, liste_fichiers)
 
@@ -1807,7 +1834,8 @@ class RessourcesPublicationTest(TestCaseContexte):
             ConstantesPublication.CHAMP_CONTENU_SIGNE: {
                 'DUMMY-contenu': True,
                 'fuuids': {},
-            }
+            },
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
         })  # Collection vide
 
         resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
@@ -1832,8 +1860,9 @@ class RessourcesPublicationTest(TestCaseContexte):
                 'fuuids': {
                     'DUMMY-fuuid-1': 'contenu-dummy'
                 },
-            }
-        })  # Collection vide
+            },
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
+        })
 
         resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
 
@@ -1858,8 +1887,9 @@ class RessourcesPublicationTest(TestCaseContexte):
                 'fuuids': {
                     'DUMMY-fuuid-1': 'contenu-dummy'
                 },
-            }
-        })  # Collection vide
+            },
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
+        })
 
         resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
 
@@ -1884,7 +1914,8 @@ class RessourcesPublicationTest(TestCaseContexte):
                     'DUMMY-fuuid-1': 'contenu-dummy',
                     'DUMMY-fuuid-2': 'contenu-dummy',
                 },
-            }
+            },
+            ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True,
         })  # Collection vide
 
         resultat = self.ressources_publication.detecter_changement_collection(contenu_collection)
@@ -1958,7 +1989,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         self.contexte.document_dao.valeurs_find.append({
             ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
-            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-cdn',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'sftp',
         })
 
         resultat = self.cascade.commande_publier_upload_datasection(params)
@@ -1966,7 +1997,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.assertDictEqual({"ok": True}, resultat)
 
         http_pub_args = self.http_publication.put_publier_repertoire_calls[0]['args']
-        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'DUMMY-cdn'}, http_pub_args[0][0])
+        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'sftp'}, http_pub_args[0][0])
         self.assertDictEqual(
             {'type_section': 'page', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'dummy/type', 'securite': '1.public', 'section_id': 'DUMMY-section', 'identificateur_document': {'_mg-libelle': 'page', 'section_id': 'DUMMY-section'}},
             http_pub_args[2]
@@ -1988,7 +2019,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         self.contexte.document_dao.valeurs_find.append({
             ConstantesPublication.CHAMP_CDN_ID: 'DUMMY-cdn',
-            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-cdn',
+            ConstantesPublication.CHAMP_TYPE_CDN: 'sftp',
         })
 
         resultat = self.cascade.commande_publier_upload_datasection(params)
@@ -1996,7 +2027,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.assertDictEqual({"ok": True}, resultat)
 
         http_pub_args = self.http_publication.put_publier_repertoire_calls[0]['args']
-        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'DUMMY-cdn'}, http_pub_args[0][0])
+        self.assertDictEqual({'cdn_id': 'DUMMY-cdn', 'type_cdn': 'sftp'}, http_pub_args[0][0])
         self.assertDictEqual(
             {'type_section': 'collection_fichiers', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'dummy/type', 'securite': '1.public', 'uuid_collection': 'DUMMY-uuid', 'identificateur_document': {'_mg-libelle': 'collection_fichiers', 'uuid': 'DUMMY-uuid'}},
             http_pub_args[2]
@@ -2045,7 +2076,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         # CDN
         self.contexte.document_dao.valeurs_find.append({
-            ConstantesPublication.CHAMP_TYPE_CDN: 'DUMMY-type'
+            ConstantesPublication.CHAMP_TYPE_CDN: 'sftp'
         })
 
         resultat = self.cascade.commande_publier_upload_siteconfiguration(params)
@@ -2053,7 +2084,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
         self.assertDictEqual({'ok': True}, resultat)
 
         call_put_args = self.cascade.http_publication.put_publier_repertoire_calls[0]['args']
-        self.assertDictEqual({'type_cdn': 'DUMMY-type'}, call_put_args[0][0])
+        self.assertDictEqual({'type_cdn': 'sftp'}, call_put_args[0][0])
         self.assertDictEqual(
             {'site_id': 'DUMMY-site', 'cdn_id': 'DUMMY-cdn', 'remote_path': '/DUMMY/path', 'mimetype': 'DUMMY/mimetype', 'identificateur_document': {'_mg-libelle': 'siteconfig', 'site_id': 'DUMMY-site'}},
             call_put_args[2]
@@ -2460,7 +2491,7 @@ class GestionnaireCascadePublicationTest(TestCaseContexte):
 
         # res
         self.contexte.document_dao.valeurs_find.append({
-
+            ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: {'DUMMY-cdn': False}
         })
 
         self.cascade.triggers_publication.sites_par_cdn.append([{
