@@ -1842,6 +1842,7 @@ class ConstantesPublication:
     LIBVAL_COLLECTION_FICHIERS = 'collection_fichiers'
     LIBVAL_FICHIER = 'fichier'
 
+    REQUETE_CONFIGURATION_MAPPING = 'configurationMapping'
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_CONFIGURATION_SITES_NOEUD = 'configurationSitesNoeud'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'

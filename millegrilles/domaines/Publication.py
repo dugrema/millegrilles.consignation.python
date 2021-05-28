@@ -77,6 +77,8 @@ class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_etat_publication()
         elif domaine_action == ConstantesPublication.REQUETE_ETAT_SITE:
             reponse = self.gestionnaire.get_ressource_site(message_dict)
+        elif domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_MAPPING:
+            reponse = self.gestionnaire.get_configuration_mapping(message_dict)
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -335,6 +337,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         site_pages = [c for c in curseur]
 
         return site_pages
+
+    def get_configuration_mapping(self, params: dict):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+        doc_mapping = collection_configuration.find_one(filtre)
+
+        return doc_mapping
 
     def get_configuration_site(self, params: dict):
         site_id = params['site_id']
@@ -979,7 +990,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         collection_ressources.update_one(identificateur_document, ops, upsert=True)
 
     def set_site_defaut(self, params: dict):
-        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+        site_id = params[ConstantesPublication.CHAMP_SITE_DEFAUT]
 
         # Sauvegarder dans la configuration de mapping
         collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
@@ -998,10 +1009,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
         }
-        collection_configuration.update(filtre, ops, upsert=True)
+        doc_mapping = collection_configuration.find_one_and_update(filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         # Invalider le mapping
         self.__gestionnaire_cascade.invalidateur.invalider_ressource_mapping()
+
+        return doc_mapping
 
 
 class ProcessusPublication(MGProcessusTransaction):
@@ -1172,6 +1185,11 @@ class ProcessusSetSiteDefaut(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-        self.controleur.gestionnaire.set_site_defaut(transaction)
+        doc_mapping = self.controleur.gestionnaire.set_site_defaut(transaction)
 
         self.set_etape_suivante()
+
+        return {
+            'ok': True,
+            'mapping': doc_mapping,
+        }

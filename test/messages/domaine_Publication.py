@@ -69,6 +69,13 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def requete_configuration_mapping(self):
+        requete = {}
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_CONFIGURATION_MAPPING
+        correlation_id = 'requete_configuration_mapping'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
     def creer_site(self):
         info_site = {
             # ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
@@ -119,7 +126,7 @@ class TestPublication(DomaineTest):
 
     def set_site_defaut(self):
         info_site = {
-            ConstantesPublication.CHAMP_SITE_ID: '81b0b12c-f186-4c9e-864b-44bff01efc61',
+            ConstantesPublication.CHAMP_SITE_DEFAUT: '81b0b12c-f186-4c9e-864b-44bff01efc61',
         }
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_SET_SITE_DEFAUT
         self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='set_site_defaut')
@@ -257,6 +264,7 @@ class TestPublication(DomaineTest):
         # self.requete_etat_publication()
         # self.commande_pousser_sections()
         # self.requete_etat_site()
+        # self.requete_configuration_mapping()
         self.set_site_defaut()
 
 
