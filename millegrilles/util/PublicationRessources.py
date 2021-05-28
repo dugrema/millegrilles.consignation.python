@@ -263,6 +263,7 @@ class RessourcesPublication:
         site_id_defaut = doc_mapping.get(ConstantesPublication.CHAMP_SITE_DEFAUT)
 
         if site_id_defaut is not None:
+            # Le site id a ete specifie dans la configuration
             pass
         elif len(sites) == 1:
             # Un seul site disponible
