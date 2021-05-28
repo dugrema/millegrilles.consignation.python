@@ -1377,7 +1377,11 @@ class GestionnaireCascadePublication:
 
         date_signature = res_data.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
         if date_signature is None:
-            res_data = self.ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
+            # res_data = self.ressources_publication.sauvegarder_contenu_gzip(res_data, filtre)
+            msg = 'La configuration du site n\'est pas preparee : %s' % str(filtre)
+            self.__logger.error(msg)
+            return {'err': msg}
+
         contenu_gzip = res_data[ConstantesPublication.CHAMP_CONTENU_GZIP]
 
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
@@ -1876,7 +1880,6 @@ class GestionnaireCascadePublication:
         return self.__gestionnaire_domaine.generateur_transactions
 
 
-
 class TriggersPublication:
 
     def __init__(self, cascade: GestionnaireCascadePublication):
@@ -2309,10 +2312,15 @@ class TriggersPublication:
                 # Mettre a jour le contenu - s'assure d'avoir tous les CID
                 doc_page = self.__cascade.ressources.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
 
+                if securite_site == Constantes.SECURITE_PRIVE:
+                    enveloppes_rechiffrage = self.__cascade.ressources.preparer_enveloppes_rechiffrage()
+                else:
+                    enveloppes_rechiffrage = None
+
                 # date_signature = doc_page.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
                 # if date_signature is None:
                 # Creer contenu .json.gz
-                self.__cascade.ressources.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj)
+                self.__cascade.ressources.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj, enveloppes_rechiffrage)
 
                 # Transmettre la commande
                 # Compter le fichier meme si on n'a pas envoye de commande: il est encore en traitement
@@ -2380,10 +2388,16 @@ class TriggersPublication:
                 'uuid': uuid_col_fichiers,
             }
 
+            securite_collection = res_collection_fichiers[ConstantesPublication.CHAMP_CONTENU].get(Constantes.DOCUMENT_INFODOC_SECURITE)
+            if securite_collection == Constantes.SECURITE_PRIVE:
+                enveloppes_rechiffrage = self.__cascade.ressources.preparer_enveloppes_rechiffrage()
+            else:
+                enveloppes_rechiffrage = None
+
             date_signature = res_collection_fichiers.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
             if date_signature is None:
                 # Creer contenu .json.gz, contenu_signe
-                self.__cascade.ressources.sauvegarder_contenu_gzip(res_collection_fichiers, filtre_fichiers_maj)
+                self.__cascade.ressources.sauvegarder_contenu_gzip(res_collection_fichiers, filtre_fichiers_maj, enveloppes_rechiffrage)
 
             self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichiers_maj)
 
@@ -2777,7 +2791,9 @@ class ProcessusPublierCollectionGrosFichiers(MGProcessus):
         uuid_collection = params['uuid_collection']
         # res_collection = self.controleur.gestionnaire.get_ressource_collection_fichiers(uuid_collection)
 
-        requete = {'uuid': uuid_collection}
+        requete = {
+            'uuid': uuid_collection,
+        }
         domaine_action = Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION
         self.set_requete(domaine_action, requete)
 

@@ -28,9 +28,9 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
         action = routing_key.split('.').pop()
 
         if action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
-            reponse = self.gestionnaire.get_collections_publiques(message_dict)
+            reponse = self.gestionnaire.get_liste_collections(message_dict)
         elif action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
-            reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
+            reponse = self.gestionnaire.get_detail_collections(message_dict)
             reponse = {'liste_collections': reponse}
         else:
             raise Exception("Requete publique non supportee " + routing_key)
@@ -83,9 +83,9 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
         elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
             reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_public(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
-            reponse = self.gestionnaire.get_collections_publiques(message_dict)
+            reponse = self.gestionnaire.get_liste_collections(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
-            reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
+            reponse = self.gestionnaire.get_detail_collections(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_TRANSFERTS_EN_COURS:
             reponse = self.gestionnaire.get_transferts_en_cours()
         elif domaine_action == ConstantesGrosFichiers.REQUETE_CONVERSIONS_MEDIA_ENCOURS:
@@ -2103,15 +2103,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Erreur, le fichier n'est pas public
         return {'err': "Le fichier n'est pas public", 'fuuid': fuuid}
 
-    def get_collections_publiques(self, params: dict):
+    def get_liste_collections(self, params: dict):
         """
         Retourne liste de toutes les collections publiques
         :param params:
         :return:
         """
+        filtre_securite = [Constantes.SECURITE_PUBLIC]
+        if params.get('prive') is True:
+            filtre_securite.append(Constantes.SECURITE_PRIVE)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+            Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': filtre_securite},
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
         projection = ['uuid', 'nom_collection', 'titre', 'description']
@@ -2125,15 +2128,19 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return colls
 
-    def get_detail_collections_publiques(self, params: dict):
+    def get_detail_collections(self, params: dict):
         """
-        Retourne liste de toutes les collections publiques
+        Retourne liste de toutes les collections publiques et privees (si param['prive']=True)
         :param params:
         :return:
         """
+        filtre_securite = [Constantes.SECURITE_PUBLIC]
+        if params.get('prive') is True:
+            filtre_securite.append(Constantes.SECURITE_PRIVE)
+
         filtre_collections = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+            Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': filtre_securite},
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
 
@@ -2255,7 +2262,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
             if len(id_collections_publiques) > 0:
                 params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: id_collections_publiques}
-                detail_collections_publiques = self.get_detail_collections_publiques(params)
+                detail_collections_publiques = self.get_detail_collections(params)
                 return detail_collections_publiques
 
     def regenerer_previews(self):
