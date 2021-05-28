@@ -222,6 +222,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPartiepage"
         elif domaine_action == ConstantesPublication.TRANSACTION_CLE_IPNS:
             processus = "millegrilles_domaines_Publication:ProcessusSauvegarderCleIpns"
+        elif domaine_action == ConstantesPublication.TRANSACTION_SET_SITE_DEFAUT:
+            processus = "millegrilles_domaines_Publication:ProcessusSetSiteDefaut"
 
         else:
             # Type de transaction inconnue, on lance une exception
@@ -976,6 +978,31 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         set_on_insert.update(identificateur_document)
         collection_ressources.update_one(identificateur_document, ops, upsert=True)
 
+    def set_site_defaut(self, params: dict):
+        site_id = params[ConstantesPublication.CHAMP_SITE_ID]
+
+        # Sauvegarder dans la configuration de mapping
+        collection_configuration = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CONFIGURATION_NOM)
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_ops = {
+            ConstantesPublication.CHAMP_SITE_DEFAUT: site_id,
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_MAPPING,
+        }
+        collection_configuration.update(filtre, ops, upsert=True)
+
+        # Invalider le mapping
+        self.__gestionnaire_cascade.invalidateur.invalider_ressource_mapping()
+
 
 class ProcessusPublication(MGProcessusTransaction):
 
@@ -1137,5 +1164,14 @@ class ProcessusSauvegarderCleIpns(MGProcessusTransaction):
         transaction = self.transaction
         identificateur_document = transaction['identificateur_document']
         self.controleur.gestionnaire.sauvegarder_cle_ipns(identificateur_document, transaction)
+
+        self.set_etape_suivante()
+
+
+class ProcessusSetSiteDefaut(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+        self.controleur.gestionnaire.set_site_defaut(transaction)
 
         self.set_etape_suivante()

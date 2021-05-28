@@ -1862,6 +1862,7 @@ class ConstantesPublication:
     TRANSACTION_MAJ_PARTIEPAGE = 'majPartiePage'
     TRANSACTION_SUPPRIMER_CDN = 'supprimerCdn'
     TRANSACTION_CLE_IPNS = 'cleIpns'
+    TRANSACTION_SET_SITE_DEFAUT = 'setSiteDefaut'
 
     COMMANDE_PUBLIER_SITE = 'publierSite'
     COMMANDE_PUBLIER_PAGE = 'publierPage'

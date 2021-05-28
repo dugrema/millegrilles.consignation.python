@@ -117,6 +117,13 @@ class TestPublication(DomaineTest):
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_PARTIEPAGE
         self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='maj_section')
 
+    def set_site_defaut(self):
+        info_site = {
+            ConstantesPublication.CHAMP_SITE_ID: '81b0b12c-f186-4c9e-864b-44bff01efc61',
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_SET_SITE_DEFAUT
+        self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name, correlation_id='set_site_defaut')
+
     def maj_post(self):
         info_post = {
             "post_id": "17b2430e-c6bc-4d0b-8dd1-9787e0b5bf2a",
@@ -249,7 +256,8 @@ class TestPublication(DomaineTest):
         # self.commande_continuer_publication()
         # self.requete_etat_publication()
         # self.commande_pousser_sections()
-        self.requete_etat_site()
+        # self.requete_etat_site()
+        self.set_site_defaut()
 
 
 # --- MAIN ---
