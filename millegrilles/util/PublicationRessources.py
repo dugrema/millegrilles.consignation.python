@@ -292,6 +292,7 @@ class RessourcesPublication:
 
                 information_site = {
                     ConstantesPublication.CHAMP_SITE_ID: site_id,
+                    Constantes.DOCUMENT_INFODOC_SECURITE: site[Constantes.DOCUMENT_INFODOC_SECURITE],
                 }
                 try:
                     information_site[ConstantesPublication.CHAMP_IPNS_ID] = site[ConstantesPublication.CHAMP_IPNS_ID]

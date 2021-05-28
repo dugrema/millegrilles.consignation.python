@@ -1,5 +1,4 @@
 import json
-import logging
 import multibase
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
@@ -1270,6 +1269,7 @@ class RessourcesPublicationTest(TestCaseContexte):
                 'DUMMY-site': {
                     ConstantesPublication.CHAMP_SITE_ID: 'DUMMY-site',
                     ConstantesPublication.CHAMP_IPNS_ID: 'DUMMY-ipns',
+                    Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
                     ConstantesPublication.CHAMP_LISTE_DOMAINES: [
                         'https://DUMMY-1'
                     ]
@@ -1304,12 +1304,12 @@ class RessourcesPublicationTest(TestCaseContexte):
         self.assertDictEqual({'_mg-libelle': 'mapping'}, update_args_1[0])
 
         self.assertDictEqual(
-            {'https://DUMMY-1': {'site_id': 'DUMMY-site', 'ipns_id': 'DUMMY-ipns'}},
+            {'https://DUMMY-1': {'site_id': 'DUMMY-site', 'ipns_id': 'DUMMY-ipns', 'securite': '1.public'}},
             update_args_1[1]['$set']['contenu']['sites']
         )
 
         self.assertDictEqual(
-            {'site_id': 'DUMMY-site', 'ipns_id': 'DUMMY-ipns'},
+            {'site_id': 'DUMMY-site', 'ipns_id': 'DUMMY-ipns', 'securite': '1.public'},
             update_args_1[1]['$set']['contenu']['site_defaut']
         )
 
