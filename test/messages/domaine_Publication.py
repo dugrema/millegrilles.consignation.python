@@ -76,6 +76,16 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def requete_configuration_sites_noeuds(self):
+        requete = {
+            'noeud_id': '4875b655-9483-4208-b351-b5480af3acc1',
+        }
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_CONFIGURATION_SITES_NOEUD
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action,
+            securite=Constantes.SECURITE_PUBLIC, correlation_id=correlation_id, reply_to=self.queue_name)
+
     def creer_site(self):
         info_site = {
             # ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
@@ -265,7 +275,8 @@ class TestPublication(DomaineTest):
         # self.commande_pousser_sections()
         # self.requete_etat_site()
         # self.requete_configuration_mapping()
-        self.set_site_defaut()
+        self.requete_configuration_sites_noeuds()
+        # self.set_site_defaut()
 
 
 # --- MAIN ---

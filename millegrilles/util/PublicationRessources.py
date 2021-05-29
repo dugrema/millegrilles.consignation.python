@@ -1069,16 +1069,21 @@ class RessourcesPublication:
                 'collection': 'ressource',
                 'type': col_fichiers[Constantes.DOCUMENT_INFODOC_LIBELLE],
             }
+
+            contenu_maj = dict()
+
             champs_id = ('uuid', 'section_id', 'site_id')
             for type_id in champs_id:
                 if col_fichiers.get(type_id):
                     identificateurs_document[type_id] = col_fichiers[type_id]
+                    contenu_maj[type_id] = col_fichiers[type_id]
 
             # Generer une cle et chiffrer le contenu
             contenu_chiffre, hachage_bytes = self.chiffrer_contenu(contenu, enveloppes_rechiffrage, identificateurs_document)
 
             # Override du contenu
-            contenu = {'contenu_chiffre': contenu_chiffre}
+            contenu_maj['contenu_chiffre'] = contenu_chiffre
+            contenu = contenu_maj
 
         contenu_signe = self.__cascade.generateur_transactions.preparer_enveloppe(
             contenu, 'Publication', ajouter_certificats=True)
