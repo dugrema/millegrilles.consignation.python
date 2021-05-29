@@ -386,7 +386,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         self.generateur_transactions.emettre_message(
             forum, 'evenement.' + domaine_action, domaine_action=domaine_action, exchanges=exchanges)
 
-        return {'ok': True}
+        return {'ok': True, 'forum': forum}
 
     def maj_forum(self, params: dict):
         ref_id = params[ConstantesForum.CHAMP_FORUM_ID]

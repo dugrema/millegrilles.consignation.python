@@ -142,7 +142,7 @@ class TestForum(DomaineTest):
     def executer(self):
         self.__logger.debug("Executer")
 
-        # self.requete_liste_forum()
+        self.requete_liste_forum()
         # self.requete_liste_forum_posts()
         # self.requete_liste_post_commentaires()
         # self.creer_forum()
@@ -151,7 +151,7 @@ class TestForum(DomaineTest):
         # self.maj_post()
         # self.creer_commentaire()
         # self.maj_commentaire()
-        self.commande_generer_forums_posts()
+        # self.commande_generer_forums_posts()
         # self.commande_generer_posts_commentaires()
         # self.commande_transmettre_forums_posts()
         # self.commande_transmettre_posts_commentaires()
