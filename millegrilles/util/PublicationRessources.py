@@ -509,7 +509,7 @@ class RessourcesPublication:
         section_id = params[ConstantesPublication.CHAMP_SECTION_ID]
 
         # Formatter les parties page, fuuids
-        fuuids_info, parties_page_ordonnees, site_id = self.formatter_parties_page(section_id)
+        fuuids_info, parties_page_ordonnees, site_id, doc_page = self.formatter_parties_page(section_id)
         fuuids = self.formatter_fuuids_page(fuuids_info)
 
         contenu = {
@@ -518,6 +518,8 @@ class RessourcesPublication:
             ConstantesPublication.CHAMP_PARTIES_PAGES: parties_page_ordonnees,
             'fuuids': fuuids,
         }
+        if doc_page.get(Constantes.DOCUMENT_INFODOC_SECURITE):
+            contenu[Constantes.DOCUMENT_INFODOC_SECURITE] = doc_page[Constantes.DOCUMENT_INFODOC_SECURITE]
 
         set_ops = {
             'contenu': contenu,
@@ -631,7 +633,7 @@ class RessourcesPublication:
             for pp_id in section[ConstantesPublication.CHAMP_PARTIES_PAGES]:
                 parties_page_ordonnees.append(parties_page[pp_id])
 
-        return fuuids_info, parties_page_ordonnees, site_id
+        return fuuids_info, parties_page_ordonnees, site_id, section
 
     def maj_ressources_fuuids(self, fuuids_info: dict, public=False):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
@@ -1162,15 +1164,19 @@ class RessourcesPublication:
 
         if date_signature is None:
             res_site = self.maj_ressources_site({'site_id': site_id})
-            securite_site = res_site[ConstantesPublication.CHAMP_CONTENU].get(Constantes.DOCUMENT_INFODOC_SECURITE)
 
-            if securite_site == Constantes.SECURITE_PRIVE:
-                # On doit chiffrer le contenu du site
-                enveloppes_rechiffrage = self.preparer_enveloppes_rechiffrage()
-            else:
-                enveloppes_rechiffrage = None
+            # # Changement d'approche, le siteconfig ne sera pas chiffre en mode prive
+            # # Les seules informations qui pourraient etre chiffrees sont le titre et info des sections
+            # # L'info des CDN et socket.io doivent etre disponibles meme avant enregistrement.
+            # securite_site = res_site[ConstantesPublication.CHAMP_CONTENU].get(Constantes.DOCUMENT_INFODOC_SECURITE)
+            # if securite_site == Constantes.SECURITE_PRIVE:
+            #     # On doit chiffrer le contenu du site
+            #     enveloppes_rechiffrage = self.preparer_enveloppes_rechiffrage()
+            # else:
+            #     enveloppes_rechiffrage = None
+            # res_site = self.sauvegarder_contenu_gzip(res_site, filtre, enveloppes_rechiffrage)
 
-            res_site = self.sauvegarder_contenu_gzip(res_site, filtre, enveloppes_rechiffrage)
+            res_site = self.sauvegarder_contenu_gzip(res_site, filtre)
 
         return res_site
 
@@ -2292,15 +2298,15 @@ class TriggersPublication:
 
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         curseur_pages = collection_ressources.find(filtre_pages)
-        for doc_page in curseur_pages:
-            section_id = doc_page[ConstantesPublication.CHAMP_SECTION_ID]
+        for res_page in curseur_pages:
+            section_id = res_page[ConstantesPublication.CHAMP_SECTION_ID]
 
             filtre_pages_maj = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_PAGE,
                 ConstantesPublication.CHAMP_SECTION_ID: section_id,
             }
             try:
-                valeur_distribution = doc_page[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
+                valeur_distribution = res_page[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES][cdn_id]
             except KeyError:
                 valeur_distribution = None
 
@@ -2310,9 +2316,14 @@ class TriggersPublication:
                 # contenu = doc_page.get('contenu')
                 # if contenu is None:
                 # Mettre a jour le contenu - s'assure d'avoir tous les CID
-                doc_page = self.__cascade.ressources.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
+                res_page = self.__cascade.ressources.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
 
                 if securite_site == Constantes.SECURITE_PRIVE:
+                    securite_page = res_page[ConstantesPublication.CHAMP_CONTENU].get(Constantes.DOCUMENT_INFODOC_SECURITE) or securite_site
+                else:
+                    securite_page = securite_site
+
+                if securite_page == Constantes.SECURITE_PRIVE:
                     enveloppes_rechiffrage = self.__cascade.ressources.preparer_enveloppes_rechiffrage()
                 else:
                     enveloppes_rechiffrage = None
@@ -2320,7 +2331,7 @@ class TriggersPublication:
                 # date_signature = doc_page.get(ConstantesPublication.CHAMP_DATE_SIGNATURE)
                 # if date_signature is None:
                 # Creer contenu .json.gz
-                self.__cascade.ressources.sauvegarder_contenu_gzip(doc_page, filtre_pages_maj, enveloppes_rechiffrage)
+                self.__cascade.ressources.sauvegarder_contenu_gzip(res_page, filtre_pages_maj, enveloppes_rechiffrage)
 
                 # Transmettre la commande
                 # Compter le fichier meme si on n'a pas envoye de commande: il est encore en traitement
