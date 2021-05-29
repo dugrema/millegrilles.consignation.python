@@ -819,7 +819,7 @@ class GestionnaireApplications:
         :param contexte:
         :return:
         """
-        self.__handler_requetes = TraitementMQRequetesBlocking(contexte)
+        self.__handler_requetes = TraitementMQRequetesBlocking(contexte, self.__service_monitor.fermeture_event)
         return self.__handler_requetes
 
 

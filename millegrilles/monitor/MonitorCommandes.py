@@ -294,7 +294,7 @@ class GestionnaireCommandes:
         :param contexte:
         :return:
         """
-        self.__handler_requetes = TraitementMQRequetesBlocking(contexte)
+        self.__handler_requetes = TraitementMQRequetesBlocking(contexte, self.__fermeture_event)
         return self.__handler_requetes
 
 

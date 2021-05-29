@@ -1371,6 +1371,10 @@ class ServiceMonitorPrincipal(ServiceMonitor):
     def role(self):
         return ConstantesGenerateurCertificat.ROLE_MONITOR
 
+    @property
+    def fermeture_event(self):
+        return self._fermeture_event
+
 
 class ServiceMonitorDependant(ServiceMonitor):
     """
