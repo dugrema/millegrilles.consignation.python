@@ -1838,7 +1838,7 @@ class ConstantesPublication:
     LIBVAL_SECTION_PAGE = 'page'
     LIBVAL_SECTION_FICHIERS = 'fichiers'
     LIBVAL_SECTION_ALBUM = 'album'
-    LIBVAL_SECTION_FORUM = 'forum'
+    LIBVAL_SECTION_FORUM = 'forums'
     LIBVAL_COLLECTION_FICHIERS = 'collection_fichiers'
     LIBVAL_FICHIER = 'fichier'
 
@@ -1916,6 +1916,7 @@ class ConstantesPublication:
     CHAMP_FORUMS = 'forums'
     CHAMP_PARTIES_PAGES = 'parties_pages'
     CHAMP_LISTE_SECTIONS = 'liste_sections'
+    CHAMP_LISTE_FORUMS = 'liste_forums'
     CHAMP_COLONNES = 'colonnes'
     CHAMP_CAPTION = 'caption'
     CHAMP_LISTE_SOCKETIO = 'listeSocketio'

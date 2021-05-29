@@ -476,6 +476,8 @@ class RessourcesPublication:
                 if uuid_collections is not None:
                     section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
                     uuid_to_map.update(uuid_collections)
+            elif type_section == ConstantesPublication.LIBVAL_SECTION_FORUM:
+                section[ConstantesPublication.CHAMP_LISTE_FORUMS] = doc_section[ConstantesPublication.CHAMP_LISTE_FORUMS]
             else:
                 section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
                 uuid_to_map.add(section_id)
@@ -1797,6 +1799,8 @@ class GestionnaireCascadePublication:
 
                 # Publier forums
                 # repertoire: data/forums
+                # collections_publiees = self.triggers_publication.emettre_publier_forum(cdn_id)
+                # compteurs_commandes_emises = compteurs_commandes_emises + collections_publiees
 
         return compteurs_commandes_emises
 
@@ -1985,10 +1989,12 @@ class TriggersPublication:
                     {'sites': {'$in': liste_sites}},
                     {Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesPublication.LIBVAL_WEBAPPS]}}
                 ],
-                # Sections fichiers et albums ne sont pas publies sous forme de ressources, ils sont inclus dans siteconfig
+                # Sections forums, fichiers et albums ne sont pas publies sous forme de ressources, ils sont
+                # inclus dans siteconfig
                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$nin': [
                     ConstantesPublication.LIBVAL_SECTION_FICHIERS,
                     ConstantesPublication.LIBVAL_SECTION_ALBUM,
+                    ConstantesPublication.LIBVAL_SECTION_FORUM,
                 ]},
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
