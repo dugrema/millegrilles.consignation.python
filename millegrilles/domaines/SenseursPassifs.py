@@ -16,7 +16,7 @@ from bson.objectid import ObjectId
 
 class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
         if action == SenseursPassifsConstantes.REQUETE_LISTE_NOEUDS:
@@ -34,7 +34,7 @@ class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete
 
 class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
         if action == SenseursPassifsConstantes.REQUETE_LISTE_NOEUDS:

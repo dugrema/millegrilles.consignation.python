@@ -32,7 +32,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
         super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         # Verifier quel processus demarrer. On match la valeur dans la routing key.
         routing_key = method.routing_key
         routing_key_sansprefixe = routing_key.replace(
@@ -54,14 +54,14 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         super().__init__(gestionnaire_domaine)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         # domaine_routing_key = method.routing_key.replace('requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM, '')
 
         action = method.routing_key.split('.')[-1]
 
         reponse = None
         if action == ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE:
-            reponse = self.gestionnaire.transmettre_cle(message_dict, properties)
+            reponse = self.gestionnaire.transmettre_cle(message_dict, properties, enveloppe_certificat)
         elif action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
             self.gestionnaire.transmettre_certificat(properties)
         elif action == ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES:
@@ -75,7 +75,7 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
             try:
                 self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
             except Exception:
-                self._logger.exception("Erreur transmission reponse %s" % reponse)
+                self.__logger.exception("Erreur transmission reponse %s" % reponse)
 
 
 class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
@@ -428,7 +428,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     #         'cert_racine': fichier_cert_racine,
     #     }
 
-    def transmettre_cle(self, evenement: dict, properties):
+    def transmettre_cle(self, evenement: dict, properties, enveloppe_certificat):
         """
         Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
         :param evenement:
@@ -449,7 +449,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             permission = evenement
             enveloppe_permission = enveloppe_evenement
 
-        hachage_bytes_permission = set(permission[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES])
+        hachage_bytes_permission = permission.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES)
+        if hachage_bytes_permission is not None:
+            hachage_bytes_permission = set(hachage_bytes_permission)
+        else:
+            hachage_bytes_permission = None
+        identificateurs_documents = permission.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS)
         domaines_permis = None
         user_id_permis = None
         securite_permise = None
@@ -490,7 +495,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     evenement.get('_certificat_tiers') or \
                     evenement.get('certificat_tiers') or \
                     evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
-                enveloppe_rechiffrage = self.validateur_pki.valider('\n'.join(rechiffrage_pems))
+                if rechiffrage_pems is not None:
+                    enveloppe_rechiffrage = self.validateur_pki.valider(rechiffrage_pems)
+                else:
+                    enveloppe_rechiffrage = enveloppe_certificat
             else:
                 self._logger.debug("Permission expiree : %s" % evenement)
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
@@ -526,15 +534,25 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
         # Conserver tous les hachages bytes demandes qui sont inclus dans la permission (et rejeter les autres)
-        hachages_bytes_demandes = set(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]).intersection(hachage_bytes_permission)
+        filtre = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: {'$in': domaines_permis}
+        }
+        if hachage_bytes_permission is not None:
+            hachages_bytes_demandes = set(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]).intersection(hachage_bytes_permission)
+            filtre[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = {
+                '$in': list(hachages_bytes_demandes)
+            }
+
+        if identificateurs_documents is not None:
+            for key, value in identificateurs_documents.items():
+                filtre[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + key] = value
+            hachages_bytes_demandes = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]
+            filtre[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = {
+                '$in': list(hachages_bytes_demandes)
+            }
 
         # Charger la cle
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
-        filtre = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: {
-                '$in': list(hachages_bytes_demandes)
-            }
-        }
         hint = [(ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES, 1)]
         curseur = collection_documents.find(filtre, hint=hint)
 

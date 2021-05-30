@@ -13,7 +13,7 @@ from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 
 class TraitementRequetesProtegeesCatalogueApplications(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesCatalogueApplications.REQUETE_LISTE_DOMAINES:
             reponse = {'resultats': self.gestionnaire.get_liste_domaines()}

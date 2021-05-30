@@ -41,7 +41,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
         if reponse is not None and properties.correlation_id is not None:
             self.transmettre_reponse(dict(), reponse, properties.reply_to, properties.correlation_id)
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
 
@@ -81,7 +81,7 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
             super().traiter_message(ch, method, properties, body)
             return
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
         domaine_action = routing_key.split('.').pop()

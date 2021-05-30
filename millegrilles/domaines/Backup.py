@@ -17,7 +17,7 @@ from millegrilles.util.BackupModule import ArchivesBackupParser, WrapperDownload
 
 class TraitementRequetesBackupProtegees(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_routing_key = method.routing_key.replace('requete.', '')
 
@@ -33,7 +33,7 @@ class TraitementRequetesBackupProtegees(TraitementRequetesProtegees):
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_routing_key = method.routing_key.replace('requete.', '')
 

@@ -1070,6 +1070,7 @@ class RessourcesPublication:
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: 'Publication',
                 'collection': 'ressource',
                 'type': col_fichiers[Constantes.DOCUMENT_INFODOC_LIBELLE],
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
             }
 
             contenu_maj = dict()

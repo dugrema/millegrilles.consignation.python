@@ -98,8 +98,8 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
         try:
             # self.gestionnaire.verificateur_transaction.verifier(message_dict)
-            self.gestionnaire.validateur_message.verifier(message_dict)
-            self.traiter_requete(ch, method, properties, body, message_dict)
+            enveloppe_certificat = self.gestionnaire.validateur_message.verifier(message_dict)
+            self.traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
             self.message_dao.transmettre_demande_certificat(fingerprint)
@@ -115,7 +115,7 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
             else:
                 self.__logger.info("Erreur traitement message (routing: %s): %s" % (method.routing_key, str(ke)))
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         resultats = list()
         for requete in message_dict['requetes']:
             resultat = self.executer_requete(requete)
@@ -1270,7 +1270,7 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         super().__init__(gestionnaire_domaine)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         commande = routing_key.split('.')[-1]
         nom_domaine = self.gestionnaire.get_collection_transaction_nom()

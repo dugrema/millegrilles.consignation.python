@@ -1853,6 +1853,7 @@ class ConstantesPublication:
     REQUETE_PARTIES_PAGE = 'partiesPages'
     REQUETE_ETAT_PUBLICATION = 'etatPublication'
     REQUETE_ETAT_SITE = 'etatSite'
+    REQUETE_PERMISSION_PRIVEE = 'requetePermissionPrivee'
 
     TRANSACTION_CREER_SITE = 'creerSite'
     TRANSACTION_MAJ_SITE = 'majSite'

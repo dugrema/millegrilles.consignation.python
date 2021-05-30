@@ -34,6 +34,7 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
         self.channel = None
+        self.queue_name = None
         self.event_recu = Event()
         # self.thread_ioloop = Thread(target=self.run_ioloop)
 
@@ -78,7 +79,7 @@ class MessagesSample(BaseCallback):
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
         # self.event_recu.set()
-        self.requete_cert_maitredescles()
+        # self.requete_cert_maitredescles()
         thread_executer = Thread(name="exec", target=self.executer)
         thread_executer.start()
 
@@ -154,6 +155,44 @@ class MessagesSample(BaseCallback):
     def requete_dechiffrage_cle(self, hachage: list):
         requete_cert_maitredescles = {
             "liste_hachage_bytes": hachage,
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def requete_dechiffrage_cle_permission(self, hachage: list):
+        requete_cert_maitredescles = {
+            "liste_hachage_bytes": hachage,
+            "permission": {
+                "_certificat": [
+                    "-----BEGIN CERTIFICATE-----\nMIID/zCCAuegAwIBAgIUdPegLK9iH2dwn2/XxWvdA4PPf4EwDQYJKoZIhvcNAQEL\nBQAwgYgxLTArBgNVBAMTJDQ4NzViNjU1LTk0ODMtNDIwOC1iMzUxLWI1NDgwYWYz\nYWNjMTEWMBQGA1UECxMNaW50ZXJtZWRpYWlyZTE/MD0GA1UEChM2ejJXMkVDblA5\nZWF1TlhENjI4YWFpVVJqNnRKZlNZaXlnVGFmZkMxYlRiQ05IQ3RvbWhvUjdzMB4X\nDTIxMDUyNTE2NTgyN1oXDTIxMDYyNDE3MDAyN1owZjE/MD0GA1UECgw2ejJXMkVD\nblA5ZWF1TlhENjI4YWFpVVJqNnRKZlNZaXlnVGFmZkMxYlRiQ05IQ3RvbWhvUjdz\nMREwDwYDVQQLDAhkb21haW5lczEQMA4GA1UEAwwHbWctZGV2NDCCASIwDQYJKoZI\nhvcNAQEBBQADggEPADCCAQoCggEBALbMEXrc/JRFZg4uRWTlxRZ46lLKVfMIHoiG\nbdg9YWccVHpLUIeSrKq9d0A4fk9uoidGnd5y/5rPR8yIIWpLjPUpQws3JJ0OFERm\nXAMzP/DwYPlPilv4zZzAKIXQhQynVRSaoCGC1nkKqcw0Hx5bpCx905XmlqP1r+7Z\nMCHmSXBYCrUszwBi+oRKBfMki4J2orGSLu6Xuk7teB2Q31vk5MqED2aTl1CONvve\nPGLUtTCjA9BhrrWXy6gWukag3OjTgQxW74KNTSqhkAREFW3BD8GCuDShP4/txF13\nQ1OlPOu143RMNQ2CsgFwi6OGA/Vp5Svfc6JZB7YDB20dQt825rECAwEAAaOBgTB/\nMB0GA1UdDgQWBBSCBC/VZ7m//WZUPWrCiXfBgl4qYDAfBgNVHSMEGDAWgBQ03Pfp\nC+YWm5vfqidQ7JKSlOvVbTAMBgNVHRMBAf8EAjAAMAsGA1UdDwQEAwIE8DAQBgQq\nAwQABAg0LnNlY3VyZTAQBgQqAwQBBAhkb21haW5lczANBgkqhkiG9w0BAQsFAAOC\nAQEAu5rUoczNKYsUa6gJpsxHGi5RvcHHRVuOwbdJnEu9qgYbNfxGXaxY+kdboHR0\nR81le5hLrSELd6TlO7uPoKUzn9uiXZpnsu1zVtcAEi9OwxE9csQt6zhnhjI5gtzn\numcI8NlGgrphNh+R7W+1MrjNqdQyN+E4rb0nSWF0kjV7qAaNjIUarvGQf2n8lThX\nFkRq6yBAwJlRorz4hlATTx9lewgjamml4CjPQ94Z5UrGY13rZn19nXs76Oe1SC7O\nW3l15sl75PkAOXw5kmrGauttdMIo3eltXShLqAWscq+0jmf29jKPdA7alLsP/RMl\np0Qmi5YZUz/HxC1C7qkCHH9TUA==\n-----END CERTIFICATE-----",
+                    "-----BEGIN CERTIFICATE-----\nMIID+DCCAmCgAwIBAgIJV4ljiVFZUHcAMA0GCSqGSIb3DQEBDQUAMBYxFDASBgNV\nBAMTC01pbGxlR3JpbGxlMB4XDTIxMDUyNDIwMDkwNloXDTI0MDUyNjIwMDkwNlow\ngYgxLTArBgNVBAMTJDQ4NzViNjU1LTk0ODMtNDIwOC1iMzUxLWI1NDgwYWYzYWNj\nMTEWMBQGA1UECxMNaW50ZXJtZWRpYWlyZTE/MD0GA1UEChM2ejJXMkVDblA5ZWF1\nTlhENjI4YWFpVVJqNnRKZlNZaXlnVGFmZkMxYlRiQ05IQ3RvbWhvUjdzMIIBIjAN\nBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyDFf51VF78Hr+MMRAyiHwu/MxDLQ\njAVWa4UcgjGIN0OvfsCe1wTV16tTWgl89uF+cyAiayNDtvu/WNLkamvAViSOvt2T\nYmH6GPHBms4MDd65IUe43Es0Qlxc5BXCyibrIaEls8M9NZfUT0PUDq8f1JQEj8R6\nHYSm8CmTj3YNQiob4ORNVhyy9/NfazfXdGYaSnnDX8PwrR/wZVY4Yee7HNJgghpD\nlfk16dTKbEn2jDf47+bW60SkV6Q2fKyZ7eT2+odtq0jHHNFZrUGrFRccVFZX4Z6F\nZ3hf0H7MSZoGgSMzO4bEfWWp/MOrivbW6kWbtE9nZA9hKP8ewVSL95yIlwIDAQAB\no1YwVDASBgNVHRMBAf8ECDAGAQH/AgEEMB0GA1UdDgQWBBQ03PfpC+YWm5vfqidQ\n7JKSlOvVbTAfBgNVHSMEGDAWgBQasUCD0J+bwB2Yk8olJGvr057k7jANBgkqhkiG\n9w0BAQ0FAAOCAYEAYNvvFhE5zHp7lIh4AWeeD8G4AZYtfH/y8HCGcsF3MW29EbTX\nj+jNmajIbV0LdPiWvjM2dV7idBSPAnvT8wr9mD9ssDPuuisXlyb4fgvgsEk/B7bC\n+5CIrvGU3oW4immJ98kM6BdsreQazwckj1lE2GIeu24hKzJ47p6y1TG9OOJhCPaa\n+dDKt/BPcBLYZjFpyneXufxXnxJTjSg3vxnspiD7xKoBpWe4eaVCTBlb7sS1ldTD\ny5I96Z+xb4fKqkg4PINsYILfw2CftP5DYd7wFt5YOIHJclZ/RGAfh+TbuTHSi1TK\n0SAtGf7yfHWj81IRP4GK6lzsZWx7F3mFU0LNSdKmr/yLCGMpVNawEQRJXKMKwX5P\nP62FmWgTWLP8Pe1H6m4jT23ZIm6jQWuKU/BlTcjoeF9X9fmo4DwJfSHeMr5JV8MW\n9pw0vVb1bZhHgtOlO5y4E6E/rqlQmQeBhTtzq8EoYeKFtIG44OYq8okibj7VKg+o\nqi9zMJBfsJpi8aJR\n-----END CERTIFICATE-----",
+                    "-----BEGIN CERTIFICATE-----\nMIIEBjCCAm6gAwIBAgIKCSg3VilRiEQQADANBgkqhkiG9w0BAQ0FADAWMRQwEgYD\nVQQDEwtNaWxsZUdyaWxsZTAeFw0yMTAyMjgyMzM4NDRaFw00MTAyMjgyMzM4NDRa\nMBYxFDASBgNVBAMTC01pbGxlR3JpbGxlMIIBojANBgkqhkiG9w0BAQEFAAOCAY8A\nMIIBigKCAYEAo7LsB6GKr+aKqzmF7jxa3GDzu7PPeOBtUL/5Q6OlZMfMKLdqTGd6\npg12GT2esBh2KWUTt6MwOz3NDgA2Yk+WU9huqmtsz2n7vqIgookhhLaQt/OoPeau\nbJyhm3BSd+Fpf56H1Ya/qZl1Bow/h8r8SjImm8ol1sG9j+bTnaA5xWF4X2Jj7k2q\nTYrJJYLTU+tEnL9jH2quaHyiuEnSOfMmSLeiaC+nyY/MuX2Qdr3LkTTTrF+uOji+\njTBFdZKxK1qGKSJ517jz9/gkDCe7tDnlTOS4qxQlIGPqVP6hcBPaeXjiQ6h1KTl2\n1B5THx0yh0G9ixg90XUuDTHXgIw3vX5876ShxNXZ2ahdxbg38m4QlFMag1RfHh9Z\nXPEPUOjEnAEUp10JgQcd70gXDet27BF5l9rXygxsNz6dqlP7oo2yI8XvdtMcFiYM\neFM1FF+KadV49cXTePqKMpir0mBtGLwtaPNAUZNGCcZCuxF/mt9XOYoBTUEIv1cq\nLsLVaM53fUFFAgMBAAGjVjBUMBIGA1UdEwEB/wQIMAYBAf8CAQUwHQYDVR0OBBYE\nFBqxQIPQn5vAHZiTyiUka+vTnuTuMB8GA1UdIwQYMBaAFBqxQIPQn5vAHZiTyiUk\na+vTnuTuMA0GCSqGSIb3DQEBDQUAA4IBgQBLjk2y9nDW2MlP+AYSZlArX9XewMCh\n2xAjU63+nBG/1nFe5u3YdciLsJyiFBlOY2O+ZGliBcQ6EhFx7SoPRDB7v7YKv8+O\nEYZOSyule+SlSk2Dv89eYdmgqess/3YyuJN8XDyEbIbP7UD2KtklxhwkpiWcVSC3\nNK3ALaXwB/5dniuhxhgcoDhztvR7JiCD3fi1Gwi8zUR4BiZOgDQbn2O3NlgFNjDk\n6eRNicWDJ19XjNRxuCKn4/8GlEdLPwlf4CoqKb+O31Bll4aWkWRb9U5lpk/Ia0Kr\no/PtNHZNEcxOrpmmiCIN1n5+Fpk5dIEKqSepWWLGpe1Omg2KPSBjFPGvciluoqfG\nerI92ipS7xJLW1dkpwRGM2H42yD/RLLocPh5ZuW369snbw+axbcvHdST4LGU0Cda\nyGZTCkka1NZqVTise4N+AV//BQjPsxdXyabarqD9ycrd5EFGOQQAFadIdQy+qZvJ\nqn8fGEjvtcCyXhnbCjCO8gykHrRTXO2icrQ=\n-----END CERTIFICATE-----"
+                ],
+                "_signature": "mAWyQqNYOFuZyWUBxpVnlRSNHdewozq07DEXTGcKdg8YibQAAElUT71QRTbSYSvWZUY60VUILXM/Ynb7nQw/Oz0SLK4qZVXgRJYaHS8SZO5EWGdLMKB4AalJn+VGbZ0IwSgE7H18qa2XPAuCbYOCT/vriwrXCmVGwSOypdtnQ+/mBOJzySVlUY6r/bC7zm4RpA05c3NJV9Tgoy7q04B6AnulrNci7zpnMrjXkAK87sYSWTKU6/EZLXddFs1VuSZTojsbc33PliwBUUAoUb2dALibE7YamM0O7IS1HWIVs+tzMHXe/0F7fPceucVWwKRMpIlVs1Hqp4H4oUtyjSEGzzl0",
+                "domaine": "Publication",
+                "duree": 43200,
+                "en-tete": {
+                    "estampille": 1622414755,
+                    "fingerprint_certificat": "zQmRUBsMvwQ72274KozPmdGeKtEnz5ZUsAdhDU51g94Ey4m",
+                    "hachage_contenu": "mEiDVfBHNba0i4nyIY1F6v7VQ8Yma1TPucmRy14G+xZHTRA",
+                    "idmg": "z2W2ECnP9eauNXD628aaiURj6tJfSYiygTaffC1bTbCNHCtomhoR7s",
+                    "uuid_transaction": "cb43e3cb-c198-11eb-bc2f-d951270ecae2",
+                    "version": 6
+                },
+                "identificateurs_document": {
+                    "securite": "2.prive"
+                },
+                "roles_permis": [
+                    "Publication"
+                ]
+            }
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
@@ -712,12 +751,16 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_compter_cles_non_dechiffrables_verifcledummy()
         # self.requete_cle_backup()
         # self.requete_cle_backup_application()
-        self.commande_sauvegarder_cle()
+        # self.commande_sauvegarder_cle()
 
         # self.requete_dechiffrage_cle([
         #     "sha512_b64:aBUX0NsH2scbs+dCqAFsd2FCRO1L6aXsvxMpqVrE94vxam45dN9J1sxhrzTh8xKvy17vZDuHW5DmqnOKAij5DQ==",
         #     "sha512_b64:ys1vTtaKjCXnqt6i2G1GbHvN9vvMoiDt2IuV6/WatDVrN6pm670KO9iiL4N/tu6U60Jhsad+W3ZJky5iUGI1Hg==",
         # ])
+
+        self.requete_dechiffrage_cle_permission([
+            'z8VtAgm7BYshU7J9ZJRJKg8ZcZF783aAJuGgyR8dLNrvAEFEWhDi8zw8oicBD7NMqYnhNzRYQ8cJTydgWyFhtsjNyWX',
+        ])
 
 
 def reset_docs_cles():
@@ -738,7 +781,7 @@ def reset_docs_cles():
 sample = MessagesSample()
 
 # TEST
-# sample.executer()
+sample.executer()
 
 # FIN TEST
 sample.event_recu.wait(10)

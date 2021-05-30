@@ -11,7 +11,7 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 
 class TraitementRequetesProtegeesMaitreComptes(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         # Verifier quel processus demarrer. On match la valeur dans la routing key.
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]

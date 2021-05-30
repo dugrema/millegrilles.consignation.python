@@ -18,7 +18,7 @@ from millegrilles.SecuritePKI import EnveloppeCertificat
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
@@ -43,7 +43,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
 class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
@@ -71,7 +71,7 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
 
 class TraitementRequetesProtegees(TraitementRequetesPrivees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 

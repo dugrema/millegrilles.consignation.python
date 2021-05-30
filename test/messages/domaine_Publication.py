@@ -86,6 +86,16 @@ class TestPublication(DomaineTest):
             requete, domaine_action,
             securite=Constantes.SECURITE_PUBLIC, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def requete_permission_privee(self):
+        requete = {}
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_PERMISSION_PRIVEE
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action,
+            securite=Constantes.SECURITE_PRIVE, correlation_id=correlation_id, reply_to=self.queue_name,
+            ajouter_certificats=True
+        )
+
     def creer_site(self):
         info_site = {
             # ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
@@ -264,6 +274,7 @@ class TestPublication(DomaineTest):
         # self.maj_section()
         # self.maj_partie_page()
         # self.supprimer_cdn()
+        self.requete_permission_privee()
 
         # self.commande_publier_fichiers()
         # self.commande_publier_sections()
@@ -275,7 +286,7 @@ class TestPublication(DomaineTest):
         # self.commande_pousser_sections()
         # self.requete_etat_site()
         # self.requete_configuration_mapping()
-        self.requete_configuration_sites_noeuds()
+        # self.requete_configuration_sites_noeuds()
         # self.set_site_defaut()
 
 

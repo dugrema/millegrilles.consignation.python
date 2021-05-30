@@ -12,7 +12,7 @@ from millegrilles.Domaines import TraitementMessageDomaineRequete, TraitementReq
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
 
@@ -28,7 +28,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
 class TraitementRequetesProtegeesPrincipale(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
 

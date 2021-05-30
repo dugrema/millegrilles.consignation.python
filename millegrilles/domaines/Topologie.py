@@ -15,7 +15,7 @@ from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 
 class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
 

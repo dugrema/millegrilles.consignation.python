@@ -11,11 +11,12 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequete
     TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.PublicationRessources import GestionnaireCascadePublication
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
@@ -24,6 +25,24 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
             reponse = self.gestionnaire.get_liste_sites()
             reponse = {'resultats': reponse}
+        else:
+            reponse = {'err': 'Requete invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            raise Exception("Requete publique non supportee " + routing_key)
+
+        if reponse:
+            self.transmettre_reponse(
+                message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
+
+
+class TraitementRequetesPriveesPublication(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        routing_key = method.routing_key
+        domaine_action = routing_key.split('.').pop()
+
+        if domaine_action == ConstantesPublication.REQUETE_PERMISSION_PRIVEE:
+            reponse = self.gestionnaire.get_permission_privee(enveloppe_certificat)
         else:
             reponse = {'err': 'Requete invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -53,7 +72,7 @@ class TraitementCommandesPubliquesPublication(TraitementMessageDomaineCommande):
 
 class TraitementRequetesProtegeesPublication(TraitementRequetesProtegees):
 
-    def traiter_requete(self, ch, method, properties, body, message_dict):
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
@@ -162,6 +181,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesPublication(self),
+            Constantes.SECURITE_PRIVE: TraitementRequetesPriveesPublication(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesPublication(self)
         }
 
@@ -1016,6 +1036,32 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         self.__gestionnaire_cascade.invalidateur.invalider_ressource_mapping()
 
         return doc_mapping
+
+    def get_permission_privee(self, enveloppe_certificat: EnveloppeCertificat):
+        """
+        Retourne une permission signee pour dechiffrer du contenu prive dans le domaine Publication
+        :param enveloppe_certificat:
+        :return:
+        """
+        set_exchanges = set(enveloppe_certificat.get_exchanges)
+        set_requis = set(Constantes.ConstantesSecurite.cascade_secure(Constantes.SECURITE_PRIVE))
+        if len(set_exchanges.intersection(set_requis)) == 0:
+            return {'ok': False, 'err': 'Permission refusee'}
+
+        permission = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesPublication.DOMAINE_NOM,
+            'roles_permis': ['Publication'],
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 12 * 60 * 60,  # 12 heures
+
+            # Indiquer que l'identificateur de documents doit contenir l'element securite = 2.prive
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
+            }
+        }
+
+        permission_signee = self.generateur_transactions.preparer_enveloppe(permission, 'permission', ajouter_certificats=True)
+
+        return permission_signee
 
 
 class ProcessusPublication(MGProcessusTransaction):
