@@ -1086,6 +1086,7 @@ class RessourcesPublication:
 
             # Override du contenu
             contenu_maj['contenu_chiffre'] = contenu_chiffre
+            contenu_maj['hachage_bytes'] = hachage_bytes
             contenu = contenu_maj
 
         contenu_signe = self.__cascade.generateur_transactions.preparer_enveloppe(
