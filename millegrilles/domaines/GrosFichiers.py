@@ -57,6 +57,23 @@ class TraitementEvenementProtege(TraitementMessageDomaineEvenement):
             raise Exception("GrosFichiers evenement protege inconnu : " + routing_key)
 
 
+class TraitementRequetesPriveesGrosFichiers(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        routing_key = method.routing_key
+        action = routing_key.split('.').pop()
+
+        if action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PRIVE:
+            reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_prive(message_dict, enveloppe_certificat)
+        else:
+            return {'ok': False, 'err': 'Requete non supportee'}
+
+        if reponse:
+            if not isinstance(reponse, dict):
+                reponse = {'resultat': reponse}
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
 class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
@@ -82,6 +99,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_document_par_fuuid(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
             reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_public(message_dict)
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PRIVE:
+            reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_prive(message_dict, enveloppe_certificat)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
             reponse = self.gestionnaire.get_liste_collections(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
@@ -183,6 +202,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesGrosFichiers(self),
+            Constantes.SECURITE_PRIVE: TraitementRequetesPriveesGrosFichiers(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesGrosFichiers(self)
         }
 
@@ -1714,12 +1734,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self._logger.debug("Set ops : %s\nUnset ops: %s" % (set_ops, unset_ops))
 
-    def preparer_information_fichier(self, fuuid, fichier: dict = None, info_version: dict = None, duree: int = 120):
+    def preparer_information_fichier(self, fuuid, fichier: dict = None, info_version: dict = None, roles: list = None, duree: int = 120):
+        if roles is None:
+            roles = ['fichiers']
 
         liste_hachage = list()
         permission = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: roles,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: duree,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: liste_hachage,
         }
@@ -2102,6 +2124,52 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # Erreur, le fichier n'est pas public
         return {'err': "Le fichier n'est pas public", 'fuuid': fuuid}
+
+    def generer_permission_dechiffrage_fichier_prive(self, params, enveloppe_certificat: EnveloppeCertificat):
+        fuuid = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        # Recuperer le fichier
+        filtre_fichier = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$all': [fuuid]},
+        }
+        projection_fichier = ['collections', 'uuid', 'versions.' + fuuid, 'nom_fichier',
+                              ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS]
+        fichier = collection_domaine.find_one(filtre_fichier, projection=projection_fichier)
+
+        try:
+            liste_collections = fichier['collections']
+        except (TypeError, KeyError):
+            fichier_prive = False
+        else:
+            # Verifier que le fichier est bien dans au moins une collection publique
+            filtre_collections = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': liste_collections},
+                Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]},
+            }
+            projection_collection = [Constantes.DOCUMENT_INFODOC_SECURITE]
+            curseur_collections = collection_domaine.find(filtre_collections, projection=projection_collection)
+
+            # Verifier qu'au moins une collection est de securite 1.public ou 2.prive
+            fichier_prive = any([s[Constantes.DOCUMENT_INFODOC_SECURITE] in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE] for s in
+                                  curseur_collections])
+
+        if fichier_prive:
+            try:
+                info_version = fichier['versions'][fuuid]
+            except KeyError:
+                info_version = None
+
+            duree_12h = 12 * 60 * 60
+            roles = [ConstantesGrosFichiers.DOMAINE_NOM]
+            permission = self.preparer_information_fichier(fuuid, fichier, info_version, roles=roles, duree=duree_12h)
+            return permission
+
+        # Erreur, le fichier n'est pas public
+        return {'err': "Le fichier n'est pas prive", 'fuuid': fuuid}
 
     def get_liste_collections(self, params: dict):
         """

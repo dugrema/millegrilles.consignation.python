@@ -1192,6 +1192,7 @@ class ConstantesGrosFichiers:
     REQUETE_DOCUMENTS_PAR_UUID = '%s.documentsParUuid' % DOMAINE_NOM
     REQUETE_DOCUMENT_PAR_FUUID = 'documentsParFuuid'
     REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC = 'demandePermissionDechiffragePublic'
+    REQUETE_PERMISSION_DECHIFFRAGE_PRIVE = 'demandePermissionDechiffragePrive'
     REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
     REQUETE_DETAIL_COLLECTIONS_PUBLIQUES = 'detailCollectionsPubliques'
     REQUETE_TRANSFERTS_EN_COURS = 'transfertsEnCours'
