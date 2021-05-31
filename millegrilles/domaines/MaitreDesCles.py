@@ -2,7 +2,7 @@
 # Responsable de la gestion et de l'acces aux cles secretes pour les niveaux 3.Protege et 4.Secure.
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesMaitreDesCles
+from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, \
     TraitementMessageDomaineRequete, TraitementRequetesProtegees, TraitementCommandesProtegees, \
     TraitementCommandesSecures
@@ -26,6 +26,41 @@ import multibase
 import pytz
 
 
+class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat: EnveloppeCertificat):
+        # Verifier quel processus demarrer. On match la valeur dans la routing key.
+        routing_key = method.routing_key
+        action = method.routing_key.split('.')[-1]
+
+        # S'assurer que le certificat a au moins le role prive
+        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PRIVE))
+        securite_cert = set(enveloppe_certificat.get_exchanges)
+        if len(securite_cert.intersection(securite_permise)) == 0:
+            return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
+
+        reponse = None
+        if action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
+            # Transmettre le certificat courant du maitre des cles
+            self.gestionnaire.transmettre_certificat(properties)
+            return
+        elif action == ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE:
+            reponse = self.gestionnaire.transmettre_cle(message_dict, properties, enveloppe_certificat)
+        else:
+            # Type de transaction inconnue, on lance une exception
+            raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+
+        if reponse is not None:
+            try:
+                self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            except Exception:
+                self.__logger.exception("Erreur transmission reponse %s" % reponse)
+
+
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
     def __init__(self, gestionnaire):
@@ -33,6 +68,12 @@ class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        # S'assurer que le certificat a au moins le role protege
+        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
+        securite_cert = set(enveloppe_certificat.get_exchanges)
+        if len(securite_cert.intersection(securite_permise)) == 0:
+            return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
+
         # Verifier quel processus demarrer. On match la valeur dans la routing key.
         routing_key = method.routing_key
         routing_key_sansprefixe = routing_key.replace(
@@ -55,7 +96,11 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
-        # domaine_routing_key = method.routing_key.replace('requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM, '')
+        # S'assurer que le certificat a au moins le role protege
+        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
+        securite_cert = set(enveloppe_certificat.get_exchanges)
+        if len(securite_cert.intersection(securite_permise)) == 0:
+            return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
         action = method.routing_key.split('.')[-1]
 
@@ -81,6 +126,12 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
 class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        # S'assurer que le certificat a au moins le role protege
+        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
+        securite_cert = set(enveloppe_certificat.get_exchanges)
+        if len(securite_cert.intersection(securite_permise)) == 0:
+            return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
+
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
 
@@ -99,6 +150,12 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
 class TraitementCommandesMaitreDesClesSecures(TraitementCommandesSecures):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        # S'assurer que le certificat a au moins le role protege
+        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_SECURE))
+        securite_cert = set(enveloppe_certificat.get_exchanges)
+        if len(securite_cert.intersection(securite_permise)) == 0:
+            return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
+
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
 
@@ -133,7 +190,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__handler_requetes = {
             Constantes.SECURITE_SECURE: TraitementRequetesMaitreDesClesProtegees(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesMaitreDesClesProtegees(self),
-            Constantes.SECURITE_PRIVE: TraitementRequetesNoeuds(self),
+            Constantes.SECURITE_PRIVE: TraitementRequetesPrivees(self),
             Constantes.SECURITE_PUBLIC: TraitementRequetesNoeuds(self),
         }
 
