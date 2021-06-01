@@ -21,7 +21,7 @@ class TestForum(DomaineTest):
 
     def requete_liste_forum_posts(self):
         requete = {
-            ConstantesForum.CHAMP_FORUM_ID: '93f69900-8be0-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_FORUM_ID: '21ad1064-d5e1-42c3-a42e-0fc0c94caa3d',
             ConstantesForum.CHAMP_SORT_TYPE: ConstantesForum.TRI_PLUSRECENT,
         }
         domaine_action = 'requete.Forum.' + ConstantesForum.REQUETE_FORUM_POSTS
@@ -142,8 +142,8 @@ class TestForum(DomaineTest):
     def executer(self):
         self.__logger.debug("Executer")
 
-        self.requete_liste_forum()
-        # self.requete_liste_forum_posts()
+        # self.requete_liste_forum()
+        self.requete_liste_forum_posts()
         # self.requete_liste_post_commentaires()
         # self.creer_forum()
         # self.maj_forum()

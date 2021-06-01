@@ -95,6 +95,27 @@ class TraitementRequetesProtegees(TraitementRequetesPrivees):
                 message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
 
 
+class TraitementCommandesPubliques(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        resultat: dict
+        if action == ConstantesForum.COMMANDE_VOTER:
+            resultat = self.gestionnaire.ajouter_vote(message_dict)
+        elif action == ConstantesForum.COMMANDE_TRANSMETTRE_FORUMS_POSTS:
+            message_dict['securite'] = Constantes.SECURITE_PUBLIC
+            resultat = self.gestionnaire.transmettre_forums_posts(message_dict, properties)
+        elif action == ConstantesForum.COMMANDE_TRANSMETTRE_POSTS_COMMENTAIRES:
+            message_dict['securite'] = Constantes.SECURITE_PUBLIC
+            resultat = self.gestionnaire.transmettre_posts_commentaires(message_dict, properties)
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+
+        return resultat
+
+
 class TraitementCommandesPrivees(TraitementMessageDomaineCommande):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
@@ -152,6 +173,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         self.__handler_commandes = {
+            Constantes.SECURITE_PUBLIC: TraitementCommandesPubliques(self),
             Constantes.SECURITE_PRIVE: TraitementCommandesPrivees(self),
             Constantes.SECURITE_PROTEGE: TraitementCommandesForumProtegees(self)
         }
@@ -1147,7 +1169,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
         forum_ids = params.get(ConstantesForum.CHAMP_FORUM_IDS)
         if forum_ids is not None:
-            filtre[ConstantesForum.CHAMP_FORUM_IDS] = {'$in': forum_ids}
+            filtre[ConstantesForum.CHAMP_FORUM_ID] = {'$in': forum_ids}
 
         collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
         curseur = collection_forums_posts.find(filtre)
@@ -1194,11 +1216,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         filtre = dict()
         forum_id = params.get(ConstantesForum.CHAMP_FORUM_ID)
+        forum_ids = params.get(ConstantesForum.CHAMP_FORUM_IDS)
         post_ids = params.get(ConstantesForum.CHAMP_POST_IDS)
+        if forum_ids is not None:
+            filtre[ConstantesForum.CHAMP_FORUM_ID] = {'$in': forum_ids}
         if forum_id is not None:
             filtre[ConstantesForum.CHAMP_FORUM_ID] = forum_id
         if post_ids is not None:
-            filtre[ConstantesForum.CHAMP_FORUM_IDS] = {'$in': post_ids}
+            filtre[ConstantesForum.CHAMP_POST_ID] = {'$in': post_ids}
 
         collection_posts_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
         curseur = collection_posts_commentaires.find(filtre)

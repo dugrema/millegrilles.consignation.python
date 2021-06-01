@@ -935,7 +935,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
                 ConstantesPublication.LIBVAL_SECTION_PAGE,
-                ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                ConstantesPublication.LIBVAL_COLLECTION_FICHIERS
             ]},
             ConstantesPublication.CHAMP_CONTENU_SIGNE: {'$exists': True},
             # ConstantesPublication.CHAMP_SITE_ID: {'$in': site_ids} ... OR liste_sites... ,  # A FAIRE

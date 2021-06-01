@@ -591,9 +591,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
         # Conserver tous les hachages bytes demandes qui sont inclus dans la permission (et rejeter les autres)
-        filtre = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: {'$in': domaines_permis}
-        }
+        filtre = dict()
+        if domaines_permis is not None:
+            filtre[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = {'$in': domaines_permis}
+
         if hachage_bytes_permission is not None:
             hachages_bytes_demandes = set(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]).intersection(hachage_bytes_permission)
             filtre[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = {
