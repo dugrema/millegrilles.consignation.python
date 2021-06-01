@@ -1070,6 +1070,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_UUIDVCOURANTE = 'fuuid_v_courante'  # FUUID de la version courante
     DOCUMENT_FICHIER_VERSIONS = 'versions'
     DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
+    DOCUMENT_FICHIER_FUUID_MIMETYPES = 'fuuidMimetypes'
     DOCUMENT_FICHIER_TAILLE = 'taille'
     DOCUMENT_FICHIER_HACHAGE = 'hachage'
     DOCUMENT_FICHIER_SUPPRIME = 'supprime'

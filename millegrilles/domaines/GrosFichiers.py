@@ -110,7 +110,7 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
         elif domaine_action == ConstantesGrosFichiers.REQUETE_CONVERSIONS_MEDIA_ENCOURS:
             reponse = self.gestionnaire.get_conversion_media_en_cours()
         else:
-            super().traiter_requete(ch, method, properties, body, message_dict)
+            super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
             return
 
         if reponse:
@@ -2135,9 +2135,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
             ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$all': [fuuid]},
         }
-        projection_fichier = ['collections', 'uuid', 'versions.' + fuuid, 'nom_fichier',
-                              ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS]
+
+        projection_fichier = [
+            'collections',
+            'uuid',
+            'versions.' + fuuid,
+            'nom_fichier',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_MIMETYPES,
+            ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS,
+        ]
         fichier = collection_domaine.find_one(filtre_fichier, projection=projection_fichier)
+
+        try:
+            mimetype = fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_MIMETYPES)[fuuid]
+        except KeyError:
+            mimetype = None
 
         try:
             liste_collections = fichier['collections']
@@ -2161,7 +2173,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             try:
                 info_version = fichier['versions'][fuuid]
             except KeyError:
-                info_version = None
+                info_version = {ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: mimetype}
 
             duree_12h = 12 * 60 * 60
             roles = [ConstantesGrosFichiers.DOMAINE_NOM]
