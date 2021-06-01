@@ -492,6 +492,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA,
             ConstantesForum.CHAMP_MEDIA_MIMETYPE_MEDIA,
             ConstantesForum.CHAMP_MEDIA_VIDEO,
+            ConstantesForum.CHAMP_MEDIA_SECURITE,
         ]
         for key in params:
             if key in champs_supportes:

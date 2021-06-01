@@ -2047,6 +2047,7 @@ class ConstantesForum:
     CHAMP_DIRTY_COMMENTS = 'dirty_comments'
     CHAMP_COMMENTAIRES = 'commentaires'
     CHAMP_MEDIA_VIDEO = 'video'
+    CHAMP_MEDIA_SECURITE = 'securiteMedia'
 
     CHAMP_FORUM_IDS = 'forum_ids'
     CHAMP_POST_IDS = 'post_ids'
