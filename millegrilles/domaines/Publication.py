@@ -149,7 +149,7 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
         elif domaine_action == ConstantesPublication.COMMANDE_POUSSER_SECTIONS:
             reponse = self.gestionnaire.pousser_sections(message_dict, properties)
         elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_FICHIERS_FORUM:
-            reponse = self.gestionnaire. xxx (message_dict, properties)
+            reponse = self.gestionnaire.publier_fichiers_forum(message_dict, properties)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -172,7 +172,7 @@ class TraitementEvenementsFichiers(TraitementMessageDomaineEvenement):
         if domaine_action == 'publierFichier':
             cascade.traiter_evenement_publicationfichier(message_dict)
         elif domaine_action in ['majFichier', 'associationPoster']:
-            cascade.traiter_evenement_maj_fichier(message_dict, routing_key)
+            cascade.traiter_evenement_maj_fichier(message_dict)
 
 
 class GestionnairePublication(GestionnaireDomaineStandard):
@@ -730,7 +730,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 'section_id': section_id,
                 'site_id': site_id
             }
-            self.demarrer_processus('millegrilles_domaines_Publication:ProcessusPublierCollectionGrosFichiers', params)
+            self.demarrer_processus('millegrilles_util_PublicationRessources:ProcessusPublierCollectionGrosFichiers', params)
 
         # # Retransmettre sur exchange 1.public pour maj live
         # self.generateur_transactions.emettre_message(
@@ -960,6 +960,30 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 section, replying_to=reply_to, correlation_id=correlation_id, ajouter_certificats=True)
 
         return {'ok': True}
+
+    def publier_fichiers_forum(self, params: dict, properties):
+        """
+        Publier tous les fichiers de la collection associer a un forum. Utilise lorsqu'un usager fait un post.
+        :param params:
+        :param properties:
+        :return:
+        """
+        forum_id = params[Constantes.ConstantesForum.CHAMP_FORUM_ID]
+
+        # Declencher les processus de synchronisation de collections.
+        # Le forum_id est le meme uuid que celui de la collection.
+        processus = "millegrilles_util_PublicationRessources:ProcessusPublierCollectionGrosFichiers"
+        params = {
+            'uuid_collection': forum_id,
+            # 'continuer_publication': True,
+            'publier_immediatement': True,
+            'properties': {
+                'reply_to': properties.reply_to,
+                'correlation_id': properties.correlation_id,
+            }
+        }
+
+        self.cascade.demarrer_processus(processus, params)
 
     def sauvegarder_cle_ipns(self, identificateur_document, params):
         set_on_insert = {
