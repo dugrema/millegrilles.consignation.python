@@ -251,6 +251,7 @@ class RessourcesPublication:
 
     def __init__(self, cascade):
         self.__cascade = cascade
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     @property
     def document_dao(self):
@@ -1231,11 +1232,16 @@ class RessourcesPublication:
         for fichier in liste_documents:
             fuuids_recus.update(fichier[ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS])
             fuuids_recus.add(fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE])
-        fuuids_signes = set(contenu_signe['fuuids'].keys())
 
-        fuuids_differents = fuuids_recus ^ fuuids_signes  # Extraire fuuids presents dans une seule liste
-        if len(fuuids_differents) > 0:
-            # On a une difference entre les listes de fuuids
+        try:
+            fuuids_signes = set(contenu_signe['fuuids'].keys())
+
+            fuuids_differents = fuuids_recus ^ fuuids_signes  # Extraire fuuids presents dans une seule liste
+            if len(fuuids_differents) > 0:
+                # On a une difference entre les listes de fuuids
+                return True
+        except KeyError:
+            self.__logger.warning("Erreur comparaison collection %s, contenu_signe n'a pas de fuuids. Regenerer collection." % uuid_collection)
             return True
 
         return False
@@ -1349,14 +1355,14 @@ class GestionnaireCascadePublication:
 
                 # Continuer publication
                 self.generateur_transactions.transmettre_commande(
-                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                    dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             else:
                 # Rien a faire, on marque la config comme publiee
                 self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
 
                 # Continuer publication
                 self.generateur_transactions.transmettre_commande(
-                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                    dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
 
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
@@ -1426,14 +1432,14 @@ class GestionnaireCascadePublication:
 
                 # Continuer publication
                 self.generateur_transactions.transmettre_commande(
-                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                    dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             else:
                 # Rien a faire, on marque la config comme publiee
                 self.invalidateur.marquer_ressource_complete(cdn_id, filtre)
 
                 # Continuer publication
                 self.generateur_transactions.transmettre_commande(
-                    dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                    dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
 
         except Exception as e:
             msg = "Erreur publication fichiers %s" % str(params)
@@ -1802,8 +1808,8 @@ class GestionnaireCascadePublication:
 
                 # Publier forums
                 # repertoire: data/forums
-                # collections_publiees = self.triggers_publication.emettre_publier_forum(cdn_id)
-                # compteurs_commandes_emises = compteurs_commandes_emises + collections_publiees
+                collections_publiees = self.triggers_publication.emettre_publier_forum(cdn_id)
+                compteurs_commandes_emises = compteurs_commandes_emises + collections_publiees
 
         return compteurs_commandes_emises
 
@@ -2178,7 +2184,7 @@ class TriggersPublication:
 
             # Continuer publication
             self.generateur_transactions.transmettre_commande(
-                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             return
         elif type_cdn in ['hiddenService', 'manuel']:
             # Rien a faire
@@ -2186,7 +2192,7 @@ class TriggersPublication:
 
             # Continuer publication
             self.generateur_transactions.transmettre_commande(
-                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
             return
         else:
             raise Exception("Type cdn non supporte %s" % type_cdn)
@@ -2455,6 +2461,35 @@ class TriggersPublication:
 
         return compteur_commandes
 
+    def emettre_publier_forum(self, cdn_id):
+        compteur_commandes = 0
+        label_champ_distribution = ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES + '.' + cdn_id
+
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        # Charger les collection_fichiers identifiees. Seulement traiter celles qui sont flaggees progres=False
+        filtre_collections_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_FORUM,
+            # ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_collections},
+            label_champ_distribution: False,
+        }
+        curseur_collection_fichiers = collection_ressources.find(filtre_collections_fichiers)
+        for res_collection_fichiers in curseur_collection_fichiers:
+            uuid_col_fichiers = res_collection_fichiers['uuid']
+            contenu = res_collection_fichiers[ConstantesPublication.CHAMP_CONTENU]
+            securite_collection = contenu[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+            filtre_fichiers_maj = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+                'uuid': uuid_col_fichiers,
+            }
+
+            # Pour l'instant, rien a faire. On fait juste marquer complete
+            self.__cascade.invalidateur.marquer_ressource_complete(cdn_id, filtre_fichiers_maj)
+
+            # compteur_commandes = compteur_commandes + 1
+
+        return compteur_commandes
+
     def emettre_publier_configuration(self, cdn_id: str, site_id: str):
         # collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
         # filtre_site = {ConstantesPublication.CHAMP_SITE_ID: site_id}
@@ -2632,7 +2667,7 @@ class TriggersPublication:
 
             # Continuer publication
             self.generateur_transactions.transmettre_commande(
-                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
 
             return 1
         else:
@@ -2641,7 +2676,7 @@ class TriggersPublication:
 
             # Continuer publication
             self.generateur_transactions.transmettre_commande(
-                dict(), ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
+                dict(), 'commande.Publication.' + ConstantesPublication.COMMANDE_CONTINUER_PUBLICATION)
 
             return 0
 
