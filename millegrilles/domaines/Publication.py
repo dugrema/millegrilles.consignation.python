@@ -148,6 +148,8 @@ class TraitementCommandesProtegeesPublication(TraitementCommandesProtegees):
             reponse = {'ok': True, 'matched_count': matched_count}
         elif domaine_action == ConstantesPublication.COMMANDE_POUSSER_SECTIONS:
             reponse = self.gestionnaire.pousser_sections(message_dict, properties)
+        elif domaine_action == ConstantesPublication.COMMANDE_PUBLIER_FICHIERS_FORUM:
+            reponse = self.gestionnaire. xxx (message_dict, properties)
         else:
             reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 

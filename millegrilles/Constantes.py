@@ -1840,7 +1840,7 @@ class ConstantesPublication:
     LIBVAL_SECTION_PAGE = 'page'
     LIBVAL_SECTION_FICHIERS = 'fichiers'
     LIBVAL_SECTION_ALBUM = 'album'
-    LIBVAL_SECTION_FORUM = 'forums'
+    LIBVAL_SECTION_FORUM = 'forum'
     LIBVAL_COLLECTION_FICHIERS = 'collection_fichiers'
     LIBVAL_FICHIER = 'fichier'
 
@@ -1882,6 +1882,7 @@ class ConstantesPublication:
     COMMANDE_PUBLIER_COMPLET = 'publierComplet'
     COMMANDE_CONTINUER_PUBLICATION = 'continuerPublication'
     COMMANDE_POUSSER_SECTIONS = 'pousserSections'
+    COMMANDE_PUBLIER_FICHIERS_FORUM = 'publierFichiersForum'
 
     EVENEMENT_CONFIRMATION_MAJ_MAPPING = 'confirmationMajMapping'
     EVENEMENT_CONFIRMATION_MAJ_SITECONFIG = 'confirmationMajSiteconfig'

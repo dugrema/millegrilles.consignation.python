@@ -1421,9 +1421,23 @@ class ProcessusTransactionAjouterPost(ProcessusTransactionPost):
 
         reponse = self.controleur.gestionnaire.maj_post(transaction)
 
-        self.set_etape_suivante()  # Termine
+        if transaction.get(ConstantesForum.CHAMP_MEDIA_UUID) is not None:
+            # On a un media - demander publication de la collection de fichiers du forum
+            commande_publier_fichiers = {
+                ConstantesForum.CHAMP_FORUM_ID: transaction[ConstantesForum.CHAMP_FORUM_ID]
+            }
+            domaine_action = 'Publication.' + Constantes.ConstantesPublication.COMMANDE_PUBLIER_FICHIERS_FORUM
+            self.ajouter_commande_a_transmettre(domaine_action, commande_publier_fichiers, blocking=True)
+            self.set_etape_suivante(ProcessusTransactionAjouterPost.attendre_publication.__name__)
+        else:
+            self.set_etape_suivante()  # Termine
 
         return reponse
+
+    def attendre_publication(self):
+
+        self.set_etape_suivante()  # Termine
+        return {'ok': True, 'publication': True}
 
 
 class ProcessusTransactionModifierPost(ProcessusTransactionPost):

@@ -856,7 +856,7 @@ class RessourcesPublication:
 
             if type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
                 self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
-            elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM]:
+            elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM, ConstantesPublication.LIBVAL_SECTION_FORUM]:
                 uuids = self.maj_ressource_avec_fichiers(section_id)
                 uuid_collections.update(uuids)
 
@@ -880,7 +880,8 @@ class RessourcesPublication:
         filtre_section = {ConstantesPublication.CHAMP_SECTION_ID: section_id}
         doc_section = collection_sections.find_one(filtre_section)
 
-        collection_uuids = doc_section.get('collections') or list()
+        # Note : les uuid de forums correspondent aussi au uuid de la collection grosfichiers de ce forum
+        collection_uuids = doc_section.get('collections') or doc_section.get('liste_forums') or list()
         site_id = doc_section[ConstantesPublication.CHAMP_SITE_ID]
         site = self.__cascade.get_site(site_id)
         liste_cdns = site[ConstantesPublication.CHAMP_LISTE_CDNS]
