@@ -59,6 +59,41 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
+class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        # Verifier quel processus demarrer. On match la valeur dans la routing key.
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        if routing_key and routing_key.startswith('requete.certificat.'):
+            fingerprint = routing_key.split('.')[-1]
+            certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
+            try:
+                chaine = [certificat[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in certificat[ConstantesSecurityPki.LIBELLE_CHAINE]]
+                generateur_transactions = self.gestionnaire.generateur_transactions
+                reponse = generateur_transactions.emettre_certificat(chaine)
+            except KeyError:
+                pass  # Certificat inconnu
+                reponse = None
+        elif action == ConstantesPki.REQUETE_CERTIFICAT_PAR_PK:
+            reponse = self.gestionnaire.get_certificat_par_pk(message_dict)
+        elif action == ConstantesPki.REQUETE_LISTE_CERTS_CA:
+            reponse = self.gestionnaire.get_liste_certificats_ca()
+        else:
+            return super().traiter_requete(ch, method, properties, body, message_dict)
+            # Type de transaction inconnue, on lance une exception
+            # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+
+        # Genere message reponse
+        if reponse:
+            correlation_id = properties.correlation_id
+            reply_to = properties.reply_to
+            self.transmettre_reponse(message_dict, reponse, replying_to=reply_to, correlation_id=correlation_id)
+
+        return reponse
+
+
 class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
 
     def __init__(self, gestionnaire_domaine):
@@ -142,6 +177,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self.__traitement_certificats = None
 
         handler_requetes_protegees = TraitementRequetesProtegeesPki(self)
+        handler_requetes_privees = TraitementRequetesPrivees(self)
         handler_requetes_publiques = TraitementRequetesPubliques(self)
         self.__handler_evenements_certificats = TraitementEvenementsPki(self)
         self.__handler_backup = HandlerBackupPKI(self._contexte)
@@ -149,7 +185,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_SECURE: handler_requetes_protegees,
             Constantes.SECURITE_PROTEGE: handler_requetes_protegees,
-            Constantes.SECURITE_PRIVE: handler_requetes_publiques,
+            Constantes.SECURITE_PRIVE: handler_requetes_privees,
             Constantes.SECURITE_PUBLIC: handler_requetes_publiques,
         }
 

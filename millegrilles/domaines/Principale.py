@@ -26,6 +26,22 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
+class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        reponse = None
+        if action == ConstantesPrincipale.REQUETE_PROFIL_MILLEGRILLE:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.LIBVAL_DOMAINES])
+        elif action == ConstantesPrincipale.REQUETE_PROFIL_USAGER:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.LIBVAL_PROFIL_USAGER])
+
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
 class TraitementRequetesProtegeesPrincipale(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
@@ -79,6 +95,7 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         self.__handler_requetes = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
+            Constantes.SECURITE_PRIVE: TraitementRequetesPrivees(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesPrincipale(self),
         }
 
