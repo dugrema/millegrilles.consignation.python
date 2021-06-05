@@ -1025,6 +1025,24 @@ class RessourcesPublication:
 
         return fuuids_info
 
+    def get_fuuids(self, fuuids: list):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_fichier = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': {'$in': fuuids},
+        }
+        curseur_fichier = collection_ressources.find(filtre_fichier)
+        return [res for res in curseur_fichier]
+
+    def get_collections(self, uuid_collections: list):
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        filtre_fichier = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
+            'uuid': {'$in': uuid_collections},
+        }
+        curseur_collections = collection_ressources.find(filtre_fichier)
+        return [res for res in curseur_collections]
+
     def reset_ressources(self, params: dict):
         """
         Reset l'etat de publication et le contenu de toutes les ressources.
@@ -1727,7 +1745,6 @@ class GestionnaireCascadePublication:
         """
         Prepare les sections fichiers (collection de fichiers) et transmet la commande d'upload.
         :param liste_res_cdns:
-        :param securite:
         :return:
         """
         liste_sites = set()
@@ -2156,7 +2173,15 @@ class TriggersPublication:
             # On a le contenu signe (genere en meme temps que le contenu GZIP)
             self.generateur_transactions.emettre_message(contenu_signe, domaine_action, exchanges=[Constantes.SECURITE_PUBLIC])
 
-    def emettre_commande_publier_fichier(self, res_fichier: dict, cdn_info: dict):
+    def emettre_commande_publier_fichier(self, res_fichier: dict, cdn_info: dict, no_emit=False):
+        """
+        Generer la commande publier fichier.
+        :param res_fichier:
+        :param cdn_info:
+        :param no_emit: Si True, n'emet pas la commande
+        :return: {'params': commande, 'domaine': domaine_action} ou None si rien a faire
+        """
+
         type_cdn = cdn_info['type_cdn']
         cdn_id = cdn_info['cdn_id']
         fuuid = res_fichier['fuuid']
@@ -2170,11 +2195,11 @@ class TriggersPublication:
         }
 
         if type_cdn == 'sftp':
-            self.emettre_commande_publier_fichier_sftp(res_fichier, cdn_info)
+            params_commande = self.emettre_commande_publier_fichier_sftp(res_fichier, cdn_info, no_emit)
         elif type_cdn in ['ipfs', 'ipfs_gateway']:
-            self.emettre_commande_publier_fichier_ipfs(res_fichier, cdn_info)
+            params_commande = self.emettre_commande_publier_fichier_ipfs(res_fichier, cdn_info, no_emit)
         elif type_cdn == 'awss3':
-            self.emettre_commande_publier_fichier_awss3(res_fichier, cdn_info)
+            params_commande = self.emettre_commande_publier_fichier_awss3(res_fichier, cdn_info, no_emit)
         elif type_cdn == 'mq':
             # Emettre document (surtout utile pour MQ)
             self.__cascade.triggers_publication.emettre_evenements_downstream(res_fichier)
@@ -2199,7 +2224,9 @@ class TriggersPublication:
 
         self.__cascade.invalidateur.marquer_ressource_encours(cdn_id, filtre_fichier_update)
 
-    def emettre_commande_publier_fichier_sftp(self, res_fichier: dict, cdn_info: dict):
+        return params_commande
+
+    def emettre_commande_publier_fichier_sftp(self, res_fichier: dict, cdn_info: dict, no_emit=False):
         fuuid = res_fichier['fuuid']
         cdn_id = cdn_info['cdn_id']
         flag_public = res_fichier.get('public') or False
@@ -2227,9 +2254,12 @@ class TriggersPublication:
             raise Exception("Fichier 1.public a publier sans mimetype")
 
         domaine = 'commande.fichiers.publierFichierSftp'
-        self.generateur_transactions.transmettre_commande(params, domaine)
+        if no_emit is False:
+            self.generateur_transactions.transmettre_commande(params, domaine)
 
-    def emettre_commande_publier_fichier_ipfs(self, res_fichier: dict, cdn_info: dict):
+        return {'params': params, 'domaine': domaine}
+
+    def emettre_commande_publier_fichier_ipfs(self, res_fichier: dict, cdn_info: dict, no_emit=False):
         fuuid = res_fichier['fuuid']
         cdn_id = cdn_info['cdn_id']
         mimetype = res_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
@@ -2252,9 +2282,12 @@ class TriggersPublication:
             raise Exception("Fichier 1.public a publier sans mimetype")
 
         domaine = 'commande.fichiers.publierFichierIpfs'
-        self.generateur_transactions.transmettre_commande(params, domaine)
+        if no_emit is False:
+            self.generateur_transactions.transmettre_commande(params, domaine)
 
-    def emettre_commande_publier_fichier_awss3(self, res_fichier: dict, cdn_info: dict):
+        return {'params': params, 'domaine': domaine}
+
+    def emettre_commande_publier_fichier_awss3(self, res_fichier: dict, cdn_info: dict, no_emit=False):
         fuuid = res_fichier['fuuid']
         cdn_id = cdn_info['cdn_id']
         mimetype = res_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
@@ -2293,7 +2326,11 @@ class TriggersPublication:
         if uuid_fichier is not None:
             params['uuid'] = uuid_fichier
         domaine = 'commande.fichiers.publierFichierAwsS3'
-        self.generateur_transactions.transmettre_commande(params, domaine)
+
+        if no_emit is False:
+            self.generateur_transactions.transmettre_commande(params, domaine)
+
+        return {'params': params, 'domaine': domaine}
 
     def emettre_publier_uploadpages(self, cdn_id: str, site_id: str):
         """
@@ -3037,3 +3074,155 @@ class ProcessusCreerCleIpnsVitrine(MGProcessus):
         self.ajouter_commande_a_transmettre(domaine_action, commande)
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusPublierFichierImmediatement(MGProcessus):
+    """
+    Publie un fichier immediatement sur tous les CDN appropries. Emet une confirmation a la fin.
+
+    Utilise pour publier des ressources dynamiquement (e.g. forum).
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        params = self.parametres
+
+        # Recuperer l'entree complete du fichier
+        fuuid = params['fuuid']
+
+        requete = {'fuuid': fuuid}
+        domaine_action = 'requete.GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_DOCUMENT_PAR_FUUID
+        self.set_requete(domaine_action, requete)
+
+        self.set_etape_suivante(ProcessusPublierFichierImmediatement.publier_fichier.__name__)
+
+    def publier_fichier(self):
+
+        doc_fichier = self.parametres['reponse'][0]
+        err = doc_fichier.get('err')
+        if err is True:
+            code_err = doc_fichier.get('code') or 'generique'
+            self.__logger.error("Erreur access fichier %s, code %s" % (self.parametres['fuuid'], code_err))
+            self.set_etape_suivante()  # Termine, err
+            return {'err': True, 'code': code_err}
+
+        gestionnaire_publication = self.controleur.gestionnaire
+        gestionnaire_cascade: GestionnaireCascadePublication = gestionnaire_publication.cascade
+        ressources = gestionnaire_cascade.ressources
+        triggers = gestionnaire_cascade.triggers
+
+        # Determiner si le fichier est present dans au moins une collection publique (dont forum)
+        uuid_collections = doc_fichier['collections']
+        res_collections = ressources.get_collections(uuid_collections)
+
+        collections_flags_publics = list()
+        set_site_ids = set()  # Liste des sites pour deploiement de la ressources (permet de trouver CDNs)
+        for c in res_collections:
+            # Conserver la liste des sites de la collection
+            set_site_ids.update(c.get('sites'))
+
+            try:
+                flag_public = c['contenu']['securite'] == Constantes.SECURITE_PUBLIC
+            except KeyError:
+                try:
+                    flag_public = c['contenu_signe']['securite'] == Constantes.SECURITE_PUBLIC
+                except KeyError:
+                    try:
+                        flag_public = c['contenu_signe']['contenu_chiffre'] is None
+                    except KeyError:
+                        # Default - public et False
+                        flag_public = False
+            collections_flags_publics.append(flag_public)
+
+        # Detecter si au moins une collection deja publiee est publique
+        flag_public = any(collections_flags_publics)
+
+        # S'assurer que les ressources existent pour tous les fuuid du fichiers
+        fuuids_dict = dict()
+        info_fuuids = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_MIMETYPES]
+        for fuuid in info_fuuids.keys():
+            fuuids_dict[fuuid] = doc_fichier
+        ressources.maj_ressources_fuuids(fuuids_dict, public=flag_public)
+
+        # Charger la liste des ressources
+        res_fuuids = ressources.get_fuuids(list(info_fuuids.keys()))
+
+        if len(res_fuuids) == 0:
+            # Rien a faire
+            return {'ok': True, 'len': 0}
+
+        # Charger la liste des site_ids associes aux collections
+        sites_par_cdn = triggers.preparer_sitesparcdn()
+
+        # Trouver les CDNs
+        cdn_par_id = dict()
+        for cdn in sites_par_cdn:
+            sites_cdn = set(cdn['sites'])
+            if len(sites_cdn.intersection(set_site_ids)) > 0:
+                # On a au moins 1 site en commun avec ce CDN
+                cdn_par_id[cdn['cdn_id']] = cdn
+
+        # Emettre commandes de publication
+        au_moins_1_commande = False
+        for res_fichier in res_fuuids:
+            for cdn_info in cdn_par_id.values():
+                params_commande = triggers.emettre_commande_publier_fichier(res_fichier, cdn_info)
+                try:
+                    commande = params_commande['params']
+                    domaine_action = params_commande['domaine']
+                    self.ajouter_commande_a_transmettre(domaine_action, commande, blocking=True)
+                    au_moins_1_commande = True
+                except TypeError:
+                    pass  # Rien a faire (e.g. CDN mq ou manuel)
+
+        if au_moins_1_commande:
+            self.set_etape_suivante(ProcessusPublierFichierImmediatement.attendre_publication_complete.__name__)
+        else:
+            # Rien a faire
+            self.set_etape_suivante()  # Termine
+
+        return {
+            'fuuids': list(info_fuuids.keys()),
+        }
+
+    def attendre_publication_complete(self):
+        """
+        Etape qui est appelee chaque fois qu'une publication est completee
+        :return:
+        """
+        # Verifier si toutes les publications sont completees.
+        fuuids = self.parametres['fuuids']
+
+        gestionnaire_publication = self.controleur.gestionnaire
+        gestionnaire_cascade: GestionnaireCascadePublication = gestionnaire_publication.cascade
+        ressources = gestionnaire_cascade.ressources
+
+        res_fuuids = ressources.get_fuuids(fuuids)
+
+        etat_complete = list()
+        for res_fuuid in res_fuuids:
+            try:
+                progres = res_fuuid[ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES]
+                if len(progres) == 0:
+                    complete = True
+                else:
+                    complete = False
+            except KeyError:
+                # Progres n'est pas present, c'est soit une erreur ou un reset
+                complete = True
+
+            etat_complete.append(complete)
+
+        complete = all(etat_complete)
+
+        # Il manque des publications, on se met en attente
+        if complete is False:
+            self.set_blocking()
+            self.set_etape_suivante(ProcessusPublierFichierImmediatement.attendre_publication_complete.__name__)
+        else:
+            # Complete, il ne reste rien a faire
+            self.set_etape_suivante()  # Termine
+            return {'ok': True}

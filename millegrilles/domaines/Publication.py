@@ -331,6 +331,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         return sections
 
+    def get_section(self, section_id: str):
+        filtre = {ConstantesPublication.CHAMP_SECTION_ID: section_id}
+        collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
+        doc_section = collection_sections.find_one(filtre)
+        return doc_section
+
     def get_liste_cdns(self, params: dict):
         collection_cdns = self.document_dao.get_collection(ConstantesPublication.COLLECTION_CDNS)
         filtre = dict()
@@ -399,6 +405,15 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
 
         return resultat
+
+    def get_ressource_fichier(self, fuuid: str):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
+            'fuuid': fuuid,
+        }
+        collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+        res_fichier = collection_ressources.find_one(filtre)
+        return res_fichier
 
     def get_configuration_sites_par_noeud(self, params: dict):
         # noeud_id = params.get('noeud_id')
@@ -969,19 +984,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         :return:
         """
         forum_id = params[Constantes.ConstantesForum.CHAMP_FORUM_ID]
+        fuuids = params['fuuids']
 
         # Declencher les processus de synchronisation de collections.
         # Le forum_id est le meme uuid que celui de la collection.
-        processus = "millegrilles_util_PublicationRessources:ProcessusPublierCollectionGrosFichiers"
-        params = {
-            'uuid_collection': forum_id,
-            # 'continuer_publication': True,
-            'publier_immediatement': True,
-            'properties': {
-                'reply_to': properties.reply_to,
-                'correlation_id': properties.correlation_id,
+        processus = "millegrilles_util_PublicationRessources:ProcessusPublierFichierImmediatement"
+        for fuuid in fuuids:
+            params = {
+                'forum_id': forum_id,
+                'fuuid': fuuid,
+                'properties': {
+                    'reply_to': properties.reply_to,
+                    'correlation_id': properties.correlation_id,
+                }
             }
-        }
 
         self.cascade.demarrer_processus(processus, params)
 

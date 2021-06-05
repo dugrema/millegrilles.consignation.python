@@ -1424,8 +1424,10 @@ class ProcessusTransactionAjouterPost(ProcessusTransactionPost):
         if transaction.get(ConstantesForum.CHAMP_MEDIA_UUID) is not None:
             # On a un media - demander publication de la collection de fichiers du forum
             commande_publier_fichiers = {
-                ConstantesForum.CHAMP_FORUM_ID: transaction[ConstantesForum.CHAMP_FORUM_ID]
+                ConstantesForum.CHAMP_FORUM_ID: transaction[ConstantesForum.CHAMP_FORUM_ID],
+                'fuuids': [transaction[ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA]],
             }
+
             domaine_action = 'commande.Publication.' + Constantes.ConstantesPublication.COMMANDE_PUBLIER_FICHIERS_FORUM
             self.ajouter_commande_a_transmettre(domaine_action, commande_publier_fichiers, blocking=True)
             self.set_etape_suivante(ProcessusTransactionAjouterPost.attendre_publication.__name__)

@@ -1042,6 +1042,7 @@ class MGProcessus:
         self._commande_blocking = None
         self._tokens_connectes = None
         self._messages_a_transmettre = list()
+        self._blocking = False  # Toggle pour indiquer qu'on doit attendre un evenement deja en vol
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -1182,6 +1183,8 @@ class MGProcessus:
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
             if self._requete is not None or self._commande_blocking is not None:
                 pass  # Arrete traitement pour attendre reponse
+            elif self._blocking:
+                pass  # On doit attendre un evenement deja en vol (e.g. commande, requete)
             elif self._ajouter_token_resumer is not None:
                 self._controleur.transmettre_message_resumer(
                     id_document_processus, self._ajouter_token_resumer)
@@ -1414,6 +1417,13 @@ class MGProcessus:
         if blocking:
             transaction['blocking'] = True
         self._messages_a_transmettre.append(transaction)
+
+    def set_blocking(self):
+        """
+        Inique qu'on doit attendre une reponse (d'une requete/commande DEJA emise)
+        :return:
+        """
+        self._blocking = True
 
     def get_transaction_token_connecte(self, token):
         """
