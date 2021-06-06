@@ -13,6 +13,29 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 
 
+class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        # Verifier quel processus demarrer. On match la valeur dans la routing key.
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        if routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES:
+            reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict)}
+        else:
+            return super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
+            # Type de transaction inconnue, on lance une exception
+            # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+
+        # Genere message reponse
+        if reponse:
+            correlation_id = properties.correlation_id
+            reply_to = properties.reply_to
+            self.transmettre_reponse(message_dict, reponse, replying_to=reply_to, correlation_id=correlation_id)
+
+        return reponse
+
+
 class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
@@ -96,6 +119,7 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.__handler_requetes_noeuds = {
+            Constantes.SECURITE_PRIVE: TraitementRequetesPrivees(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesTopologie(self)
         }
 

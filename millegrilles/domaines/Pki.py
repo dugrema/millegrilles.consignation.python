@@ -81,7 +81,7 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
         elif action == ConstantesPki.REQUETE_LISTE_CERTS_CA:
             reponse = self.gestionnaire.get_liste_certificats_ca()
         else:
-            return super().traiter_requete(ch, method, properties, body, message_dict)
+            return super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
             # Type de transaction inconnue, on lance une exception
             # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
 
