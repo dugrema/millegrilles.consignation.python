@@ -102,6 +102,18 @@ class TraitementMessagesMiddleware(BaseCallback):
                     callback=None
                 )
 
+            routing_keys_prive = [
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
+            ]
+            # Ajouter les routing keys
+            for routing_key in routing_keys_prive:
+                self.__channel.queue_bind(
+                    exchange=Constantes.SECURITE_PRIVE,
+                    queue=self.queue_name,
+                    routing_key=routing_key,
+                    callback=None
+                )
+
             routing_keys_privepublic = [
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
             ]
