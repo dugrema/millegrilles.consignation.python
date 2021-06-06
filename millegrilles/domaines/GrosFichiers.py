@@ -65,6 +65,8 @@ class TraitementRequetesPriveesGrosFichiers(TraitementMessageDomaineRequete):
 
         if action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PRIVE:
             reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_prive(message_dict, enveloppe_certificat)
+        elif action == ConstantesGrosFichiers.REQUETE_COLLECTION_PERSONNELLE:
+            reponse = self.gestionnaire.get_contenu_collection_personnelle(message_dict)
         else:
             return {'ok': False, 'err': 'Requete non supportee'}
 
