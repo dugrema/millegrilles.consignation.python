@@ -125,6 +125,12 @@ class TraitementCommandesPrivees(TraitementMessageDomaineCommande):
         resultat: dict
         if action == ConstantesForum.COMMANDE_VOTER:
             resultat = self.gestionnaire.ajouter_vote(message_dict)
+        elif action == ConstantesForum.COMMANDE_TRANSMETTRE_FORUMS_POSTS:
+            message_dict['securite'] = Constantes.SECURITE_PRIVE
+            resultat = self.gestionnaire.transmettre_forums_posts(message_dict, properties)
+        elif action == ConstantesForum.COMMANDE_TRANSMETTRE_POSTS_COMMENTAIRES:
+            message_dict['securite'] = Constantes.SECURITE_PRIVE
+            resultat = self.gestionnaire.transmettre_posts_commentaires(message_dict, properties)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -984,6 +990,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             post = collection_posts.find({ConstantesForum.CHAMP_POST_ID: post_id})
             forum = self.get_forum(post[ConstantesForum.CHAMP_FORUM_ID])
 
+        forum_id = forum[ConstantesForum.CHAMP_FORUM_ID]
+
         securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
 
         champs_post = [
@@ -1104,7 +1112,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
             unset_ops[ConstantesForum.CHAMP_COMMENTAIRES] = True
             for champ in champs_post:
-                unset_ops[champ] = True
+                if champ not in [ConstantesForum.CHAMP_FORUM_ID]:
+                    unset_ops[champ] = True
 
             # On ajoute une permission de niveau prive pour tous les medias du forum
             fuuids = list(set(fuuids))  # Dedupe
@@ -1130,6 +1139,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             post_comments['permission'] = permission
         else:
             unset_ops['permission'] = True
+
+        post_comments[ConstantesForum.CHAMP_FORUM_ID] = forum_id
 
         # Signer le post
         post_comments = self.generateur_transactions.preparer_enveloppe(

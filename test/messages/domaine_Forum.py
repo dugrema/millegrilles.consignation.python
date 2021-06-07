@@ -112,8 +112,8 @@ class TestForum(DomaineTest):
 
     def commande_generer_posts_commentaires(self):
         commande = {
-            # ConstantesForum.CHAMP_FORUM_ID: '93f69900-8be0-11eb-80e1-6d0a897f52de',
-            ConstantesForum.CHAMP_POST_IDS: ['12e5c0c1-e934-4107-b97a-e3cd2120b502']
+            ConstantesForum.CHAMP_FORUM_IDS: ['21ad1064-d5e1-42c3-a42e-0fc0c94caa3d', 'f79a8178-fe9b-4288-b811-ab1490ee8dab'],
+            # ConstantesForum.CHAMP_POST_IDS: ['12e5c0c1-e934-4107-b97a-e3cd2120b502']
         }
         domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES
         correlation_id = 'test'
@@ -143,7 +143,7 @@ class TestForum(DomaineTest):
         self.__logger.debug("Executer")
 
         # self.requete_liste_forum()
-        self.requete_liste_forum_posts()
+        # self.requete_liste_forum_posts()
         # self.requete_liste_post_commentaires()
         # self.creer_forum()
         # self.maj_forum()
@@ -152,7 +152,7 @@ class TestForum(DomaineTest):
         # self.creer_commentaire()
         # self.maj_commentaire()
         # self.commande_generer_forums_posts()
-        # self.commande_generer_posts_commentaires()
+        self.commande_generer_posts_commentaires()
         # self.commande_transmettre_forums_posts()
         # self.commande_transmettre_posts_commentaires()
 
