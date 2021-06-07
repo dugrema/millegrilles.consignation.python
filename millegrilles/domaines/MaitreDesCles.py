@@ -5,7 +5,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, \
     TraitementMessageDomaineRequete, TraitementRequetesProtegees, TraitementCommandesProtegees, \
-    TraitementCommandesSecures
+    TraitementCommandesSecures, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
@@ -114,13 +114,28 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         elif action == ConstantesMaitreDesCles.REQUETE_COMPTER_CLES_NON_DECHIFFRABLES:
             reponse = self.gestionnaire.compter_cles_non_dechiffrables(message_dict)
         else:
-            reponse = super().traiter_requete(ch, method, properties, body, message_dict)
+            reponse = super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
 
         if reponse is not None:
             try:
                 self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
             except Exception:
                 self.__logger.exception("Erreur transmission reponse %s" % reponse)
+
+
+class TraitementCommandesPrivees(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        resultat: dict
+        if action == ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE:
+            resultat = self.gestionnaire.sauvegarder_cle(message_dict, properties)
+        else:
+            resultat = super().traiter_commande(ch, method, properties, body, message_dict)
+
+        return resultat
 
 
 class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
@@ -196,6 +211,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.__handler_commandes = super().get_handler_commandes()
         self.__handler_commandes[Constantes.SECURITE_PROTEGE] = TraitementCommandesMaitreDesClesProtegees(self)
+        self.__handler_commandes[Constantes.SECURITE_PRIVE] = TraitementCommandesPrivees(self)
         self.__handler_commandes[Constantes.SECURITE_SECURE] = TraitementCommandesMaitreDesClesSecures(self)
 
         self.__encryption_helper = None
@@ -501,6 +517,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         try:
             permission = evenement['permission']
+            if permission.get('err'):
+                # Erreur dans la permission, on refuse le dechiffrage
+                return {'err': permission.get('err')}
             enveloppe_permission = self.extraire_certificat(permission)
         except KeyError:
             permission = evenement
@@ -562,7 +581,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
             if user_id_permis is not None:
                 # Verifier que le certificat de la requete est du bon user id
-                enveloppe_user_id = enveloppe_evenement.get_user_id
+                try:
+                    enveloppe_user_id = enveloppe_evenement.get_user_id
+                except x509.extensions.ExtensionNotFound:
+                    self._logger.debug("Permission refuse, certificat ne correspond pas au user id %s", user_id_permis)
+                    return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
                 if enveloppe_user_id is None or enveloppe_user_id != user_id_permis:
                     self._logger.debug("Requete du mauvais user_id : %s" % evenement)
                     return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
