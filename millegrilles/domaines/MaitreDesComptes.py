@@ -4,36 +4,9 @@ import pytz
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds, TraitementRequetesProtegees, TraitementCommandesProtegees, \
-    TransactionTypeInconnuError, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementCommandesProtegees, \
+    TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
-
-
-class TraitementRequetesProtegeesMaitreComptes(TraitementMessageDomaineRequete):
-
-    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
-        # Verifier quel processus demarrer. On match la valeur dans la routing key.
-        routing_key = method.routing_key
-        action = routing_key.split('.')[-1]
-
-        if action == ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER:
-            reponse = self.gestionnaire.charger_usager(message_dict)
-        elif action == ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE:
-            reponse = self.gestionnaire.get_info_proprietaire()
-        elif action == ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS:
-            reponse = self.gestionnaire.get_liste_usagers(message_dict)
-        else:
-            return super().traiter_requete(ch, method, properties, body, message_dict)
-            # Type de transaction inconnue, on lance une exception
-            # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
-
-        # Genere message reponse
-        if reponse:
-            correlation_id = properties.correlation_id
-            reply_to = properties.reply_to
-            self.transmettre_reponse(message_dict, reponse, replying_to=reply_to, correlation_id=correlation_id)
-
-        return reponse
 
 
 class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
@@ -50,9 +23,32 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
         elif action == ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS:
             reponse = self.gestionnaire.get_liste_usagers(message_dict)
         else:
-            return super().traiter_requete(ch, method, properties, body, message_dict)
-            # Type de transaction inconnue, on lance une exception
-            # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+            return super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
+
+        # Genere message reponse
+        if reponse:
+            correlation_id = properties.correlation_id
+            reply_to = properties.reply_to
+            self.transmettre_reponse(message_dict, reponse, replying_to=reply_to, correlation_id=correlation_id)
+
+        return reponse
+
+
+class TraitementRequetesProtegeesMaitreComptes(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+        # Verifier quel processus demarrer. On match la valeur dans la routing key.
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER:
+            reponse = self.gestionnaire.charger_usager(message_dict)
+        elif action == ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE:
+            reponse = self.gestionnaire.get_info_proprietaire()
+        elif action == ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS:
+            reponse = self.gestionnaire.get_liste_usagers(message_dict)
+        else:
+            return super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
 
         # Genere message reponse
         if reponse:
@@ -181,13 +177,17 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         return ConstantesMaitreDesComptes.QUEUE_NOM
 
     def charger_usager(self, message_dict):
-        nom_usager = message_dict[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        nom_usager = message_dict.get(ConstantesMaitreDesComptes.CHAMP_NOM_USAGER)
+        user_id = message_dict.get(ConstantesMaitreDesComptes.CHAMP_USER_ID)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {
                 '$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE]
             },
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
+        if user_id is not None:
+            filtre[ConstantesMaitreDesComptes.CHAMP_USER_ID] = user_id
+        elif nom_usager is not None:
+            filtre[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER] = nom_usager
 
         collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         document_usager = collection.find_one(filtre)
@@ -466,11 +466,17 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if resultat.matched_count != 1:
             raise Exception("Erreur ajout cle, aucun document modifie")
 
-    def suppression_cles(self, nom_usager: str):
+    def suppression_cles(self, nom_usager: str = None, user_id: str = None):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
+        if nom_usager is not None:
+            filtre[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER] = nom_usager
+        elif user_id is not None:
+            filtre[ConstantesMaitreDesComptes.CHAMP_USER_ID] = user_id
+        else:
+            return {'err': 'Il faut fournir le user_id ou nom_usager'}
+
         ops = {
             '$unset': {ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: True},
             '$currentDate': {
@@ -694,8 +700,9 @@ class ProcessusSupprimerCles(MGProcessusTransaction):
     def initiale(self):
         transaction = self.transaction
 
-        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
-        self.controleur.gestionnaire.suppression_cles(nom_usager)
+        nom_usager = transaction.get(ConstantesMaitreDesComptes.CHAMP_NOM_USAGER)
+        user_id = transaction.get(ConstantesMaitreDesComptes.CHAMP_USER_ID)
+        self.controleur.gestionnaire.suppression_cles(nom_usager, user_id)
 
         self.set_etape_suivante()  #Termine
 

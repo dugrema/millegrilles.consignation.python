@@ -47,7 +47,7 @@ class MessagesSample(BaseCallback):
         print(json.dumps(message, indent=4))
 
     def requete_profil_usager(self):
-        requete = {'nomUsager': 'test'}
+        requete = {'userId': 'zQmdPavTTxhnjCKbrcPXUcfVcbpNSssGTVUQboGGRFVt4bN'}
         domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER])
         enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
 
@@ -64,10 +64,10 @@ class MessagesSample(BaseCallback):
 
     def requete_liste_usagers(self):
         requete = {
-            ConstantesMaitreDesComptes.CHAMP_LIST_USERIDS: [
-                'zQmZAHGPjqBMu9E18gvcRztsoY6okSUVsSFu7V6t5hrtsDD',
-                'zQmWApXQASWLPGgqgxj7gBYL5VSF6nqzkrwJdDp4QfRjAXX',
-            ]
+            # ConstantesMaitreDesComptes.CHAMP_LIST_USERIDS: [
+            #     'zQmZAHGPjqBMu9E18gvcRztsoY6okSUVsSFu7V6t5hrtsDD',
+            #     'zQmWApXQASWLPGgqgxj7gBYL5VSF6nqzkrwJdDp4QfRjAXX',
+            # ]
         }
         domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS])
         enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
@@ -217,7 +217,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # self.requete_info_proprietaire()
-        # self.requete_profil_usager()
+        self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
         # self.transaction_maj_motdepasse()
@@ -231,7 +231,7 @@ class MessagesSample(BaseCallback):
         # self.transaction_ajouter_certificat_navigateur()
         # self.transaction_maj_usager_totp()
         # self.commande_activer_certificat()
-        self.requete_liste_usagers()
+        # self.requete_liste_usagers()
 
 
 # --- MAIN ---
