@@ -1535,6 +1535,8 @@ class ConstantesMaitreDesComptes:
 
     COMMANDE_ACTIVATION_TIERCE = 'activationTierce'
 
+    EVENEMENT_ACTIVATION_FINGERPRINTPK = 'activationFingerprintPk'
+
 
 class ConstantesMessagerie:
 

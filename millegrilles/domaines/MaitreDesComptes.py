@@ -547,6 +547,15 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             raise Exception("Erreur set flag d'activation tierce sur usager %s pour fingerprint %s, "
                             "aucun document modifie" % (nom_usager, fingerprint_pk))
 
+        # Emettre evenement pour indiquer que le certificat est pret
+        evenement_activation = {'fingerprint_pk': fingerprint_pk}
+        domaine_action = 'evenement.MaitreDesComptes.' + ConstantesMaitreDesComptes.EVENEMENT_ACTIVATION_FINGERPRINTPK
+        self.generateur_transactions.emettre_message(
+            evenement_activation,
+            domaine_action,
+            exchanges=[Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]
+        )
+
         return {'ok': True}
 
     # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
