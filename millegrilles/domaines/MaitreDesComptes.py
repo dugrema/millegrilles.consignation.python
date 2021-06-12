@@ -5,7 +5,7 @@ import pytz
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementCommandesProtegees, \
-    TraitementMessageDomaineRequete
+    TraitementMessageDomaineRequete, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
@@ -59,6 +59,21 @@ class TraitementRequetesProtegeesMaitreComptes(TraitementMessageDomaineRequete):
         return reponse
 
 
+class TraitementCommandesMaitredesclesPrivees(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        resultat: dict
+        if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
+            resultat = self.gestionnaire.set_activation_tierce(message_dict)
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+
+        return resultat
+
+
 class TraitementCommandesMaitredesclesProtegees(TraitementCommandesProtegees):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
@@ -92,6 +107,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         self.__handler_commandes = {
             Constantes.SECURITE_SECURE: TraitementCommandesMaitredesclesProtegees(self),
+            Constantes.SECURITE_PRIVE: TraitementCommandesMaitredesclesPrivees(self),
             Constantes.SECURITE_PROTEGE: TraitementCommandesMaitredesclesProtegees(self),
         }
 
