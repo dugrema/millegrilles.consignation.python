@@ -1536,6 +1536,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_ASSOCIER_CERTIFICAT = 'associerCertificat'
     TRANSACTION_AJOUTER_NAVIGATEUR = 'ajouterNavigateur'
     TRANSACTION_MAJ_USAGER_TOTP = 'majUsagerTotp'
+    TRANSACTION_MAJ_USAGER_DELEGATIONS = 'majUsagerDelegations'
 
     COMMANDE_ACTIVATION_TIERCE = 'activationTierce'
     COMMANDE_SIGNER_COMPTEUSAGER = 'signerCompteUsager'

@@ -2,6 +2,8 @@ import logging
 import datetime
 import pytz
 
+from pymongo import ReturnDocument
+
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes, ConstantesGenerateurCertificat
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementCommandesProtegees, \
@@ -167,6 +169,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAjouterCertificatNavigateur"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_USAGER_TOTP:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajUsagerTotp"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_USAGER_DELEGATIONS:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajDelegationsCompteUsager"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -625,6 +629,30 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             ajouter_certificats=True,
         )
 
+    def maj_delegations(self, user_id, params: dict):
+        set_ops = dict()
+        champs = [
+            ConstantesMaitreDesComptes.CHAMP_COMPTE_PRIVE,
+            ConstantesMaitreDesComptes.CHAMP_DELEGATION_GLOBALE,
+            ConstantesMaitreDesComptes.CHAMP_DELEGATIONS_DOMAINES,
+            ConstantesMaitreDesComptes.CHAMP_DELEGATIONS_SOUSDOMAINES,
+        ]
+        for champ in champs:
+            try:
+                set_ops[champ] = params[champ]
+            except KeyError:
+                pass  # OK
+
+        ops = {
+            '$set': set_ops,
+        }
+
+        filtre = {ConstantesMaitreDesComptes.CHAMP_USER_ID: user_id}
+        collection = self.document_dao.get_collection(ConstantesMaitreDesComptes.COLLECTION_USAGERS_NOM)
+        resultat = collection.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
+
+        return resultat
+
     # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
     #     filtre = {
     #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
@@ -752,6 +780,21 @@ class ProcessusMajCleUsagerPrive(MGProcessusTransaction):
         self.controleur.gestionnaire.maj_cle_usagerprive(nom_usager, cle)
 
         self.set_etape_suivante()  #Termine
+
+
+class ProcessusMajDelegationsCompteUsager(MGProcessusTransaction):
+    """
+    Met a jour delegations et flag compte_prive
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        user_id = transaction[ConstantesMaitreDesComptes.CHAMP_USER_ID]
+        resultat = self.controleur.gestionnaire.maj_delegations(user_id, transaction)
+
+        self.set_etape_suivante()  #Termine
+
+        return resultat
 
 
 class ProcessusSupprimerMotdepasse(MGProcessusTransaction):
