@@ -1517,6 +1517,9 @@ class ConstantesMaitreDesComptes:
     CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK = 'activations_par_fingerprint_pk'
     CHAMP_LIST_USERIDS = 'liste_userids'
     CHAMP_COMPTE_PRIVE = 'compte_prive'
+    CHAMP_DELEGATION_GLOBALE = 'delegation_globale'
+    CHAMP_DELEGATIONS_DOMAINES = 'delegations_domaines'
+    CHAMP_DELEGATIONS_SOUSDOMAINES = 'delegations_sousdomaines'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
