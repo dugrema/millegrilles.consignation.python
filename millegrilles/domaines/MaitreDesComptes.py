@@ -643,6 +643,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             except KeyError:
                 pass  # OK
 
+        set_ops[ConstantesMaitreDesComptes.CHAMP_DELEGATIONS_DATE] = datetime.datetime.utcnow()
+
         ops = {
             '$set': set_ops,
         }

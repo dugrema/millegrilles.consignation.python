@@ -1520,6 +1520,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_DELEGATION_GLOBALE = 'delegation_globale'
     CHAMP_DELEGATIONS_DOMAINES = 'delegations_domaines'
     CHAMP_DELEGATIONS_SOUSDOMAINES = 'delegations_sousdomaines'
+    CHAMP_DELEGATIONS_DATE = 'delegations_date'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
