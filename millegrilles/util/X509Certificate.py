@@ -1698,7 +1698,7 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
                 x509.UnrecognizedExtension(custom_oid_delegation_globale, delegation_globale.encode('utf-8')),
                 critical=False
             )
-        except KeyError:
+        except (AttributeError, KeyError):
             pass  # OK
 
         try:
@@ -1708,7 +1708,7 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
                 x509.UnrecognizedExtension(custom_oid_delegation_domaines, delegations_domaines.encode('utf-8')),
                 critical=False
             )
-        except KeyError:
+        except (AttributeError, KeyError):
             pass  # OK
 
         try:
@@ -1718,7 +1718,7 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
                 x509.UnrecognizedExtension(custom_oid_delegation_sousdomaines, delegations_sousdomaines.encode('utf-8')),
                 critical=False
             )
-        except KeyError:
+        except (AttributeError, KeyError):
             pass  # OK
 
         return builder
