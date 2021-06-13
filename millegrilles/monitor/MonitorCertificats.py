@@ -682,7 +682,15 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         """
         self.__logger.debug("Commande signature certificat : %s" % str(commande))
 
-        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        # Verifier signature du message - doit venir d'un service secure
+        message = commande.message
+        compte = message['compte']
+        enveloppe_certificat = self._service_monitor.validateur_message.verifier(message)
+        securite_commande = enveloppe_certificat.get_exchanges
+        if Constantes.SECURITE_SECURE not in securite_commande:
+            return {'err': 'Permission refusee', 'code': 5}
+
+        duree_certs = environ.get('CERT_DUREE') or '31'  # Defaut 31 jours
         duree_certs = int(duree_certs)
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
         duree_certs_heures = int(duree_certs_heures)
@@ -712,16 +720,36 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             }
 
         csr = contenu['csr'].encode('utf-8')
-        est_proprietaire = contenu.get('estProprietaire')
-        nom_usager = contenu['nomUsager']
-        user_id = contenu['userId']
-        if est_proprietaire:
-            securite = Constantes.SECURITE_PROTEGE
-        else:
+        # est_proprietaire = contenu.get('estProprietaire')
+        nom_usager = compte['nomUsager']
+        user_id = compte['userId']
+
+        delegation_globale = compte.get('delegation_globale')
+        delegations_domaines = compte.get('delegations_domaines')
+        if delegations_domaines is not None:
+            delegations_domaines = ','.join(delegations_domaines)
+        delegations_sousdomaines = compte.get('delegations_sousdomaines')
+        if delegations_sousdomaines is not None:
+            delegations_sousdomaines = ','.join(delegations_sousdomaines)
+
+        compte_prive = compte.get(Constantes.ConstantesMaitreDesComptes.CHAMP_COMPTE_PRIVE) or False
+
+        if compte_prive is True:
             securite = Constantes.SECURITE_PRIVE
+        else:
+            securite = Constantes.SECURITE_PUBLIC
 
         clecert = self.__renouvelleur.signer_navigateur(
-            csr, securite, duree=duree_delta, est_proprietaire=est_proprietaire, nom_usager=nom_usager, user_id=user_id)
+            csr,
+            securite,
+            duree=duree_delta,
+            nom_usager=nom_usager,
+            user_id=user_id,
+            compte_prive=compte_prive,
+            delegation_globale=delegation_globale,
+            delegations_domaines=delegations_domaines,
+            delegations_sousdomaines=delegations_sousdomaines
+        )
 
         # Emettre le nouveau certificat pour conserver sous PKI
         self._service_monitor.generateur_transactions.emettre_certificat(clecert.chaine)

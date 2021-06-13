@@ -1516,6 +1516,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_TOTP = 'totp'
     CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK = 'activations_par_fingerprint_pk'
     CHAMP_LIST_USERIDS = 'liste_userids'
+    CHAMP_COMPTE_PRIVE = 'compte_prive'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
@@ -1639,6 +1640,7 @@ class ConstantesGenerateurCertificat:
     ROLE_GROS_FICHIERS = 'GrosFichiers'
     ROLE_MONGOEXPRESS = 'mongoexpress'
     ROLE_NAVIGATEUR = 'navigateur'
+    ROLE_COMPTE_PRIVE = 'compte_prive'
     ROLE_WEB_PROTEGE = 'web_protege'
     ROLE_WEB_PRIVE = 'web_prive'
     ROLE_WEB_PUBLIC = 'web_public'

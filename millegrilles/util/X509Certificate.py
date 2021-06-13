@@ -75,11 +75,11 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
 
     # Liste des domaines auxquels l'usager a un acces total (niveau 3.protege)
     # Exemple : GrosFichiers,CoupDoeil,Publication
-    MQ_DELEGATION_DOMAINE_OID = x509.ObjectIdentifier('1.2.3.4.5')
+    MQ_DELEGATION_DOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.5')
 
     # Liste des sous-domaines auxquels l'usager a un acces total (niveau 3.protege)
     # Exemple : Publication:forum_id=abc1234,GrosFichiers:uuid_collection=abcd1234;uuid_collection=abcd1235
-    MQ_DELEGATION_SOUSDOMAINE_OID = x509.ObjectIdentifier('1.2.3.4.6')
+    MQ_DELEGATIONS_SOUSDOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.6')
 
 
 class EnveloppeCleCert:
@@ -1655,9 +1655,10 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
 
         roles = [
             ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
-            ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS,
         ]
-        exchange_list = [Constantes.SECURITE_PRIVE]
+
+        if kwargs.get('compte_prive') is True:
+            roles.append(ConstantesGenerateurCertificat.ROLE_COMPTE_PRIVE)
 
         csr = kwargs.get('csr')
         sujet_dict = dict()
@@ -1671,11 +1672,11 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
         # On doit recuperer le user_id en parametres
         user_id: str = kwargs['user_id']
 
-        if kwargs.get('est_proprietaire'):
-            roles.append('proprietaire')
-            exchange_list.append(Constantes.SECURITE_PROTEGE)
-        elif kwargs.get('securite') == Constantes.SECURITE_PROTEGE:
-            exchange_list.append(Constantes.SECURITE_PROTEGE)
+        # if kwargs.get('est_proprietaire'):
+        #     roles.append('proprietaire')
+        #     exchange_list.append(Constantes.SECURITE_PROTEGE)
+        # elif kwargs.get('securite') == Constantes.SECURITE_PROTEGE:
+        #     exchange_list.append(Constantes.SECURITE_PROTEGE)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ','.join(roles).encode('utf-8')
@@ -1684,18 +1685,41 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
             critical=False
         )
 
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join(exchange_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
         custom_oid_user_id = ConstantesGenerateurCertificat.MQ_USERID_OID
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_user_id, user_id.encode('utf-8')),
             critical=False
         )
+
+        try:
+            delegation_globale = kwargs['delegation_globale']
+            custom_oid_delegation_globale = ConstantesGenerateurCertificat.MQ_DELEGATION_GLOBALE_OID
+            builder = builder.add_extension(
+                x509.UnrecognizedExtension(custom_oid_delegation_globale, delegation_globale.encode('utf-8')),
+                critical=False
+            )
+        except KeyError:
+            pass  # OK
+
+        try:
+            delegations_domaines = kwargs['delegations_domaines']
+            custom_oid_delegation_domaines = ConstantesGenerateurCertificat.MQ_DELEGATION_DOMAINES_OID
+            builder = builder.add_extension(
+                x509.UnrecognizedExtension(custom_oid_delegation_domaines, delegations_domaines.encode('utf-8')),
+                critical=False
+            )
+        except KeyError:
+            pass  # OK
+
+        try:
+            delegations_sousdomaines = kwargs['delegations_sousdomaines']
+            custom_oid_delegation_sousdomaines = ConstantesGenerateurCertificat.MQ_DELEGATIONS_SOUSDOMAINES_OID
+            builder = builder.add_extension(
+                x509.UnrecognizedExtension(custom_oid_delegation_sousdomaines, delegations_sousdomaines.encode('utf-8')),
+                critical=False
+            )
+        except KeyError:
+            pass  # OK
 
         return builder
 
