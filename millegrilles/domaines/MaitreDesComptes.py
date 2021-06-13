@@ -3,7 +3,7 @@ import datetime
 import pytz
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesMaitreDesComptes
+from millegrilles.Constantes import ConstantesMaitreDesComptes, ConstantesGenerateurCertificat
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementCommandesProtegees, \
     TraitementMessageDomaineRequete, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -68,6 +68,8 @@ class TraitementCommandesMaitredesclesPrivees(TraitementMessageDomaineCommande):
         resultat: dict
         if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
             resultat = self.gestionnaire.set_activation_tierce(message_dict)
+        elif action == ConstantesMaitreDesComptes.COMMANDE_SIGNER_COMPTEUSAGER:
+            resultat = self.gestionnaire.signer_compte_usager(message_dict, properties, enveloppe_certificat)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -83,6 +85,8 @@ class TraitementCommandesMaitredesclesProtegees(TraitementCommandesProtegees):
         resultat: dict
         if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
             resultat = self.gestionnaire.set_activation_tierce(message_dict)
+        elif action == ConstantesMaitreDesComptes.COMMANDE_SIGNER_COMPTEUSAGER:
+            resultat = self.gestionnaire.signer_compte_usager(message_dict, properties, enveloppe_certificat)
         # if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.COMMANDE_SIGNER_CLE_BACKUP):
         #     resultat = self.gestionnaire.AAAA()
         # else:
@@ -557,6 +561,65 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         )
 
         return {'ok': True}
+
+    def signer_compte_usager(self, params: dict, properties, enveloppe_certificat):
+        """
+        Debut du processus de signature d'un certificat de navigateur pour un usager.
+
+        :param params:
+        :param properties:
+        :param enveloppe_certificat:
+        :return:
+        """
+        # Verifier que l'enveloppe de certificat provient d'un serveur prive (monitor) ou protege (web_protege)
+        roles = enveloppe_certificat.get_roles
+        exchanges = enveloppe_certificat.get_exchanges
+        if Constantes.SECURITE_PRIVE not in exchanges and Constantes.SECURITE_PROTEGE not in exchanges:
+            return {'err': 'Permission refusee', 'code': 1}
+
+        subject = enveloppe_certificat.formatter_subject()
+        cn = subject['commonName']
+        if ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE not in roles and cn != 'monitor':
+            return {'err': 'Permission refusee', 'code': 2}
+
+        # Charger l'usager de la base de donnees
+        collection = self.document_dao.get_collection(ConstantesMaitreDesComptes.COLLECTION_USAGERS_NOM)
+        filtre = {
+            ConstantesMaitreDesComptes.CHAMP_USER_ID: params[ConstantesMaitreDesComptes.CHAMP_USER_ID]
+        }
+        doc_usager = collection.find_one(filtre)
+
+        if doc_usager is None:
+            return {'err': 'Permission refusee', 'code': 3}
+
+        # Cleanup
+        try:
+            del doc_usager[ConstantesMaitreDesComptes.CHAMP_WEBAUTHN]
+        except KeyError:
+            pass  # OK
+        try:
+            del doc_usager[ConstantesMaitreDesComptes.CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK]
+        except KeyError:
+            pass  # OK
+        for key in doc_usager.copy().keys():
+            if key.startswith('_'):
+                del doc_usager[key]
+
+        # Injecter l'information dans les params
+        params['compte'] = doc_usager
+        del params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        del params[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
+
+        # Emettre le compte usager pour qu'il soit signe et retourne au demandeur (serveur web)
+        domaine_action = 'commande.servicemonitor.signerNavigateur'
+        self.generateur_transactions.transmettre_commande(
+            params,
+            domaine_action,
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=properties.reply_to,
+            correlation_id=properties.correlation_id,
+            ajouter_certificats=True,
+        )
 
     # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
     #     filtre = {

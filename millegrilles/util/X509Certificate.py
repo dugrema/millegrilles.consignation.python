@@ -69,6 +69,18 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
     # userId: ID unique de l'usager (ne pas confondre avec nomUsager dans CN)
     MQ_USERID_OID = x509.ObjectIdentifier('1.2.3.4.3')
 
+    # Role usager 'administrateur' qui s'applique a toute la MilleGrille.
+    # Valeurs: proprietaire, delegue
+    MQ_DELEGATION_GLOBALE_OID = x509.ObjectIdentifier('1.2.3.4.4')
+
+    # Liste des domaines auxquels l'usager a un acces total (niveau 3.protege)
+    # Exemple : GrosFichiers,CoupDoeil,Publication
+    MQ_DELEGATION_DOMAINE_OID = x509.ObjectIdentifier('1.2.3.4.5')
+
+    # Liste des sous-domaines auxquels l'usager a un acces total (niveau 3.protege)
+    # Exemple : Publication:forum_id=abc1234,GrosFichiers:uuid_collection=abcd1234;uuid_collection=abcd1235
+    MQ_DELEGATION_SOUSDOMAINE_OID = x509.ObjectIdentifier('1.2.3.4.6')
+
 
 class EnveloppeCleCert:
 
@@ -1614,171 +1626,6 @@ class GenererApplicationPrivee(GenerateurNoeud):
         return builder
 
 
-class GenererHebergementTransactions(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchange_list = [
-            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
-            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
-        ]
-        exchanges = ','.join(exchange_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
-        ]
-        roles = ','.join(roles_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
-class GenererHebergementDomaines(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchange_list = [
-            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
-            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
-        ]
-        exchanges = ','.join(exchange_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
-        ]
-        roles = ','.join(roles_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
-class GenererHebergementMaitredescles(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchange_list = [
-            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
-            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
-        ]
-        exchanges = ','.join(exchange_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
-        ]
-        roles = ','.join(roles_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
-class GenererHebergementCoupdoeil(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchange_list = [
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-        ]
-        exchanges = ','.join(exchange_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
-        ]
-        roles = ','.join(roles_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
-class GenererHebergementFichiers(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchange_list = [
-            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
-        ]
-        exchanges = ','.join(exchange_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
-        ]
-        roles = ','.join(roles_list).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        liste_dns = [
-            x509.DNSName(u'heb_fichiers'),
-            x509.DNSName(u'fichiers'),
-            x509.DNSName(u'%s' % self._common_name),
-        ]
-
-        # Ajouter noms DNS valides pour MQ
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
-
-        return builder
-
-
 class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
 
     def __init__(self, idmg, domaines: list, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
@@ -1905,14 +1752,6 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE: GenererNoeudPrive,
             ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC: GenererNoeudPublic,
             ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE: GenererApplicationPrivee,
-
-            # Hebergement
-            # ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS: GenererHebergementTransactions,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES: GenererHebergementDomaines,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES: GenererHebergementMaitredescles,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL: GenererHebergementCoupdoeil,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS: GenererHebergementFichiers,
         }
 
         # S'assurer que le dict contient reference aux CAs

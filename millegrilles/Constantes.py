@@ -1534,6 +1534,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_MAJ_USAGER_TOTP = 'majUsagerTotp'
 
     COMMANDE_ACTIVATION_TIERCE = 'activationTierce'
+    COMMANDE_SIGNER_COMPTEUSAGER = 'signerCompteUsager'
 
     EVENEMENT_ACTIVATION_FINGERPRINTPK = 'activationFingerprintPk'
 
