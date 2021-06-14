@@ -280,9 +280,13 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         for usager in curseur:
             user_id = usager[ConstantesMaitreDesComptes.CHAMP_USER_ID]
             nom_usager = usager[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+            compte_prive = usager.get(ConstantesMaitreDesComptes.CHAMP_COMPTE_PRIVE) or False
+
             batch_usagers.append({
                 ConstantesMaitreDesComptes.CHAMP_USER_ID: user_id,
                 ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+                ConstantesMaitreDesComptes.CHAMP_COMPTE_PRIVE: compte_prive,
+                ConstantesMaitreDesComptes.CHAMP_DELEGATION_GLOBALE: usager.get(ConstantesMaitreDesComptes.CHAMP_DELEGATION_GLOBALE),
             })
 
         return {'complet': True, 'usagers': batch_usagers}
