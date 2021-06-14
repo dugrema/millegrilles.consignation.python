@@ -229,6 +229,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
                 ConstantesMaitreDesComptes.CHAMP_DELEGATION_GLOBALE,
                 ConstantesMaitreDesComptes.CHAMP_DELEGATIONS_DOMAINES,
                 ConstantesMaitreDesComptes.CHAMP_DELEGATIONS_SOUSDOMAINES,
+                ConstantesMaitreDesComptes.CHAMP_DELEGATIONS_DATE,
             ]
             document_filtre = dict()
             for key, value in document_usager.items():
