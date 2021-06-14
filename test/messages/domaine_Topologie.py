@@ -79,7 +79,7 @@ class MessagesSample(DomaineTest):
         print("Envoi metadata: %s" % enveloppe_val)
 
     def requete_liste_applications(self):
-        requete = {'securite': '3.protege'}
+        requete = {}
         domaine_action = ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES
         enveloppe_val = self.generateur.transmettre_requete(
             requete, domaine_action,
@@ -234,10 +234,10 @@ class MessagesSample(DomaineTest):
     def executer(self):
         # sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
-        # sample.requete_liste_applications()
+        sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
-        sample.requete_info_noeud()
+        # sample.requete_info_noeud()
         # sample.transaction_ajouter_domaine()
         # sample.transaction_supprimer_domaine()
         # self.transaction_consignation_web()

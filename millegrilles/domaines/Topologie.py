@@ -21,7 +21,7 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
         action = routing_key.split('.')[-1]
 
         if routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES:
-            reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict)}
+            reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict, enveloppe_certificat)}
         else:
             return super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
             # Type de transaction inconnue, on lance une exception
@@ -49,7 +49,7 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_DOMAINE:
             reponse = self.gestionnaire.get_info_domaine(message_dict)
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES:
-            reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict)}
+            reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict, enveloppe_certificat)}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_NOEUD:
             reponse = self.gestionnaire.get_info_noeud(message_dict)
         elif action == ConstantesTopologie.REQUETE_PERMISSION:
@@ -564,7 +564,7 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
 
         return noeuds
 
-    def get_liste_applications_deployees(self, params: dict):
+    def get_liste_applications_deployees(self, params: dict, enveloppe_certificat):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD
@@ -573,10 +573,20 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             'applications': 1
         }
 
-        securite = params.get('securite')
-        securite_demande = 2
-        if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+        exchanges = enveloppe_certificat.get_exchanges
+        if Constantes.SECURITE_SECURE in exchanges:
+            securite_demande = 4
+        elif Constantes.SECURITE_PROTEGE in exchanges:
             securite_demande = 3
+        elif Constantes.SECURITE_PRIVE in exchanges:
+            securite_demande = 2
+        else:
+            securite_demande = 1
+
+        # securite = params.get('securite')
+        # securite_demande = 2
+        # if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+        #     securite_demande = 3
 
         liste_applications = list()
         for noeud in collection.find(filtre, projection):
