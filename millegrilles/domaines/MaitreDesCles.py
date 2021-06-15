@@ -38,9 +38,7 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
         action = method.routing_key.split('.')[-1]
 
         # S'assurer que le certificat a au moins le role prive
-        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PRIVE))
-        securite_cert = set(enveloppe_certificat.get_exchanges)
-        if len(securite_cert.intersection(securite_permise)) == 0:
+        if enveloppe_certificat.est_acces_prive() is not True:
             return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
         reponse = None
@@ -69,9 +67,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         # S'assurer que le certificat a au moins le role protege
-        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
-        securite_cert = set(enveloppe_certificat.get_exchanges)
-        if len(securite_cert.intersection(securite_permise)) == 0:
+        if enveloppe_certificat.est_acces_protege() is not True:
             return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
         # Verifier quel processus demarrer. On match la valeur dans la routing key.
@@ -150,15 +146,18 @@ class TraitementCommandesPrivees(TraitementMessageDomaineCommande):
 
 class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
 
-    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+    def traiter_commande(self, enveloppe_certificat: EnveloppeCertificat, ch, method, properties, body, message_dict):
         # S'assurer que le certificat a au moins le role protege
-        securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
-        securite_cert = set(enveloppe_certificat.get_exchanges)
-        if len(securite_cert.intersection(securite_permise)) == 0:
-            return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
+        # securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
+        # securite_cert = set(enveloppe_certificat.get_exchanges)
+        # if len(securite_cert.intersection(securite_permise)) == 0:
+        #     return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
+
+        if enveloppe_certificat.est_acces_prive() is not True:
+            return {'ok': False, 'msg': 'Acces refuse'}
 
         resultat: dict
         if routing_key == 'commande.%s.%s' % (

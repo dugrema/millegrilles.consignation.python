@@ -3998,11 +3998,11 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
         # Extraire usager du certificat
         # transaction = self.transaction
 
-        certificat = self.certificat
-        niveaux_securite = certificat.get_exchanges
+        certificat: EnveloppeCertificat = self.certificat
+        est_acces_prive = certificat.est_acces_prive()
         user_id = certificat.get_user_id
 
-        if user_id is None or not any([n in ConstantesSecurite.cascade_secure(Constantes.SECURITE_PRIVE) for n in niveaux_securite]):
+        if user_id is None and est_acces_prive is not True:
             raise Exception("Niveau de securite ne permet pas d'ajouter un fichier")
 
         # Identifier collection personelle de l'usager. Creer la collection au besoin.
