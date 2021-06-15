@@ -96,9 +96,19 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
-        # S'assurer que le certificat a au moins le role protege
+        # S'assurer que le certificat a au moins le role protege ou equivalent
         securite_permise = set(ConstantesSecurite.cascade_secure(Constantes.SECURITE_PROTEGE))
-        securite_cert = set(enveloppe_certificat.get_exchanges)
+        securite_cert = set()
+        try:
+            securite_cert = set(enveloppe_certificat.get_exchanges)
+        except x509.extensions.ExtensionNotFound:
+            try:
+                delegation_globale = enveloppe_certificat.get_delegation_globale
+                if delegation_globale in ['proprietaire', 'delegue']:
+                    securite_cert = set([Constantes.SECURITE_PROTEGE])
+            except x509.extensions.ExtensionNotFound:
+                securite_cert = set()
+
         if len(securite_cert.intersection(securite_permise)) == 0:
             return {'ok': False, Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
@@ -591,15 +601,24 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
             if securite_permise is not None:
-                exchanges_user = enveloppe_evenement.get_exchanges
-                if securite_permise not in exchanges_user:
+                if securite_permise == Constantes.SECURITE_PROTEGE:
+                    acces_securite = enveloppe_evenement.est_acces_protege()
+                elif securite_permise == Constantes.SECURITE_PRIVE:
+                    acces_securite = enveloppe_evenement.est_acces_prive()
+                else:
+                    acces_securite = False
+
+                if acces_securite is not True:
                     return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
         else:
             self._logger.debug("Verification de certificat pour dechiffrer une cle : %s" % evenement)
 
             # Verifier le niveau d'acces (exchange)
-            exchanges = enveloppe_evenement.get_exchanges
+            try:
+                exchanges = enveloppe_evenement.get_exchanges
+            except x509.extensions.ExtensionNotFound:
+                exchanges = list()
 
             if Constantes.SECURITE_SECURE in exchanges:
                 # Le certificat donne acces a toutes les cles sans verification supplementaire
@@ -609,9 +628,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 domaines_permis = enveloppe_evenement.get_roles
                 enveloppe_rechiffrage = enveloppe_evenement
             else:
-                self._logger.debug("Le dechiffrage ne peut etre demande directement par un certificat "
-                                   "1.public ou 2.prive : %s" % evenement)
-                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+                if enveloppe_evenement.est_delegation_globale():
+                    enveloppe_rechiffrage = enveloppe_evenement
+                else:
+                    self._logger.debug("Le dechiffrage ne peut etre demande directement par un certificat "
+                                       "1.public ou 2.prive : %s" % evenement)
+                    return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
         # Conserver tous les hachages bytes demandes qui sont inclus dans la permission (et rejeter les autres)
         filtre = dict()

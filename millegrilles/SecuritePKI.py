@@ -148,13 +148,32 @@ class EnveloppeCertificat:
         return attribute_values
 
     @property
-    def get_user_id(self):
+    def get_user_id(self) -> str:
         MQ_USERID_OID = x509.ObjectIdentifier('1.2.3.4.3')
         extensions = self._certificat.extensions
         oid_attribute = extensions.get_extension_for_oid(MQ_USERID_OID)
         oid_value = oid_attribute.value
         oid_value = oid_value.value.decode('utf-8')
         return oid_value
+
+    @property
+    def get_delegation_globale(self) -> str:
+        MQ_DELEGATION_GLOBALE_OID = x509.ObjectIdentifier('1.2.3.4.4')
+        extensions = self._certificat.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_DELEGATION_GLOBALE_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        return oid_value
+
+    @property
+    def get_delegations_domaines(self) -> list:
+        MQ_DOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.5')
+        extensions = self._certificat.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_DOMAINES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
 
     @property
     def subject_organization_name(self):
@@ -297,6 +316,69 @@ class EnveloppeCertificat:
         pem_bytes = ''.join(pem.strip().decode('utf-8').split('\n')[1:-1]).encode('utf-8')
         pk_bytes = base64.b64decode(pem_bytes)
         return hacher(pk_bytes, hashing_code='sha2-256', encoding='base64')
+
+    def est_delegation_globale(self):
+        """
+        :return: True si le certificat est une delegation globale.
+        """
+        try:
+            # Une delegation globale (proprietaire ou delegue) donne acces protege global
+            delegation_globale = self.get_delegation_globale
+            if delegation_globale in [Constantes.ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE, Constantes.ConstantesMaitreDesComptes.LIBVAL_DELEGUE]:
+                return True
+        except x509.extensions.ExtensionNotFound:
+            pass  # OK
+
+        return False
+
+    def est_acces_protege(self, domaines: list = None) -> bool:
+        """
+        Permet de verifier si le certificat donne un acces protege.
+        :param domaines: (Optionnel) Liste des domaines a verifier pour l'acces protege
+        :return: True si exchange est 3.protege, 4.secure ou delegation_globale est proprietaire ou delegue.
+        """
+        try:
+            # L'acces aux exchanges 3.protege ou 4.secure donne un acces protege global
+            exchanges = self.get_exchanges
+            if Constantes.SECURITE_PROTEGE in exchanges or Constantes.SECURITE_SECURE in exchanges:
+                return True
+        except x509.extensions.ExtensionNotFound:
+            pass  # OK
+
+        try:
+            # Une delegation globale (proprietaire ou delegue) donne acces protege global
+            delegation_globale = self.get_delegation_globale
+            if delegation_globale in [Constantes.ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE, Constantes.ConstantesMaitreDesComptes.LIBVAL_DELEGUE]:
+                return True
+        except x509.extensions.ExtensionNotFound:
+            pass  # OK
+
+        try:
+            # Verifier si l'usager a la delegation du domaine
+            delegation_domaines = set(self.get_delegations_domaines)
+            param_domaines = set(domaines)
+            if len(delegation_domaines.intersection(param_domaines)) > 0:
+                return True
+        except x509.extensions.ExtensionNotFound:
+            pass  # OK
+
+        return False
+
+    def est_acces_prive(self):
+        """
+        :return: True si le certificat permet un acces prive.
+        """
+        try:
+            # L'acces aux exchanges 3.protege ou 4.secure donne un acces protege global
+            roles = self.get_roles
+            if Constantes.ConstantesGenerateurCertificat.ROLE_COMPTE_PRIVE in roles:
+                return True
+        except x509.extensions.ExtensionNotFound:
+            pass  # OK
+
+        # Le compte n'a pas le flag prive. On permet quand meme un acces prive si le certificat
+        # a des indicateurs "proteges" globaux (pas de verification de domaines/sous-domaines)
+        return self.est_acces_protege()
 
 
 class UtilCertificats:

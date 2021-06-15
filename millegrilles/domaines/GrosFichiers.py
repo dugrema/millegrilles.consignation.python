@@ -9,6 +9,7 @@ import multibase
 
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from cryptography import x509
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres, ConstantesSecurite, ConstantesMaitreDesCles
@@ -569,19 +570,43 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return documents
 
+    def verifier_acces_certificat(self, enveloppe_certificat: EnveloppeCertificat):
+        acces = dict()
+        try:
+            exchanges = enveloppe_certificat.get_exchanges
+
+            if Constantes.SECURITE_PROTEGE or Constantes.SECURITE_SECURE in exchanges:
+                securite = Constantes.SECURITE_PROTEGE
+            elif Constantes.SECURITE_PRIVE in exchanges:
+                securite = Constantes.SECURITE_PRIVE
+            else:
+                securite = Constantes.SECURITE_PUBLIC
+
+            acces['securite'] = securite
+
+        except x509.extensions.ExtensionNotFound:
+            # Verifier si on a un certificat avec delegation globale ou un user_id
+            delegation_globale = enveloppe_certificat.get_delegation_globale
+            if delegation_globale in ['proprietaire', 'delegue']:
+                acces['securite'] = Constantes.SECURITE_PROTEGE
+            else:
+                try:
+                    roles = enveloppe_certificat.get_roles
+                    if Constantes.ConstantesMaitreDesComptes.CHAMP_COMPTE_PRIVE in roles:
+                        # Acces prive
+                        acces['securite'] = Constantes.SECURITE_PRIVE
+                except KeyError:
+                    pass  # OK
+
+        return acces
+
     def get_collections(self, params: dict):
 
         # Verifier le niveau d'acces du demandeur
         enveloppe_certificat = self.validateur_message.verifier(params)
-        exchanges = enveloppe_certificat.get_exchanges
-        if Constantes.SECURITE_SECURE in exchanges or Constantes.SECURITE_PROTEGE in exchanges:
-            niveaux_securite = ConstantesSecurite.cascade_public(Constantes.SECURITE_PROTEGE)
-        elif Constantes.SECURITE_PRIVE in exchanges:
-            niveaux_securite = ConstantesSecurite.cascade_public(Constantes.SECURITE_PRIVE)
-        elif Constantes.SECURITE_PUBLIC in exchanges:
-            niveaux_securite = ConstantesSecurite.cascade_public(Constantes.SECURITE_PUBLIC)
-        else:
-            return list()  # Aucun acces permis
+        acces = self.verifier_acces_certificat(enveloppe_certificat)
+        securite = acces.get('securite') or Constantes.SECURITE_PUBLIC
+        niveaux_securite = ConstantesSecurite.cascade_public(securite)
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
@@ -634,8 +659,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return documents
 
     def get_contenu_collection(self, params: dict):
+        # Verifier le niveau d'acces du demandeur
         enveloppe_certificat = self.validateur_message.verifier(params)
-        exchanges = enveloppe_certificat.get_exchanges
+        acces = self.verifier_acces_certificat(enveloppe_certificat)
+        securite = acces.get('securite') or Constantes.SECURITE_PUBLIC
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
@@ -658,9 +685,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             # Collection inconnue, retourner erreur
             return {'err': True, 'code': 'NOTFOUND', 'message': 'Collection %s inconnue' % uuid_collection}
 
-        if Constantes.SECURITE_PROTEGE in exchanges or Constantes.SECURITE_SECURE in exchanges:
+        if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
             permission = None  # Certificat donne acces directement, permission non requise
-        elif Constantes.SECURITE_PRIVE in exchanges and securite_collection == Constantes.SECURITE_PRIVE:
+        elif securite == Constantes.SECURITE_PRIVE:
             permission = {
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: 12 * 60 * 60,  # 12 heures
                 Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
