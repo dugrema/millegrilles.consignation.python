@@ -429,7 +429,7 @@ class RessourcesPublication:
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
                 ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
                 ConstantesPublication.LIBVAL_SECTION_PAGE,
-                ConstantesPublication.LIBVAL_SECTION_FORUM,
+                ConstantesPublication.LIBVAL_SECTION_FORUMS,
                 ConstantesPublication.LIBVAL_SITE_CONFIG,
             ]},
             'sites': {'$all': [site_id]},
@@ -477,7 +477,7 @@ class RessourcesPublication:
                 if uuid_collections is not None:
                     section[ConstantesPublication.CHAMP_COLLECTIONS] = uuid_collections
                     uuid_to_map.update(uuid_collections)
-            elif type_section == ConstantesPublication.LIBVAL_SECTION_FORUM:
+            elif type_section == ConstantesPublication.LIBVAL_SECTION_FORUMS:
                 section[ConstantesPublication.CHAMP_LISTE_FORUMS] = doc_section[ConstantesPublication.CHAMP_LISTE_FORUMS]
             else:
                 section[ConstantesPublication.CHAMP_SECTION_ID] = section_id
@@ -834,7 +834,7 @@ class RessourcesPublication:
                 ConstantesPublication.LIBVAL_SECTION_PAGE,
                 ConstantesPublication.LIBVAL_SECTION_FICHIERS,
                 ConstantesPublication.LIBVAL_SECTION_ALBUM,
-                ConstantesPublication.LIBVAL_SECTION_FORUM,
+                ConstantesPublication.LIBVAL_SECTION_FORUMS,
             ]},
             # ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
         }
@@ -857,7 +857,7 @@ class RessourcesPublication:
 
             if type_section == ConstantesPublication.LIBVAL_SECTION_PAGE:
                 self.maj_ressources_page({ConstantesPublication.CHAMP_SECTION_ID: section_id})
-            elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM, ConstantesPublication.LIBVAL_SECTION_FORUM]:
+            elif type_section in [ConstantesPublication.LIBVAL_SECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_ALBUM, ConstantesPublication.LIBVAL_SECTION_FORUMS]:
                 uuids = self.maj_ressource_avec_fichiers(section_id)
                 uuid_collections.update(uuids)
 
@@ -1666,13 +1666,13 @@ class GestionnaireCascadePublication:
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
             }
-        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_FORUM]:
+        elif section_id is not None or type_section in [ConstantesPublication.LIBVAL_COLLECTION_FICHIERS, ConstantesPublication.LIBVAL_SECTION_FORUMS]:
             # C'est une section, on verifie si toutes les sections sont completees
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
                     ConstantesPublication.LIBVAL_COLLECTION_FICHIERS,
                     ConstantesPublication.LIBVAL_SECTION_PAGE,
-                    ConstantesPublication.LIBVAL_SECTION_FORUM,
+                    ConstantesPublication.LIBVAL_SECTION_FORUMS,
                 ]}
             }
         else:
@@ -2020,7 +2020,7 @@ class TriggersPublication:
                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$nin': [
                     ConstantesPublication.LIBVAL_SECTION_FICHIERS,
                     ConstantesPublication.LIBVAL_SECTION_ALBUM,
-                    ConstantesPublication.LIBVAL_SECTION_FORUM,
+                    ConstantesPublication.LIBVAL_SECTION_FORUMS,
                 ]},
                 ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: {'$not': {'$all': [cdn_id]}},
             }
@@ -2505,7 +2505,7 @@ class TriggersPublication:
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         # Charger les collection_fichiers identifiees. Seulement traiter celles qui sont flaggees progres=False
         filtre_collections_fichiers = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_FORUM,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SECTION_FORUMS,
             # ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_collections},
             label_champ_distribution: False,
         }

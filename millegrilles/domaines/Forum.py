@@ -1284,10 +1284,10 @@ class ProcessusTransactionCreationForum(MGProcessusTransaction):
         :param certificat:
         :return:
         """
-        certificat = self.certificat
-        niveaux_securite = certificat.get_exchanges
+        certificat: EnveloppeCertificat = self.certificat
+        acces_protege = certificat.est_acces_protege(['Forum'])
 
-        if Constantes.SECURITE_PROTEGE not in niveaux_securite and Constantes.SECURITE_SECURE not in niveaux_securite:
+        if acces_protege is not True:
             self.__logger.error("ProcessusTransactionCreationForum: Usager n'a pas le niveau securite 3.protege")
             return False
 
@@ -1317,10 +1317,10 @@ class ProcessusTransactionModifierForum(MGProcessusTransaction):
         :param certificat:
         :return:
         """
-        certificat = self.certificat
-        niveaux_securite = certificat.get_exchanges
+        certificat: EnveloppeCertificat = self.certificat
+        acces_protege = certificat.est_acces_protege(['Forum'])
 
-        if Constantes.SECURITE_PROTEGE not in niveaux_securite and Constantes.SECURITE_SECURE not in niveaux_securite:
+        if acces_protege is not True:
             self.__logger.error("ProcessusTransactionCreationForum: Usager n'a pas le niveau securite 3.protege")
             return False
 
@@ -1351,10 +1351,11 @@ class ProcessusTransactionPost(MGProcessusTransaction):
         :return:
         """
         transaction = self.transaction
-        certificat = self.certificat
+        certificat: EnveloppeCertificat = self.certificat
 
-        niveaux_securite = certificat.get_exchanges
-        if ConstantesSecurite.verifier_minimum(Constantes.SECURITE_PRIVE, niveaux_securite) is False:
+        acces_prive = certificat.est_acces_prive()
+
+        if acces_prive is not True:
             self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
             return False
 
@@ -1389,10 +1390,12 @@ class ProcessusTransactionCommentaire(MGProcessusTransaction):
         :return:
         """
         transaction = self.transaction
-        certificat = self.certificat
+        certificat: EnveloppeCertificat = self.certificat
 
-        niveaux_securite = certificat.get_exchanges
-        if ConstantesSecurite.verifier_minimum(Constantes.SECURITE_PRIVE, niveaux_securite) is False:
+        acces_prive = certificat.est_acces_prive()
+
+        # niveaux_securite = certificat.get_exchanges
+        if acces_prive is not True:
             self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
             return False
 
@@ -1427,7 +1430,12 @@ class ProcessusTransactionAjouterPost(ProcessusTransactionPost):
         transaction = self.transaction
 
         # Injecter userId a partir du certificat
-        certificat = self.certificat
+        certificat: EnveloppeCertificat = self.certificat
+        acces_prive = certificat.est_acces_prive()
+        if acces_prive is not True:
+            self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
+            return False
+
         transaction[ConstantesForum.CHAMP_USERID] = certificat.get_user_id
 
         reponse = self.controleur.gestionnaire.maj_post(transaction)
@@ -1465,7 +1473,12 @@ class ProcessusTransactionModifierPost(ProcessusTransactionPost):
         """
         transaction = self.transaction
 
-        certificat = self.certificat
+        certificat: EnveloppeCertificat = self.certificat
+        acces_prive = certificat.est_acces_prive()
+        if acces_prive is not True:
+            self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
+            return False
+
         transaction[ConstantesForum.CHAMP_USERID] = certificat.get_user_id
 
         reponse = self.controleur.gestionnaire.maj_post(transaction)
@@ -1486,6 +1499,12 @@ class ProcessusTransactionAjouterCommentaire(ProcessusTransactionCommentaire):
         :return:
         """
         transaction = self.transaction
+
+        certificat: EnveloppeCertificat = self.certificat
+        acces_prive = certificat.est_acces_prive()
+        if acces_prive is not True:
+            self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
+            return False
 
         # Injecter userId a partir du certificat
         certificat = self.certificat
@@ -1510,7 +1529,12 @@ class ProcessusTransactionModifierCommentaire(ProcessusTransactionCommentaire):
         """
         transaction = self.transaction
 
-        certificat = self.certificat
+        certificat: EnveloppeCertificat = self.certificat
+        acces_prive = certificat.est_acces_prive()
+        if acces_prive is not True:
+            self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
+            return False
+
         transaction[ConstantesForum.CHAMP_USERID] = certificat.get_user_id
 
         reponse = self.controleur.gestionnaire.maj_commentaire(transaction)

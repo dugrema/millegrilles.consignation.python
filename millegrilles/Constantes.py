@@ -1851,7 +1851,7 @@ class ConstantesPublication:
     LIBVAL_SECTION_PAGE = 'page'
     LIBVAL_SECTION_FICHIERS = 'fichiers'
     LIBVAL_SECTION_ALBUM = 'album'
-    LIBVAL_SECTION_FORUM = 'forum'
+    LIBVAL_SECTION_FORUMS = 'forums'
     LIBVAL_COLLECTION_FICHIERS = 'collection_fichiers'
     LIBVAL_FICHIER = 'fichier'
 
