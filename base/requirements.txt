@@ -1,21 +1,21 @@
-certifi>=2020.12.5
+certifi>=2021.5.30
 pika==0.13.1
 pytz>=2020.4
-feedparser>=6.0.2
-cryptography==3.1.1
-urllib3>=1.26.2
+feedparser>=6.0.6
+cryptography==3.4.7
+urllib3>=1.26.5
 psutil>=5.8.0
-base58>=2.0.1
+base58>=2.1.0
 
-pymongo>=3.11.2,<4.0
+pymongo>=3.11.4,<4.0
 
-cssutils>=1.0.2,<2.0
+cssutils>=2.3.0
 diff-match-patch>=20200713
-openpyxl>=3.0.5
+openpyxl>=3.0.7
 requests>=2.25.1
 
-docker>=4.4.0
-zeroconf>=0.28.7
+docker>=4.4.3
+zeroconf>=0.31.0
 bson>=0.5.10
 
 blynklib>=0.2.6,<0.3.0
@@ -24,4 +24,4 @@ py-cid
 py-multihash>=0.8.2
 py-multibase>=1.0.3
 py-ipld-dag
-ipfshttpclient>=0.6.1
+ipfshttpclient>=0.7.0
