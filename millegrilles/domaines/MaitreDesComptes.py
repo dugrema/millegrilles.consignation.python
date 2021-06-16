@@ -333,6 +333,23 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         fingerprint_pk = info_usager[Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE]
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
+        # S'assurer que le compte n'existe pas deja
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
+        filtre_existant = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            '$or': [
+                {ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager},
+                {ConstantesMaitreDesComptes.CHAMP_USER_ID: id_usager},
+            ],
+        }
+        compte_existant = collection.find_one(filtre_existant)
+        if compte_existant is not None:
+            return {
+                'err': 'Le compte usager existe deja',
+                'code': 4,
+                'user_id': compte_existant[ConstantesMaitreDesComptes.CHAMP_USER_ID]
+            }
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
@@ -359,7 +376,6 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             }
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops, upsert=True)
         if not resultat.upserted_id and resultat.matched_count == 0:
             raise Exception("Erreur inscription, aucun document modifie")
