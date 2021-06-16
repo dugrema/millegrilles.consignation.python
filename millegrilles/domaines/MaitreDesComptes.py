@@ -171,6 +171,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajUsagerTotp"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_USAGER_DELEGATIONS:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajDelegationsCompteUsager"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_DELEGATION_SIGNEE:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAjouterDelegationSignee"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -676,6 +678,30 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         return resultat
 
+    def ajouter_delegation_globale_signee(self, user_id: str, confirmation: dict):
+        """
+        Permet d'ajouter une delegation globale via signature par cle de millegrille
+        :param user_id:
+        :param confirmation:
+        :return:
+        """
+
+        enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
+
+        try:
+            self.validateur_message.verifier_signature_message(confirmation, enveloppe_millegrille)
+        except Exception as e:
+            # Exception, signifie que la signature est invalide
+            self._logger.exception("Erreur verification signature de millegrille")
+            return False
+
+        # La confirmation est bien signee par la cle de millegrille. On peut proceder.
+        self.maj_delegations(
+            user_id,
+            {ConstantesMaitreDesComptes.CHAMP_DELEGATION_GLOBALE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE}
+        )
+        return True
+
     # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
     #     filtre = {
     #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
@@ -911,3 +937,19 @@ class ProcessusAjouterCertificatNavigateur(MGProcessusTransaction):
         self.controleur.gestionnaire.ajouter_certificat_navigateur(nom_usager, transaction)
 
         self.set_etape_suivante()  #Termine
+
+
+class ProcessusAjouterDelegationSignee(MGProcessusTransaction):
+    """
+    Ajoute une delegation globale pour un usager - doit contenir une confirmation signee par la cle de millegrille
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        user_id = transaction[ConstantesMaitreDesComptes.CHAMP_USER_ID]
+        confirmation = transaction[ConstantesMaitreDesComptes.CHAMP_CONFIRMATION]
+        resultat = self.controleur.gestionnaire.ajouter_delegation_globale_signee(user_id, confirmation)
+
+        self.set_etape_suivante()  #Termine
+
+        return {'ok': resultat}

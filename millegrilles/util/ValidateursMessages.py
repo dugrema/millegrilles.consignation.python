@@ -121,6 +121,24 @@ class ValidateurMessage:
 
         return hachage
 
+    def verifier_signature_message(self, message: dict, enveloppe_certificat: EnveloppeCertificat):
+        """
+        Verifie que le message a bien ete signe par la cle specifiee
+        :param message:
+        :return:
+        """
+        signature = message['_signature']
+
+        message_copie = dict()
+        for key, value in message.items():
+            if not key.startswith('_'):
+                message_copie[key] = value
+
+        # Lance une exception si echec
+        self.__verifier_signature(message_copie, signature, enveloppe_certificat)
+
+        return True
+
     def __verifier_signature(self, message: dict, signature: str, enveloppe: EnveloppeCertificat):
         # Le certificat est valide. Valider la signature du message.
         # signature_bytes = b64decode(signature)

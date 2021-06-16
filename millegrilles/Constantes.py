@@ -1522,6 +1522,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_DELEGATIONS_DOMAINES = 'delegations_domaines'
     CHAMP_DELEGATIONS_SOUSDOMAINES = 'delegations_sousdomaines'
     CHAMP_DELEGATIONS_DATE = 'delegations_date'
+    CHAMP_CONFIRMATION = 'confirmation'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
@@ -1539,6 +1540,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_AJOUTER_NAVIGATEUR = 'ajouterNavigateur'
     TRANSACTION_MAJ_USAGER_TOTP = 'majUsagerTotp'
     TRANSACTION_MAJ_USAGER_DELEGATIONS = 'majUsagerDelegations'
+    TRANSACTION_AJOUTER_DELEGATION_SIGNEE = 'ajouterDelegationSignee'
 
     COMMANDE_ACTIVATION_TIERCE = 'activationTierce'
     COMMANDE_SIGNER_COMPTEUSAGER = 'signerCompteUsager'
