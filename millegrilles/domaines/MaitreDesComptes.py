@@ -608,9 +608,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if Constantes.SECURITE_PRIVE not in exchanges and Constantes.SECURITE_PROTEGE not in exchanges:
             return {'err': 'Permission refusee', 'code': 1}
 
-        subject = enveloppe_certificat.formatter_subject()
-        cn = subject['commonName']
-        if ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE not in roles and cn != 'monitor':
+        if ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE not in roles and ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE not in roles:
             return {'err': 'Permission refusee', 'code': 2}
 
         # Charger l'usager de la base de donnees
