@@ -705,12 +705,12 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         roles_cert = enveloppe_cert.get_roles
 
         roles_permis = [
-            ConstantesGenerateurCertificat.ROLE_DOMAINES,
             ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+            ConstantesGenerateurCertificat.ROLE_DOMAINES,
         ]
-        test_roles = any([r in roles_permis for r in roles_cert])
+        est_protege = enveloppe_cert.est_acces_protege(roles_permis)
 
-        if enveloppe_cert.subject_organization_name == idmg and test_roles:
+        if enveloppe_cert.subject_organization_name == idmg and est_protege:
             pass
         else:
             return {
@@ -797,12 +797,12 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
             ConstantesGenerateurCertificat.ROLE_DOMAINES,
         ]
-        test_roles = any([r in roles_permis for r in roles_cert])
+        est_protege = enveloppe_cert.est_acces_protege(roles_permis)
 
         csr_bytes = contenu['csr'].encode('utf-8')
         # csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
 
-        if enveloppe_cert.subject_organization_name == idmg and test_roles:
+        if enveloppe_cert.subject_organization_name == idmg and est_protege:
             # On utilise le niveau de securite demande
             role_noeud = contenu['securite'].split('.')[1]
         elif ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE in roles_cert:

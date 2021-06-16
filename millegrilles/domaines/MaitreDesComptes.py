@@ -745,6 +745,8 @@ class ProcessusInscrireUsager(MGProcessusTransaction):
         self.controleur.gestionnaire.inscrire_usager(transaction)
         self.set_etape_suivante()  #Termine
 
+        return {'ok': True}
+
 
 class ProcessusMajMotdepasse(MGProcessusTransaction):
     """
