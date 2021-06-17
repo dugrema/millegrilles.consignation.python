@@ -606,7 +606,7 @@ class RessourcesPublication:
         fuuids_info = dict()
 
         parties_page_ids = section.get(ConstantesPublication.CHAMP_PARTIES_PAGES)
-        if parties_page_ids is not None:
+        if parties_page_ids is not None and parties_page_ids != '':
             collection_partiespage = self.document_dao.get_collection(ConstantesPublication.COLLECTION_PARTIES_PAGES)
             filtre_partiespage = {
                 ConstantesPublication.CHAMP_PARTIEPAGE_ID: {'$in': parties_page_ids}
