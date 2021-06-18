@@ -1080,16 +1080,16 @@ class RessourcesPublication:
 
         return resultat.matched_count
 
-    def sauvegarder_contenu_gzip(self, col_fichiers, filtre_res, enveloppes_rechiffrage=None):
+    def sauvegarder_contenu_gzip(self, doc_pub, filtre_res, enveloppes_rechiffrage=None):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
-        contenu = col_fichiers['contenu']
+        contenu = doc_pub['contenu']
 
         if enveloppes_rechiffrage is not None:
             # Preparer un identificateur de document pour la cle
             identificateurs_document = {
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: 'Publication',
                 'collection': 'ressource',
-                'type': col_fichiers[Constantes.DOCUMENT_INFODOC_LIBELLE],
+                'type': doc_pub[Constantes.DOCUMENT_INFODOC_LIBELLE],
                 Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
             }
 
@@ -1097,9 +1097,9 @@ class RessourcesPublication:
 
             champs_id = ('uuid', 'section_id', 'site_id')
             for type_id in champs_id:
-                if col_fichiers.get(type_id):
-                    identificateurs_document[type_id] = col_fichiers[type_id]
-                    contenu_maj[type_id] = col_fichiers[type_id]
+                if doc_pub.get(type_id):
+                    identificateurs_document[type_id] = doc_pub[type_id]
+                    contenu_maj[type_id] = doc_pub[type_id]
 
             # Generer une cle et chiffrer le contenu
             contenu_chiffre, hachage_bytes = self.chiffrer_contenu(contenu, enveloppes_rechiffrage, identificateurs_document)
@@ -1107,6 +1107,10 @@ class RessourcesPublication:
             # Override du contenu
             contenu_maj['contenu_chiffre'] = contenu_chiffre
             contenu_maj['hachage_bytes'] = hachage_bytes
+            try:
+                contenu_maj[ConstantesPublication.CHAMP_TYPE_SECTION] = contenu[ConstantesPublication.CHAMP_TYPE_SECTION]
+            except KeyError:
+                pass  # OK
             contenu = contenu_maj
 
         contenu_signe = self.__cascade.generateur_transactions.preparer_enveloppe(
