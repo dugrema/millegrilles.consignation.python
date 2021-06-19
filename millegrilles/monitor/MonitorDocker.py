@@ -777,6 +777,13 @@ class GestionnaireModulesDocker:
         if len(config_existante) == 1:
             config_existante[0].remove()
 
+    def supprimer_secret(self, config_name):
+        filtre = {'name': config_name}
+        secrets = self.__docker.secrets
+        secret_existant = secrets.list(filters=filtre)
+        if len(secret_existant) == 1:
+            secret_existant[0].remove()
+
     def charger_config_recente(self, config_name):
         return self.__trouver_config(config_name)
 

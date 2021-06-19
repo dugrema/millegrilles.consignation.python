@@ -4,6 +4,7 @@ import datetime
 
 from os import path
 from base64 import b64decode
+from threading import Event
 
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import EnveloppeCertificat
@@ -96,6 +97,25 @@ class GestionnaireWeb:
 
     def regenerer_configuration(self, mode_installe):
         self.__generer_fichiers_configuration(mode_installe=mode_installe)
+
+        if mode_installe is True:
+            # Si on est sur un noeud prive ou public, s'assurer de supprimer le certificat self-signed nginx
+            securite_noeud = self.__service_monitor.securite
+            if securite_noeud in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
+                try:
+                    gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+                    event_attente = Event()
+                    self.__logger.info("Attente suppression service NGINX pour retirer cert/cle nginx")
+                    for i in range(0, 5):
+                        try:
+                            gestionnaire_docker.supprimer_service('nginx')
+                            event_attente.wait(5)
+                        except IndexError:
+                            break  # Ok, service retire
+                    gestionnaire_docker.supprimer_config('pki.nginx.cert')
+                    gestionnaire_docker.supprimer_secret('pki.nginx.key')
+                except Exception:
+                    self.__logger.exception("Erreur suppression pki.nginx.cert")
 
     def __creer_repertoires(self):
         # Verifier si les repertoires existent

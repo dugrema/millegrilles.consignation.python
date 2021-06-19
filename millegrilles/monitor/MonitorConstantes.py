@@ -26,8 +26,12 @@ DICT_MODULES_PRIVES = {
     },
     ConstantesServiceMonitor.MODULE_NGINX: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
-        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
+        # 'role': ConstantesGenerateurCertificat.ROLE_NGINX,
     },
+    # ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
+    #     'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
+    #     # 'nom_image': ConstantesServiceMonitor.MODULE_WEB,
+    # },
 }
 
 DICT_MODULES_PROTEGES = {
