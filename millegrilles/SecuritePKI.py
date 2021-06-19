@@ -369,9 +369,10 @@ class EnveloppeCertificat:
         :return: True si le certificat permet un acces prive.
         """
         try:
-            # L'acces aux exchanges 3.protege ou 4.secure donne un acces protege global
+            # Les roles 'prive' ou 'compte_prive' indiquent un certificat avec acces 2.prive
             roles = self.get_roles
-            if Constantes.ConstantesGenerateurCertificat.ROLE_COMPTE_PRIVE in roles:
+            if Constantes.ConstantesGenerateurCertificat.ROLE_COMPTE_PRIVE in roles or \
+                    Constantes.ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE in roles:
                 return True
         except x509.extensions.ExtensionNotFound:
             pass  # OK
