@@ -311,6 +311,10 @@ class ServiceMonitor:
             host=self._nodename, secrets=path_secrets, insecure=mode_insecure
         )
 
+        mq_pret = self._gestionnaire_mq.attendre_mq(10)  # Healthcheck, attendre 10 secondes
+
+        return mq_pret
+
     def preparer_gestionnaire_commandes(self):
         try:
             os.mkfifo(self._args.pipe)
