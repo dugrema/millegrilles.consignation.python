@@ -320,7 +320,7 @@ location /fichiers_transfert {
   #proxy_ssl_verify       on;
   #proxy_ssl_verify_depth 1;
 
-  include /etc/nginx/conf.d/auth_public.include;
+  # include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
   include /etc/nginx/conf.d/component_cors.include;
 }
