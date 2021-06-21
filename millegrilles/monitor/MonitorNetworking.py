@@ -316,8 +316,9 @@ location /fichiers_transfert {
   proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
   proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
 
-  proxy_ssl_verify       on;
-  proxy_ssl_verify_depth 1;
+  # NGINX protege utilise un certificat web (Let's Encrypt) - il faudrait mettre le cert SSL racine LE ici...
+  #proxy_ssl_verify       on;
+  #proxy_ssl_verify_depth 1;
 
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
