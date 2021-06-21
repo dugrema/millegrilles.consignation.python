@@ -361,8 +361,7 @@ location /fichiers {
 
 # Configuration de transfert de fichiers entre systemes (verif client SSL seulement)
 location /fichiers_transfert {
-  proxy_pass        $upstream_node_fichiers;
-  proxy_connect_timeout 1s;
+  include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
 
   # Mapping certificat client pour connexion consignation fichiers
   proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
