@@ -231,7 +231,7 @@ resolver 127.0.0.11 valid=30s;
             # En cours d'installation
             securite = None
 
-        if securite is not None and securite != Constantes.SECURITE_PUBLIC:
+        if securite is not None and securite not in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]:
             # Mode prive ou protege - on ajoute les certs SSL client en option
             ssl_certs_content = """
 ssl_certificate       /run/secrets/webcert.pem;
@@ -244,7 +244,7 @@ ssl_verify_client      optional;
 ssl_verify_depth       1;
             """
         else:
-            # Pas de certificat client SSL pour noeud public
+            # Pas de certificat client SSL pour noeud public ou prive
             ssl_certs_content = """
 ssl_certificate       /run/secrets/webcert.pem;
 ssl_certificate_key   /run/secrets/webkey.pem;
@@ -288,7 +288,13 @@ location = / {
         """ % redirect_defaut
 
         location_fichiers_public = """
+# Agit comme reverse-proxy pour distribuer les fichiers
 location /fichiers {
+  rewrite ^/fichiers/(.*)$ /fichiers_transfert/$1 last;
+}
+
+# Cache/proxy vers le noeud protege.
+location /fichiers_transfert {
   slice 5m;
   proxy_cache       cache_fichiers;
   proxy_cache_lock  on;
@@ -304,6 +310,16 @@ location /fichiers {
   proxy_headers_hash_bucket_size 64;
 
   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
+
+  # Mapping certificat client pour connexion consignation fichiers
+  proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+  proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+  proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+
+  proxy_ssl_verify       on;
+  proxy_ssl_verify_depth 1;
+
+  include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
   include /etc/nginx/conf.d/component_cors.include;
 }
@@ -340,6 +356,22 @@ location /fichiers {
 
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
+  include /etc/nginx/conf.d/component_cors.include;
+}
+
+# Configuration de transfert de fichiers entre systemes (verif client SSL seulement)
+location /fichiers_transfert {
+  proxy_pass        $upstream_node_fichiers;
+  proxy_connect_timeout 1s;
+
+  # Mapping certificat client pour connexion consignation fichiers
+  proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+  proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+  proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+  proxy_ssl_verify              on;
+  proxy_ssl_verify_depth        1;
+
+  include /etc/nginx/conf.d/component_base.include;  # Active validation SSL client nginx, passe resultat dans headers
   include /etc/nginx/conf.d/component_cors.include;
 }
         """
