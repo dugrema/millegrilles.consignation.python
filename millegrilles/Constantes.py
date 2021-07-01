@@ -1091,6 +1091,11 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_COMMANDE_PERMISSION = 'permission'
     DOCUMENT_FICHIER_FLAG_PREVIEW = 'preview_traite'
     DOCUMENT_FICHIER_FUUID_ASSOCIES = 'fuuid_associes'
+    DOCUMENT_FICHIER_ANIME = 'anime'
+    DOCUMENT_FICHIER_WIDTH = 'width'
+    DOCUMENT_FICHIER_HEIGHT = 'height'
+    DOCUMENT_FICHIER_RESOLUTION = 'resolution'
+    DOCUMENT_FICHIER_IMAGES = 'images'
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'
@@ -1152,6 +1157,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_ASSOCIER_THUMBNAIL = '%s.associerThumbnail' % DOMAINE_NOM
     TRANSACTION_ASSOCIER_VIDEO_TRANSCODE = '%s.associerVideo' % DOMAINE_NOM
     TRANSACTION_ASSOCIER_PREVIEW = '%s.associerPreview' % DOMAINE_NOM
+    TRANSACTION_ASSOCIER_CONVERSIONS = '%s.associerConversions' % DOMAINE_NOM
     TRANSACTION_DECRIRE_FICHIER = 'decrireFichier'
     TRANSACTION_DECRIRE_COLLECTION = 'decrireCollection'
 

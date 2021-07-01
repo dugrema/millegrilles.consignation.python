@@ -1008,8 +1008,12 @@ class GestionnaireDomaine:
 
     def marquer_transaction_en_erreur(self, dict_message):
         # Type de transaction inconnue, on lance une exception
-        id_transaction = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
-        domaine = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        try:
+            id_transaction = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+            domaine = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        except KeyError:
+            self.__logger.error("Erreur sur transaction, identificateur manquant : %s" % dict_message)
+            return
 
         # Extraire domaine et sous-domaine
         routing = GenerateurTransaction.formatter_routing_evenement(domaine, 'transactionEvenement')

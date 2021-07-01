@@ -22,22 +22,22 @@ from millegrilles.util.JSONMessageEncoders import JSONHelper
 from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
-class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
-
-    def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
-        routing_key = method.routing_key
-        action = routing_key.split('.').pop()
-
-        if action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
-            reponse = self.gestionnaire.get_liste_collections(message_dict)
-        elif action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
-            reponse = self.gestionnaire.get_detail_collections(message_dict)
-            reponse = {'liste_collections': reponse}
-        else:
-            raise Exception("Requete publique non supportee " + routing_key)
-
-        if reponse:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
+# class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
+#
+#     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
+#         routing_key = method.routing_key
+#         action = routing_key.split('.').pop()
+#
+#         if action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
+#             reponse = self.gestionnaire.get_liste_collections(message_dict)
+#         elif action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
+#             reponse = self.gestionnaire.get_detail_collections(message_dict)
+#             reponse = {'liste_collections': reponse}
+#         else:
+#             raise Exception("Requete publique non supportee " + routing_key)
+#
+#         if reponse:
+#             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
 
 
 class TraitementEvenementProtege(TraitementMessageDomaineEvenement):
@@ -204,7 +204,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
 
         self.__handler_requetes_noeuds = {
-            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesGrosFichiers(self),
+            # Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesGrosFichiers(self),
             Constantes.SECURITE_PRIVE: TraitementRequetesPriveesGrosFichiers(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesGrosFichiers(self)
         }
@@ -285,8 +285,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreCollection"
 
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:  # deprecate, remplacer par ASSOCIER_CONVERSIONS
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierPreview"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_CONVERSIONS:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierConversions"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
 
@@ -2111,6 +2113,65 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update_one(filtre, ops)
 
+    def associer_conversions(self, params: dict):
+        """
+        Sert a associer les conversions et autre information d'une image (width, height, etc.).
+        :param params:
+        :return:
+        """
+        uuid_fichier = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        fuuid_fichier = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        conversions_images = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_IMAGES]
+        width = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_WIDTH)
+        height = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_HEIGHT)
+        mimetype = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
+        anime = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ANIME) or False
+
+        prefixe_versions = ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS + '.' + fuuid_fichier
+
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+        }
+        set_ops = {
+            prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_IMAGES: conversions_images,
+            prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_ANIME: anime,
+        }
+        if mimetype is not None:
+            set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = mimetype
+            set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_MIMETYPES + '.' + fuuid_fichier] = mimetype
+        if width is not None and height is not None:
+            set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_WIDTH] = width
+            set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_HEIGHT] = height
+
+        fuuids = set()
+
+        # Creer mapping fuuid/mimetype
+        for info_image in conversions_images.values():
+            fuuid_image = info_image[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
+            fuuids.add(fuuid_image)
+
+            mimetype_image = info_image[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+            set_ops[ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES + '.' + fuuid_image] = mimetype_image
+
+        # Legacy, recreer ancienne approche _preview (utiliser poster)
+        info_poster = conversions_images['poster']
+        set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] = info_poster[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
+        set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW] = info_poster[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
+        set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = info_poster[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+        set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW] = 'jpg'
+
+        ops = {
+            '$set': set_ops,
+            '$addToSet': {ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS: {'$each': list(fuuids)}},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        resultat = collection_grosfichiers.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
+
+        return resultat
+
     def generer_permission_dechiffrage_fichier_public(self, params: dict):
         fuuid = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
@@ -3102,24 +3163,6 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         except TypeError:
             pass  # None, pas de collections publiques
 
-    # def evenement_maj_collection_publique(self, uuid_collection: str):
-    #     """
-    #     Verifie si le changement a un impact sur la collection. Si la colleciton est publique, emet les maj.
-    #     :param uuid_collection: collection modifiee
-    #     :return:
-    #     """
-    #     params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [uuid_collection]}
-    #     detail_collections_publiques = self.controleur.gestionnaire.get_detail_collections_publiques(params)
-    #
-    #     for c in detail_collections_publiques:
-    #         domaine_action = 'evenements.GrosFichiers.' + ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE
-    #         self.generateur_transactions.emettre_message(
-    #             c,
-    #             domaine_action,
-    #             exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
-    #             ajouter_certificats=True
-    #         )
-
 
 class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
     pass
@@ -3192,129 +3235,129 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
 
 
-class ProcessusTransactionDemandeThumbnailProtege(ProcessusGrosFichiersActivite):
-    """
-    Transaction qui sert a synchroniser la demande et reception d'un thumbnail protege.
-    """
-    def initiale(self):
-
-        transaction = self.transaction
-        fuuid = transaction['fuuid']
-        uuid_fichier = transaction['uuid_fichier']
-
-        # Transmettre requete pour certificat de consignation.grosfichiers
-        self.set_requete('pki.role.fichiers', {})
-
-        # Le processus est en mode regeneration
-        # self._traitement_collection()
-        token_attente = 'associer_thumbnail:%s' % fuuid
-        if not self._controleur.is_regeneration:
-            self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.attente_cle_decryptage.__name__,
-                                    [token_attente])
-        else:
-            self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.persister.__name__, [token_attente])  # Termine
-
-        return {
-            'fuuid': fuuid,
-            'uuid_fichier': uuid_fichier,
-        }
-
-    def attente_cle_decryptage(self):
-        fuuid = self.parametres['fuuid']
-
-        fingerprint_fichiers = self.parametres['reponse'][0]['fingerprint']
-
-        # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
-        transaction_maitredescles = {
-            'fuuid': fuuid,
-            'fingerprint': fingerprint_fichiers,
-        }
-        domaine = 'millegrilles.domaines.MaitreDesCles.decryptageGrosFichier'
-
-        # Effectuer requete pour re-chiffrer la cle du document pour le consignateur de transactions
-        self.set_requete(domaine, transaction_maitredescles)
-
-        # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
-
-        # token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
-        self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.demander_thumbnail_protege.__name__)
-
-    def demander_thumbnail_protege(self):
-        information_cle_secrete = self.parametres['reponse'][1]
-
-        cle_secrete_chiffree = information_cle_secrete['cle']
-        iv = information_cle_secrete['iv']
-
-        information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
-
-        fuuid = self.parametres['fuuid']
-        token_attente = 'associer_thumbnail:%s' % fuuid
-
-        # Transmettre commande a grosfichiers
-
-        commande = {
-            'fuuid': fuuid,
-            'cleSecreteChiffree': cle_secrete_chiffree,
-            'iv': iv,
-            'nomfichier': information_fichier['nom'],
-            'mimetype': information_fichier['mimetype'],
-            'extension': information_fichier.get('extension'),
-        }
-
-        self.controleur.generateur_transactions.transmettre_commande(
-            commande, ConstantesGrosFichiers.COMMANDE_GENERER_THUMBNAIL_PROTEGE)
-
-        self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.persister.__name__, [token_attente])
-
-    def persister(self):
-
-        # MAJ Collections associes au fichier
-        self.controleur.gestionnaire.maj_fichier_dans_collection(self.parametres['uuid_fichier'])
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """
-        Emet un evenement pour indiquer que le transfert complete est arrive. Comme on ne donne pas de prochaine
-        etape, une fois les tokens consommes, le processus sera termine.
-        """
-        transaction = self.charger_transaction()
-        fuuid = transaction.get('fuuid')
-        token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
-        self.resumer_processus([token_resumer])
-
-        # Une fois les tokens consommes, le processus sera termine.
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionTransfertComplete.attente_token.__name__)
-
-        return {'fuuid': fuuid}
-
-    def attente_token(self):
-        self.set_etape_suivante()  # Termine
+# class ProcessusTransactionDemandeThumbnailProtege(ProcessusGrosFichiersActivite):
+#     """
+#     Transaction qui sert a synchroniser la demande et reception d'un thumbnail protege.
+#     """
+#     def initiale(self):
+#
+#         transaction = self.transaction
+#         fuuid = transaction['fuuid']
+#         uuid_fichier = transaction['uuid_fichier']
+#
+#         # Transmettre requete pour certificat de consignation.grosfichiers
+#         self.set_requete('pki.role.fichiers', {})
+#
+#         # Le processus est en mode regeneration
+#         # self._traitement_collection()
+#         token_attente = 'associer_thumbnail:%s' % fuuid
+#         if not self._controleur.is_regeneration:
+#             self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.attente_cle_decryptage.__name__,
+#                                     [token_attente])
+#         else:
+#             self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.persister.__name__, [token_attente])  # Termine
+#
+#         return {
+#             'fuuid': fuuid,
+#             'uuid_fichier': uuid_fichier,
+#         }
+#
+#     def attente_cle_decryptage(self):
+#         fuuid = self.parametres['fuuid']
+#
+#         fingerprint_fichiers = self.parametres['reponse'][0]['fingerprint']
+#
+#         # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
+#         transaction_maitredescles = {
+#             'fuuid': fuuid,
+#             'fingerprint': fingerprint_fichiers,
+#         }
+#         domaine = 'millegrilles.domaines.MaitreDesCles.decryptageGrosFichier'
+#
+#         # Effectuer requete pour re-chiffrer la cle du document pour le consignateur de transactions
+#         self.set_requete(domaine, transaction_maitredescles)
+#
+#         # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
+#
+#         # token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+#         self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.demander_thumbnail_protege.__name__)
+#
+#     def demander_thumbnail_protege(self):
+#         information_cle_secrete = self.parametres['reponse'][1]
+#
+#         cle_secrete_chiffree = information_cle_secrete['cle']
+#         iv = information_cle_secrete['iv']
+#
+#         information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
+#
+#         fuuid = self.parametres['fuuid']
+#         token_attente = 'associer_thumbnail:%s' % fuuid
+#
+#         # Transmettre commande a grosfichiers
+#
+#         commande = {
+#             'fuuid': fuuid,
+#             'cleSecreteChiffree': cle_secrete_chiffree,
+#             'iv': iv,
+#             'nomfichier': information_fichier['nom'],
+#             'mimetype': information_fichier['mimetype'],
+#             'extension': information_fichier.get('extension'),
+#         }
+#
+#         self.controleur.generateur_transactions.transmettre_commande(
+#             commande, ConstantesGrosFichiers.COMMANDE_GENERER_THUMBNAIL_PROTEGE)
+#
+#         self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.persister.__name__, [token_attente])
+#
+#     def persister(self):
+#
+#         # MAJ Collections associes au fichier
+#         self.controleur.gestionnaire.maj_fichier_dans_collection(self.parametres['uuid_fichier'])
+#
+#         self.set_etape_suivante()  # Termine
 
 
-class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
+# class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers):
+#
+#     def __init__(self, controleur: MGPProcesseur, evenement):
+#         super().__init__(controleur, evenement)
+#
+#     def initiale(self):
+#         """
+#         Emet un evenement pour indiquer que le transfert complete est arrive. Comme on ne donne pas de prochaine
+#         etape, une fois les tokens consommes, le processus sera termine.
+#         """
+#         transaction = self.charger_transaction()
+#         fuuid = transaction.get('fuuid')
+#         token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
+#         self.resumer_processus([token_resumer])
+#
+#         # Une fois les tokens consommes, le processus sera termine.
+#         self.set_etape_suivante(ProcessusTransactionNouvelleVersionTransfertComplete.attente_token.__name__)
+#
+#         return {'fuuid': fuuid}
+#
+#     def attente_token(self):
+#         self.set_etape_suivante()  # Termine
 
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
 
-    def initiale(self):
-        """
-        Emet un evenement pour indiquer que les cles sont recues par le MaitreDesCles.
-        """
-        transaction = self.charger_transaction()
-        fuuid = transaction.get('fuuid')
-
-        token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid)
-        self.resumer_processus([token_resumer])
-
-        self.set_etape_suivante()  # Termine
-        return {'fuuid': fuuid}
+# class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
+#
+#     def __init__(self, controleur: MGPProcesseur, evenement):
+#         super().__init__(controleur, evenement)
+#
+#     def initiale(self):
+#         """
+#         Emet un evenement pour indiquer que les cles sont recues par le MaitreDesCles.
+#         """
+#         transaction = self.charger_transaction()
+#         fuuid = transaction.get('fuuid')
+#
+#         token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid)
+#         self.resumer_processus([token_resumer])
+#
+#         self.set_etape_suivante()  # Termine
+#         return {'fuuid': fuuid}
 
 
 class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
@@ -3331,7 +3374,6 @@ class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
 
         # Tenter de mettre a jour fichier et document
         self.evenement_maj_fichier(uuid_doc)
-        self.evenement_maj_collection_publique(uuid_doc)
 
         self.set_etape_suivante()  # Termine
 
@@ -3372,25 +3414,25 @@ class ProcessusTransactionDecricreCollection(ProcessusGrosFichiers):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-
-        # Eliminer doublons
-        etiquettes = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
-        self.__logger.error("Etiquettes: %s" % etiquettes)
-
-        self._controleur.gestionnaire.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
-
-        self.set_etape_suivante()  # Termine
-
-        return {'uuid_fichier': uuid_fichier}
+# class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite):
+#
+#     def __init__(self, controleur: MGPProcesseur, evenement):
+#         super().__init__(controleur, evenement)
+#         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+#
+#     def initiale(self):
+#         transaction = self.charger_transaction()
+#         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+#
+#         # Eliminer doublons
+#         etiquettes = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+#         self.__logger.error("Etiquettes: %s" % etiquettes)
+#
+#         self._controleur.gestionnaire.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
+#
+#         self.set_etape_suivante()  # Termine
+#
+#         return {'uuid_fichier': uuid_fichier}
 
 
 class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersActivite):
@@ -3532,143 +3574,143 @@ class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersActivite):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionChangerEtiquettesCollection(ProcessusGrosFichiersActivite):
+# class ProcessusTransactionChangerEtiquettesCollection(ProcessusGrosFichiersActivite):
+#
+#     def __init__(self, controleur: MGPProcesseur, evenement):
+#         super().__init__(controleur, evenement)
+#
+#     def initiale(self):
+#         transaction = self.charger_transaction()
+#         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+#         libelles = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+#
+#         self._controleur.gestionnaire.maj_etiquettes(uuid_collection, ConstantesGrosFichiers.LIBVAL_COLLECTION, libelles)
+#
+#         self.set_etape_suivante()  # Termine
+#
+#         return {'uuid_collection': uuid_collection}
 
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
 
-    def initiale(self):
-        transaction = self.charger_transaction()
-        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        libelles = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
-
-        self._controleur.gestionnaire.maj_etiquettes(uuid_collection, ConstantesGrosFichiers.LIBVAL_COLLECTION, libelles)
-
-        self.set_etape_suivante()  # Termine
-
-        return {'uuid_collection': uuid_collection}
-
-
-class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
-    """
-    Fige une collection et genere le torrent.
-    Pour les collections privees et publiques, le processus de distribution/publication est enclenche.
-    """
-
-    def initiale(self):
-        """
-        Figer la collection qui va servir a creer le torrent.
-        :return:
-        """
-        transaction = self.charger_transaction()
-        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-
-        info_collection = self._controleur.gestionnaire.figer_collection(uuid_collection)
-        info_collection['uuid_collection'] = uuid_collection
-
-        self.set_etape_suivante(ProcessusTransactionFigerCollection.creer_fichier_torrent.__name__)
-
-        # Faire une requete pour les parametres de trackers
-        requete = {"requetes": [{"filtre": {
-            '_mg-libelle': ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
-        }}]}
-        self.set_requete('millegrilles.domaines.Parametres', requete)
-
-        return info_collection
-
-    def creer_fichier_torrent(self):
-        """
-        Generer un fichier torrent et transmettre au module de consignation.
-        :return:
-        """
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
-        parametres = self.parametres
-
-        # Charger la collection et la re-sauvegarder avec _mg-libelle = collection.figee
-        # Aussi generer un uuidv1 pour uuid-fige
-        collection_figee = collection_domaine.find_one({
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: parametres['uuid_collection_figee'],
-        })
-
-        champs_copier = [
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
-            ConstantesGrosFichiers.DOCUMENT_SECURITE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
-            ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES,
-            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
-        ]
-
-        documents = []
-        commande = {
-            ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS: documents,
-        }
-        for champ in champs_copier:
-            commande[champ] = collection_figee.get(champ)
-
-        for uuid_doc, doc in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
-            documents.append(doc)
-
-        # Creer le URL pour le tracker torrent
-        commande['trackers'] = self.__url_trackers()
-
-        self.__logger.info("Commande creation torrent:\n%s" % str(commande))
-        self.ajouter_commande_a_transmettre('commande.torrent.creerNouveau', commande)
-
-        token_attente_torrent = 'collection_figee_torrent:%s' % parametres['uuid_collection_figee']
-
-        securite_collection = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
-        if securite_collection == Constantes.SECURITE_PUBLIC:
-            # Une fois le torrent cree, on va publier la collection figee
-            self.set_etape_suivante(
-                ProcessusTransactionFigerCollection.publier_collection_figee.__name__,
-                token_attente=[token_attente_torrent]
-            )
-        else:
-            self.set_etape_suivante(token_attente=[token_attente_torrent])  # Termine
-
-    def publier_collection_figee(self):
-
-        requete = {"requetes": [{"filtre": {
-            '_mg-libelle': ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
-        }}]}
-        self.set_requete('millegrilles.domaines.Parametres', requete)
-
-        self.set_etape_suivante(ProcessusTransactionFigerCollection.public_collection_sur_noeuds.__name__)
-
-    def public_collection_sur_noeuds(self):
-
-        liste_noeuds = self.parametres['reponse'][1][0]
-        uuid_collection_figee = self.parametres['uuid_collection_figee']
-
-        domaine_publier = ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION
-        for noeud in liste_noeuds:
-            url_web = noeud['url_web']
-            transaction = {
-                "uuid": uuid_collection_figee,
-                "url_web": url_web,
-            }
-            self.controleur.generateur_transactions.soumettre_transaction(transaction, domaine_publier)
-
-        self.set_etape_suivante()  # Termine
-
-    def __url_trackers(self):
-        # Creer le URL pour le tracker torrent
-        reponse_parametres = self.parametres['reponse'][0][0]
-
-        trackers = list()
-
-        # Tracker hard-coded, a corriger
-        trackers.append('http://tracker-ipv4.millegrilles.com:6969/announce')
-
-        for noeud_public in reponse_parametres:
-            url_public = noeud_public['url_web']
-            url_tracker = '%s/announce' % url_public
-            trackers.append(url_tracker)
-
-        return trackers
+# class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
+#     """
+#     Fige une collection et genere le torrent.
+#     Pour les collections privees et publiques, le processus de distribution/publication est enclenche.
+#     """
+#
+#     def initiale(self):
+#         """
+#         Figer la collection qui va servir a creer le torrent.
+#         :return:
+#         """
+#         transaction = self.charger_transaction()
+#         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+#
+#         info_collection = self._controleur.gestionnaire.figer_collection(uuid_collection)
+#         info_collection['uuid_collection'] = uuid_collection
+#
+#         self.set_etape_suivante(ProcessusTransactionFigerCollection.creer_fichier_torrent.__name__)
+#
+#         # Faire une requete pour les parametres de trackers
+#         requete = {"requetes": [{"filtre": {
+#             '_mg-libelle': ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
+#         }}]}
+#         self.set_requete('millegrilles.domaines.Parametres', requete)
+#
+#         return info_collection
+#
+#     def creer_fichier_torrent(self):
+#         """
+#         Generer un fichier torrent et transmettre au module de consignation.
+#         :return:
+#         """
+#         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+#
+#         parametres = self.parametres
+#
+#         # Charger la collection et la re-sauvegarder avec _mg-libelle = collection.figee
+#         # Aussi generer un uuidv1 pour uuid-fige
+#         collection_figee = collection_domaine.find_one({
+#             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+#             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: parametres['uuid_collection_figee'],
+#         })
+#
+#         champs_copier = [
+#             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+#             ConstantesGrosFichiers.DOCUMENT_SECURITE,
+#             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
+#             ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE,
+#             ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES,
+#             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+#         ]
+#
+#         documents = []
+#         commande = {
+#             ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS: documents,
+#         }
+#         for champ in champs_copier:
+#             commande[champ] = collection_figee.get(champ)
+#
+#         for uuid_doc, doc in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
+#             documents.append(doc)
+#
+#         # Creer le URL pour le tracker torrent
+#         commande['trackers'] = self.__url_trackers()
+#
+#         self.__logger.info("Commande creation torrent:\n%s" % str(commande))
+#         self.ajouter_commande_a_transmettre('commande.torrent.creerNouveau', commande)
+#
+#         token_attente_torrent = 'collection_figee_torrent:%s' % parametres['uuid_collection_figee']
+#
+#         securite_collection = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
+#         if securite_collection == Constantes.SECURITE_PUBLIC:
+#             # Une fois le torrent cree, on va publier la collection figee
+#             self.set_etape_suivante(
+#                 ProcessusTransactionFigerCollection.publier_collection_figee.__name__,
+#                 token_attente=[token_attente_torrent]
+#             )
+#         else:
+#             self.set_etape_suivante(token_attente=[token_attente_torrent])  # Termine
+#
+#     def publier_collection_figee(self):
+#
+#         requete = {"requetes": [{"filtre": {
+#             '_mg-libelle': ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
+#         }}]}
+#         self.set_requete('millegrilles.domaines.Parametres', requete)
+#
+#         self.set_etape_suivante(ProcessusTransactionFigerCollection.public_collection_sur_noeuds.__name__)
+#
+#     def public_collection_sur_noeuds(self):
+#
+#         liste_noeuds = self.parametres['reponse'][1][0]
+#         uuid_collection_figee = self.parametres['uuid_collection_figee']
+#
+#         domaine_publier = ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION
+#         for noeud in liste_noeuds:
+#             url_web = noeud['url_web']
+#             transaction = {
+#                 "uuid": uuid_collection_figee,
+#                 "url_web": url_web,
+#             }
+#             self.controleur.generateur_transactions.soumettre_transaction(transaction, domaine_publier)
+#
+#         self.set_etape_suivante()  # Termine
+#
+#     def __url_trackers(self):
+#         # Creer le URL pour le tracker torrent
+#         reponse_parametres = self.parametres['reponse'][0][0]
+#
+#         trackers = list()
+#
+#         # Tracker hard-coded, a corriger
+#         trackers.append('http://tracker-ipv4.millegrilles.com:6969/announce')
+#
+#         for noeud_public in reponse_parametres:
+#             url_public = noeud_public['url_web']
+#             url_tracker = '%s/announce' % url_public
+#             trackers.append(url_tracker)
+#
+#         return trackers
 
 
 class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
@@ -3715,27 +3757,27 @@ class ProcessusTransactionChangerFavoris(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
 
-class ProcessusTransactionCleSecreteFichier(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-
-        fuuid = transaction.get('fuuid')
-        cle_secrete = transaction['cle_secrete_decryptee']
-        iv = transaction['iv']
-        token_resumer = 'decrypterFichier_cleSecrete:%s' % fuuid
-        self.resumer_processus([token_resumer])
-
-        self.set_etape_suivante()
-
-        return {
-            'fuuid': fuuid,
-            'cle_secrete_decryptee': cle_secrete,
-            'iv': iv,
-        }
+# class ProcessusTransactionCleSecreteFichier(ProcessusGrosFichiers):
+#
+#     def __init__(self, controleur: MGPProcesseur, evenement):
+#         super().__init__(controleur, evenement)
+#
+#     def initiale(self):
+#         transaction = self.charger_transaction()
+#
+#         fuuid = transaction.get('fuuid')
+#         cle_secrete = transaction['cle_secrete_decryptee']
+#         iv = transaction['iv']
+#         token_resumer = 'decrypterFichier_cleSecrete:%s' % fuuid
+#         self.resumer_processus([token_resumer])
+#
+#         self.set_etape_suivante()
+#
+#         return {
+#             'fuuid': fuuid,
+#             'cle_secrete_decryptee': cle_secrete,
+#             'iv': iv,
+#         }
 
 
 class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
@@ -3755,184 +3797,204 @@ class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
 
-class ProcessusPublierCollection(ProcessusGrosFichiers):
+class ProcessusTransactionAssocierConversions(ProcessusGrosFichiers):
     """
-    Publie une collection sur un noeud public (Vitrine)
+    Associe les conversions (differentes versions/resolutions) d'une image.
     """
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.transaction
-        url_noeud_public = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
-        uuid_collection_figee = transaction[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+        transaction = self.charger_transaction()
+        self.controleur.gestionnaire.associer_conversions(transaction)
 
-        # Inserer dans les documents de vitrine
-        # Ceci va automatiquement les publier (via watchers MongoDB)
-        self.controleur.gestionnaire.maj_documents_vitrine(uuid_collection_figee)
-
-        self.set_requete(ConstantesParametres.REQUETE_NOEUD_PUBLIC, {
-            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
-        })
-
-        self.set_etape_suivante(ProcessusPublierCollection.determiner_type_deploiement.__name__)
-
-        return {
-            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
-            ConstantesParametres.TRANSACTION_CHAMP_UUID: uuid_collection_figee,
-        }
-
-    def determiner_type_deploiement(self):
-
-        info_noeud_public = self.parametres['reponse'][0][0]
-        mode_deploiement = info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_MODE_DEPLOIEMENT]
-
-        if mode_deploiement == 'torrent':
-            self.set_etape_suivante(ProcessusPublierCollection.deploiement_torrent.__name__)
-        elif mode_deploiement == 's3':
-            self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3.__name__)
-        else:
-            raise Exception("Mode de deploiement inconnu pour noeud public " + self.parametres[
-                ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB])
-
-    def deploiement_torrent(self):
-        """
-        Lancer le processus de deploiement avec Torrents
-        :return:
-        """
-        self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
-
-    def deploiement_s3(self):
-        """
-        Demander le fingerprint du certificat de consignationfichiers
-        :return:
-        """
-        self.set_requete('pki.role.fichiers', {})
-
-        self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3_demander_cle_rechiffree.__name__)
-
-    def deploiement_s3_demander_cle_rechiffree(self):
-        """
-        Demander la cle pour le mot de passe Amazon
-        :return:
-        """
-
-        fingerprint_fichiers = self.parametres['reponse'][1]['fingerprint']
-
-        transaction_maitredescles = {
-            'fingerprint': fingerprint_fichiers,
-            "identificateurs_document": {
-                "champ": "awsSecretAccessKey",
-                "url_web": self.parametres[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB],
-            }
-        }
-        domaine = 'millegrilles.domaines.MaitreDesCles.decryptageDocument'
-
-        # Effectuer requete pour re-chiffrer la cle du document pour le consignateur de transactions
-        self.set_requete(domaine, transaction_maitredescles)
-
-        self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3_commande.__name__)
-
-    def deploiement_s3_commande(self):
-        """
-        Lancer le processus de deploiement avec Amazon S3
-        :return:
-        """
-        info_noeud_public = self.parametres['reponse'][0][0]
-
-        # Extraire liste de fichiers a publier de la collection
-        collection_figee_uuid = self.parametres[ConstantesParametres.TRANSACTION_CHAMP_UUID]
-        collection_figee = self.controleur.gestionnaire.get_collection_figee_par_uuid(collection_figee_uuid)
-        liste_documents = collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
-        info_documents_a_publier = []
-        for document_a_publier in liste_documents.values():
-            if document_a_publier[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesGrosFichiers.LIBVAL_FICHIER:
-
-                info_doc = {
-                    'nom': document_a_publier['nom'],
-                }
-
-                # Gerer l'exception des videos, on publie uniquement le clip mp4 en 480p
-                if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P) is not None:
-                    # On publie uniquement le video a 480p
-                    info_doc.update({
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[
-                            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P],
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[
-                            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P],
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: 'mp4',
-                    })
-                else:
-                    # C'est un fichier standard
-                    info_doc.update({
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[
-                            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: document_a_publier[
-                            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL],
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[
-                            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
-                    })
-                info_documents_a_publier.append(info_doc)
-
-                if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
-                    # On ajoute aussi l'upload du preview
-                    info_preview = {
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW],
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW],
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: 'jpg',
-                    }
-                    info_documents_a_publier.append(info_preview)
-
-        # Creer commande de deploiement pour consignationfichiers
-        commande_deploiement = {
-            "credentials": {
-                "accessKeyId": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_ACCESS_KEY],
-                "secretAccessKeyChiffre": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE],
-                "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_CRED_REGION],
-                "cle": self.parametres['reponse'][2]['cle'],
-                "iv": self.parametres['reponse'][2]['iv'],
-            },
-            "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_REGION],
-            "bucket": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_NAME],
-            "dirfichier": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_DIR],
-            "fuuidFichiers": info_documents_a_publier,
-            "uuid_source_figee": collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE],
-            "uuid_collection_figee": collection_figee_uuid,
-        }
-
-        self.ajouter_commande_a_transmettre('commande.grosfichiers.publierCollection', commande_deploiement)
-
-        self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
-
-        return {
-            "commande": commande_deploiement
-        }
-
-    def publier_metadonnees_collection(self):
-
-        collection_figee_uuid = self.parametres[ConstantesParametres.TRANSACTION_CHAMP_UUID]
-        collection_figee = self.controleur.gestionnaire.get_collection_figee_par_uuid(collection_figee_uuid)
-
-        collection_filtree = dict()
-        for key, value in collection_figee.items():
-            if not key.startswith('_'):
-                collection_filtree[key] = value
-
-        url_web = self.parametres[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
-        url_web = url_web.replace('.', '_')
-        domaine = 'commande.%s.publierCollection' % url_web
-
-        self.controleur.transmetteur.emettre_message_public(collection_filtree, domaine)
-
-        # Publier les documents de sections avec fichiers (fichiers, albums, podcasts, etc.)
-        # Note : ajouter un selecteur pour charger uniquement les sections actives (menu du noeud)
-        document_fichiers = self.controleur.gestionnaire.get_document_vitrine_fichiers()
-        domaine_fichiers = 'commande.%s.publierFichiers' % url_web
-        self.controleur.transmetteur.emettre_message_public(document_fichiers, domaine_fichiers)
-
-        document_albums = self.controleur.gestionnaire.get_document_vitrine_albums()
-        domaine_albums = 'commande.%s.publierAlbums' % url_web
-        self.controleur.transmetteur.emettre_message_public(document_albums, domaine_albums)
+        try:
+            self.evenement_maj_fichier(transaction['uuid'])
+        except Exception:
+            self.__logger.exception("Erreur verification collection publique")
 
         self.set_etape_suivante()
+
+
+# class ProcessusPublierCollection(ProcessusGrosFichiers):
+#     """
+#     Publie une collection sur un noeud public (Vitrine)
+#     """
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#         url_noeud_public = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+#         uuid_collection_figee = transaction[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+#
+#         # Inserer dans les documents de vitrine
+#         # Ceci va automatiquement les publier (via watchers MongoDB)
+#         self.controleur.gestionnaire.maj_documents_vitrine(uuid_collection_figee)
+#
+#         self.set_requete(ConstantesParametres.REQUETE_NOEUD_PUBLIC, {
+#             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
+#         })
+#
+#         self.set_etape_suivante(ProcessusPublierCollection.determiner_type_deploiement.__name__)
+#
+#         return {
+#             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
+#             ConstantesParametres.TRANSACTION_CHAMP_UUID: uuid_collection_figee,
+#         }
+#
+#     def determiner_type_deploiement(self):
+#
+#         info_noeud_public = self.parametres['reponse'][0][0]
+#         mode_deploiement = info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_MODE_DEPLOIEMENT]
+#
+#         if mode_deploiement == 'torrent':
+#             self.set_etape_suivante(ProcessusPublierCollection.deploiement_torrent.__name__)
+#         elif mode_deploiement == 's3':
+#             self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3.__name__)
+#         else:
+#             raise Exception("Mode de deploiement inconnu pour noeud public " + self.parametres[
+#                 ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB])
+#
+#     def deploiement_torrent(self):
+#         """
+#         Lancer le processus de deploiement avec Torrents
+#         :return:
+#         """
+#         self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
+#
+#     def deploiement_s3(self):
+#         """
+#         Demander le fingerprint du certificat de consignationfichiers
+#         :return:
+#         """
+#         self.set_requete('pki.role.fichiers', {})
+#
+#         self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3_demander_cle_rechiffree.__name__)
+#
+#     def deploiement_s3_demander_cle_rechiffree(self):
+#         """
+#         Demander la cle pour le mot de passe Amazon
+#         :return:
+#         """
+#
+#         fingerprint_fichiers = self.parametres['reponse'][1]['fingerprint']
+#
+#         transaction_maitredescles = {
+#             'fingerprint': fingerprint_fichiers,
+#             "identificateurs_document": {
+#                 "champ": "awsSecretAccessKey",
+#                 "url_web": self.parametres[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB],
+#             }
+#         }
+#         domaine = 'millegrilles.domaines.MaitreDesCles.decryptageDocument'
+#
+#         # Effectuer requete pour re-chiffrer la cle du document pour le consignateur de transactions
+#         self.set_requete(domaine, transaction_maitredescles)
+#
+#         self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3_commande.__name__)
+#
+#     def deploiement_s3_commande(self):
+#         """
+#         Lancer le processus de deploiement avec Amazon S3
+#         :return:
+#         """
+#         info_noeud_public = self.parametres['reponse'][0][0]
+#
+#         # Extraire liste de fichiers a publier de la collection
+#         collection_figee_uuid = self.parametres[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+#         collection_figee = self.controleur.gestionnaire.get_collection_figee_par_uuid(collection_figee_uuid)
+#         liste_documents = collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
+#         info_documents_a_publier = []
+#         for document_a_publier in liste_documents.values():
+#             if document_a_publier[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesGrosFichiers.LIBVAL_FICHIER:
+#
+#                 info_doc = {
+#                     'nom': document_a_publier['nom'],
+#                 }
+#
+#                 # Gerer l'exception des videos, on publie uniquement le clip mp4 en 480p
+#                 if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P) is not None:
+#                     # On publie uniquement le video a 480p
+#                     info_doc.update({
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[
+#                             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P],
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[
+#                             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P],
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: 'mp4',
+#                     })
+#                 else:
+#                     # C'est un fichier standard
+#                     info_doc.update({
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[
+#                             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: document_a_publier[
+#                             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL],
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[
+#                             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
+#                     })
+#                 info_documents_a_publier.append(info_doc)
+#
+#                 if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
+#                     # On ajoute aussi l'upload du preview
+#                     info_preview = {
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW],
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW],
+#                         ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: 'jpg',
+#                     }
+#                     info_documents_a_publier.append(info_preview)
+#
+#         # Creer commande de deploiement pour consignationfichiers
+#         commande_deploiement = {
+#             "credentials": {
+#                 "accessKeyId": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_ACCESS_KEY],
+#                 "secretAccessKeyChiffre": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE],
+#                 "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_CRED_REGION],
+#                 "cle": self.parametres['reponse'][2]['cle'],
+#                 "iv": self.parametres['reponse'][2]['iv'],
+#             },
+#             "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_REGION],
+#             "bucket": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_NAME],
+#             "dirfichier": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_DIR],
+#             "fuuidFichiers": info_documents_a_publier,
+#             "uuid_source_figee": collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE],
+#             "uuid_collection_figee": collection_figee_uuid,
+#         }
+#
+#         self.ajouter_commande_a_transmettre('commande.grosfichiers.publierCollection', commande_deploiement)
+#
+#         self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
+#
+#         return {
+#             "commande": commande_deploiement
+#         }
+#
+#     def publier_metadonnees_collection(self):
+#
+#         collection_figee_uuid = self.parametres[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+#         collection_figee = self.controleur.gestionnaire.get_collection_figee_par_uuid(collection_figee_uuid)
+#
+#         collection_filtree = dict()
+#         for key, value in collection_figee.items():
+#             if not key.startswith('_'):
+#                 collection_filtree[key] = value
+#
+#         url_web = self.parametres[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+#         url_web = url_web.replace('.', '_')
+#         domaine = 'commande.%s.publierCollection' % url_web
+#
+#         self.controleur.transmetteur.emettre_message_public(collection_filtree, domaine)
+#
+#         # Publier les documents de sections avec fichiers (fichiers, albums, podcasts, etc.)
+#         # Note : ajouter un selecteur pour charger uniquement les sections actives (menu du noeud)
+#         document_fichiers = self.controleur.gestionnaire.get_document_vitrine_fichiers()
+#         domaine_fichiers = 'commande.%s.publierFichiers' % url_web
+#         self.controleur.transmetteur.emettre_message_public(document_fichiers, domaine_fichiers)
+#
+#         document_albums = self.controleur.gestionnaire.get_document_vitrine_albums()
+#         domaine_albums = 'commande.%s.publierAlbums' % url_web
+#         self.controleur.transmetteur.emettre_message_public(document_albums, domaine_albums)
+#
+#         self.set_etape_suivante()
 
 
 class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
@@ -4070,6 +4132,9 @@ class ProcessusTransactionNouveauFichierUsager(ProcessusGrosFichiers):
         if mimetype in ['video', 'image']:
             self._traiter_media(resultat)
 
+        # Tenter de mettre a jour fichier et document
+        self.evenement_maj_fichier(resultat['uuid'])
+
         return resultat
 
     def _traiter_media(self, info: dict):
@@ -4120,6 +4185,9 @@ class ProcessusTransactionSupprimerFichierUsager(ProcessusGrosFichiers):
         #        le fichier devient orphelin sauf s'il est aussi utilise ailleurs (e.g. forum)
         uuid_collection = user_id
         self.controleur.gestionnaire.retirer_fichiers_collection(uuid_collection, [uuid_fichier])
+
+        # Tenter de mettre a jour fichier et document
+        self.evenement_maj_fichier(uuid_fichier)
 
         self.set_etape_suivante()  # Termine
         return {
