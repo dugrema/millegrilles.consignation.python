@@ -1109,7 +1109,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = dict()
-        champs = ['nom_fichier', 'titre', 'description', 'commentaires']
+        champs = ['nom_fichier', 'titre', 'description']
         for champ in champs:
             try:
                 set_operation[champ] = transaction[champ]
@@ -1120,11 +1120,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
         }
-        resultat = collection_domaine.update_one(filtre, {
+        resultat = collection_domaine.find_one_and_update(filtre, {
             '$set': set_operation,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        })
+        }, return_document=ReturnDocument.AFTER)
         self._logger.debug('maj_description_fichier resultat: %s' % str(resultat))
+
+        return resultat
 
     def maj_description_collection(self, uuid_collection, transaction: dict):
         """
@@ -3402,13 +3404,13 @@ class ProcessusTransactionDecricreFichier(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur.gestionnaire.maj_description_fichier(uuid_fichier, transaction)
-
-        self.set_etape_suivante()  # Termine
+        resultat = self._controleur.gestionnaire.maj_description_fichier(uuid_fichier, transaction)
 
         self.evenement_maj_fichier(uuid_fichier)
 
-        return {'uuid_fichier': uuid_fichier}
+        self.set_etape_suivante()  # Termine
+
+        return resultat
 
 
 class ProcessusTransactionDecricreCollection(ProcessusGrosFichiers):
