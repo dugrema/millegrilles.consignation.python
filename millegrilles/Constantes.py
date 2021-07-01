@@ -1186,6 +1186,7 @@ class ConstantesGrosFichiers:
     EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE = 'confirmationMajCollectionPublique'
     EVENEMENT_MAJ_FICHIER = 'majFichier'
     EVENEMENT_ASSOCIATION_POSTER = 'associationPoster'
+    EVENEMENT_ASSOCIATION_CONVERSIONS = 'associationConversions'
     EVENEMENT_AJOUT_VIDEO = 'ajoutVideo'
 
     REQUETE_VITRINE_FICHIERS = '%s.vitrineFichiers' % DOMAINE_NOM

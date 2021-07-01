@@ -2134,6 +2134,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
         set_ops = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: True,
             prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_IMAGES: conversions_images,
             prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_ANIME: anime,
         }
@@ -2169,6 +2170,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         resultat = collection_grosfichiers.find_one_and_update(filtre, ops, return_document=ReturnDocument.AFTER)
+        self.emettre_evenement_fichier_maj(fuuid_fichier, resultat, ConstantesGrosFichiers.EVENEMENT_ASSOCIATION_CONVERSIONS)
+
+        # MAJ document medias, retirer la demande de preview (complete)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_TRANSCODAGE_MEDIA
+        }
+        unset_ops = {
+            ConstantesGrosFichiers.DOCUMENT_POSTERS + '.' + fuuid_fichier: True
+        }
+        ops = {
+            '$unset': unset_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        collection_grosfichiers.update_one(filtre, ops)
 
         return resultat
 
