@@ -2128,6 +2128,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         height = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_HEIGHT)
         mimetype = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE)
         anime = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ANIME) or False
+        metadata = params.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA)
 
         prefixe_versions = ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS + '.' + fuuid_fichier
 
@@ -2146,6 +2147,30 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if width is not None and height is not None:
             set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_WIDTH] = width
             set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_HEIGHT] = height
+        if metadata is not None:
+            set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA] = metadata
+
+            # Tenter extraction de details metadata
+            try:
+                duration_str = metadata['duration']
+                duration_split = duration_str.split(':')
+                duration_td = datetime.timedelta(hours=int(duration_split[0]), minutes=int(duration_split[1]), seconds=int(float(duration_split[2])))
+                duration = int(duration_td.total_seconds())
+                set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_DURATION] = duration
+            except (TypeError, KeyError, IndexError, AttributeError):
+                pass
+
+            try:
+                codec_video = metadata['video'].split(' ')[0]
+                set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_CODEC_VIDEO] = codec_video
+            except (KeyError, IndexError, AttributeError):
+                pass
+
+            try:
+                codec_audio = metadata['audio'].split(' ')[0]
+                set_ops[prefixe_versions + '.' + ConstantesGrosFichiers.DOCUMENT_FICHIER_CODEC_AUDIO] = codec_audio
+            except (KeyError, IndexError, AttributeError):
+                pass
 
         fuuids = set()
 

@@ -1096,6 +1096,9 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_HEIGHT = 'height'
     DOCUMENT_FICHIER_RESOLUTION = 'resolution'
     DOCUMENT_FICHIER_IMAGES = 'images'
+    DOCUMENT_FICHIER_DURATION = 'duration'
+    DOCUMENT_FICHIER_CODEC_VIDEO = 'codec_video'
+    DOCUMENT_FICHIER_CODEC_AUDIO = 'codec_audio'
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'
