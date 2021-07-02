@@ -2591,7 +2591,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: fuuid,
             'mimetype': commande['mimetype']
         }
-        champs_optionnels = ['bitrate', 'height']
+        champs_optionnels = ['bitrateAudio', 'resolutionVideo', 'bitrateVideo', 'codecAudio', 'codecVideo']
         for champ in champs_optionnels:
             try:
                 commande_transcodage[champ] = commande[champ]
