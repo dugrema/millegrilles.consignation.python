@@ -1006,8 +1006,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         evenement_prive = {
             'uuid': evenement['uuid'],
             'fuuid': fuuid,
-            'collections': evenement['collections'],
         }
+        try:
+            evenement_prive['collections'] = evenement['collections']
+        except KeyError:
+            evenement_prive['collections'] = list()
+
         self.generateur_transactions.emettre_message(
             evenement_prive,
             domaine_action,
@@ -2603,6 +2607,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         correlation_id = properties.correlation_id
         self.generateur_transactions.transmettre_commande(
             commande_transcodage, domaine_action, reply_to=reply_to, correlation_id=correlation_id)
+
+        return {'ok': True}
 
     def uploader_fichiers_manquants_awss3(self, uuid_collection, noeud_ids):
         """
