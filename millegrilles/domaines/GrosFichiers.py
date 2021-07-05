@@ -1142,7 +1142,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = dict()
-        champs = ['nom_collection', 'titre', 'description', 'commentaires', 'securite']
+        champs = ['nom_collection', 'titre', 'description', 'securite']
         for champ in champs:
             try:
                 set_operation[champ] = transaction[champ]
@@ -1153,11 +1153,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION
         }
-        resultat = collection_domaine.update_one(filtre, {
-            '$set': set_operation,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        })
+        resultat = collection_domaine.find_one_and_update(
+            filtre,
+            {
+                '$set': set_operation,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            },
+            return_document=ReturnDocument.AFTER
+        )
+
         self._logger.debug('maj_description_collection resultat: %s' % str(resultat))
+        return resultat
 
     def maj_etiquettes(self, uuid_fichier, type_document, etiquettes: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -3214,6 +3220,26 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         except TypeError:
             pass  # None, pas de collections publiques
 
+    def evenement_maj_collection(self, uuid_collection: str):
+        """
+        Verifie si le changement a un impact sur les collections publiques et transmet un evenement
+        pour chaque collection publique affectee.
+        :param uuid_fichier: fichier qui a ete mis a jour
+        :return:
+        """
+        doc_collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
+        # Emettre un evenement pour chaque collection publique
+        try:
+            domaine_action = 'evenement.grosfichiers.' + ConstantesGrosFichiers.EVENEMENT_MAJ_COLLECTION
+            self.generateur_transactions.emettre_message(
+                doc_collection,
+                domaine_action,
+                exchanges=[Constantes.SECURITE_PROTEGE],
+                ajouter_certificats=True
+            )
+        except TypeError:
+            pass  # Ok
+
 
 class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
     pass
@@ -3456,13 +3482,13 @@ class ProcessusTransactionDecricreCollection(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur.gestionnaire.maj_description_collection(uuid_collection, transaction)
+        doc_collection = self._controleur.gestionnaire.maj_description_collection(uuid_collection, transaction)
+
+        self.evenement_maj_collection(uuid_collection)
 
         self.set_etape_suivante()  # Termine
 
-        # self.evenement_maj_collection_publique(uuid_collection)
-
-        return {'uuid_collection': uuid_collection}
+        return doc_collection
 
 
 # class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite):
@@ -3536,6 +3562,8 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
 
         self._controleur.gestionnaire.creer_collection(uuid_collection, nom_collection, uuid_parent, creer_parent)
 
+        self.evenement_maj_collection(uuid_collection)
+
         self.set_etape_suivante()  # Termine
 
         return {'uuid_collection': uuid_collection}
@@ -3561,6 +3589,8 @@ class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersActivite):
                     changements[key] = value
 
         self._controleur.gestionnaire.renommer_collection(uuid_collection, changements)
+
+        self.evenement_maj_collection(uuid_collection)
 
         self.set_etape_suivante()  # Termine
 
@@ -3777,7 +3807,9 @@ class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
         for uuid_fichier in documents_uuids:
+            # Mettre a jour fichier/collection
             self.evenement_maj_fichier(uuid_fichier)
+            self.evenement_maj_collection(uuid_fichier)
 
 
 class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
@@ -3805,6 +3837,8 @@ class ProcessusTransactionChangerFavoris(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         docs_uuids = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS)
         self._controleur.gestionnaire.changer_favoris(docs_uuids)
+        for doc_uuid in docs_uuids:
+            self.evenement_maj_collection(doc_uuid)
         self.set_etape_suivante()
 
 
