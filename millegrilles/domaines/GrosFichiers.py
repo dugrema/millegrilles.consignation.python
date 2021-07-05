@@ -3808,8 +3808,14 @@ class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
 
         for uuid_fichier in documents_uuids:
             # Mettre a jour fichier/collection
-            self.evenement_maj_fichier(uuid_fichier)
-            self.evenement_maj_collection(uuid_fichier)
+            try:
+                self.evenement_maj_fichier(uuid_fichier)
+            except AttributeError:
+                pass  # OK, pas un fichier
+                try:
+                    self.evenement_maj_collection(uuid_fichier)
+                except AttributeError:
+                    pass  # OK, pas une collection
 
 
 class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
