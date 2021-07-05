@@ -2587,7 +2587,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         info_version = info_fichier['versions'][fuuid]
 
         # Marquer document media
-        self.ajouter_transcodage_video(info_version)
+        resolution = commande['resolutionVideo']
+        mimetype = commande['mimetype']
+        bitrate = commande['bitrateVideo']
+        self.ajouter_transcodage_video(info_version, mimetype=mimetype, resolution=resolution, bitrate=bitrate)
 
         # Transmettre commande a consignation_fichiers
         commande_transcodage = {
