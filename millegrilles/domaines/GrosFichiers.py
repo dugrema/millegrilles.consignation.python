@@ -566,6 +566,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     'nom_collection',
                     Constantes.DOCUMENT_INFODOC_LIBELLE,
                     Constantes.DOCUMENT_INFODOC_SECURITE,
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_TITRE,
                 ]:
                     doc_filtre[key] = value
             documents.append(doc_filtre)
@@ -636,9 +637,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                ConstantesGrosFichiers.LIBVAL_FICHIER,
                 ConstantesGrosFichiers.LIBVAL_COLLECTION,
-                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
             ]},
             ConstantesGrosFichiers.DOCUMENT_FAVORIS: {'$exists': True},
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
@@ -649,6 +648,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: True,
             ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: True,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: True,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TITRE: True,
         }
 
         limit = params.get('limit') or 1000
