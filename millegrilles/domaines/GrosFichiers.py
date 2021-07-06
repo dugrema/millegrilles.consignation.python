@@ -1220,10 +1220,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
                 ConstantesGrosFichiers.LIBVAL_FICHIER,
                 ConstantesGrosFichiers.LIBVAL_COLLECTION,
-                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
             ]}
         }
-        resultat = collection_domaine.update_one(filtre, {
+        resultat = collection_domaine.update_many(filtre, {
             '$set': set_operation,
             '$unset': unset_operation
         })
@@ -3555,6 +3554,15 @@ class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         uuids_documents = transaction[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
         self._controleur.gestionnaire.recuperer_fichier(uuids_documents)
+
+        for uuid_doc in uuids_documents:
+            try:
+                self.evenement_maj_fichier(uuid_doc)
+            except AttributeError:
+                try:
+                    self.evenement_maj_collection(uuid_doc)
+                except AttributeError:
+                    pass  # OK
 
         self.set_etape_suivante()  # Termine
 
