@@ -129,7 +129,7 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
         action = routing_key.split('.')[-1]
 
         if action == ConstantesGrosFichiers.COMMANDE_REGENERER_PREVIEWS:
-            return self.gestionnaire.regenerer_previews()
+            return self.gestionnaire.regenerer_previews(message_dict)
         elif action == ConstantesGrosFichiers.COMMANDE_TRANSCODER_VIDEO:
             return self.gestionnaire.declencher_transcodage_video(message_dict, properties)
         elif action == ConstantesGrosFichiers.COMMANDE_RESET_FICHIERS_PUBLIES:
@@ -622,6 +622,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE: True,
             ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: True,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: True,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TITRE: True,
         }
 
         limit = params.get('limit') or 1000
@@ -2487,21 +2488,36 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 detail_collections_publiques = self.get_detail_collections(params)
                 return detail_collections_publiques
 
-    def regenerer_previews(self):
+    def regenerer_previews(self, params: dict):
         """
         Regenere les previews manquants sur les fichiers de media (video, images)
         :return:
         """
         collection_documents = self.get_collection()
+
+        target_fichiers = dict()
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            '$or': [
-                {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: False},
-                {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: {'$exists': False}},
-            ],
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: {'$regex': '^(video|image)'},
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
+
+        if params is not None:
+            try:
+                target_fichiers['uuid'] = {'$in': params['uuid']}
+            except KeyError:
+                pass  # OK
+
+        if len(target_fichiers) == 0:
+            # Utilise une requete sur tous les ficheirs non generes
+            target_fichiers = {'$or': [
+                {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: False},
+                {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: {'$exists': False}},
+            ]}
+
+        filtre.update(target_fichiers)
+
         curseur = collection_documents.find(filtre)
 
         conversions_resoumises = False
