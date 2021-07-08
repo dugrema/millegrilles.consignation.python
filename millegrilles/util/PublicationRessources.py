@@ -678,11 +678,11 @@ class RessourcesPublication:
             try:
                 fuuid_mimetypes = info[ConstantesGrosFichiers.CHAMP_FUUID_MIMETYPES]
                 set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = fuuid_mimetypes[fuuid]
-            except KeyError as ke:
+            except KeyError:
                 if fuuid == info['fuuid_v_courante']:
                     set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = info['mimetype']
                 else:
-                    raise ke
+                    self.__logger.exception("Erreur traitement publication %s", fuuid)
 
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_FICHIER,
