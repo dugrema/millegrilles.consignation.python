@@ -943,7 +943,36 @@ class RessourcesPublication:
 
         set_fuuids = set()
         for f in liste_fichiers:
-            fuuids_fichier = f.get('fuuids')
+            mimetype = f.get('mimetype') or 'application/stream'
+            mimetype_base = mimetype.split('/')[0]
+
+            version_courante = f['version_courante']
+            fuuid_v_courante = version_courante['fuuid']
+            image_animee = version_courante.get('anime') or False
+
+            fuuids_fichier = list()
+
+            # Recuperer toutes les images
+            images = version_courante.get('images')
+            if images is not None:
+                for value in images.values():
+                    if value.get('data_chiffre') is None:
+                        # Ce n'est pas une image inline (chiffree)
+                        fuuid_image = value['hachage']
+                        fuuids_fichier.append(fuuid_image)
+
+            # Recuperer differents formats videos
+            videos = version_courante.get('video')
+            if videos is not None:
+                for value in videos.values():
+                    fuuid_image = value['hachage']
+                    fuuids_fichier.append(fuuid_image)
+
+            # fuuids_fichier = f.get('fuuids').copy()
+            if mimetype_base not in ['video', 'image'] or image_animee is True:
+                # On n'a pas un format multimedia (ou on a GIF animee)
+                fuuids_fichier.append(fuuid_v_courante)
+
             if fuuids_fichier:
                 set_fuuids.update(fuuids_fichier)
 
@@ -966,7 +995,7 @@ class RessourcesPublication:
         fuuids_dict = dict()
         flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
         for f in liste_fichiers:
-            for fuuid in f['fuuids']:
+            for fuuid in set_fuuids:
                 fuuids_dict[fuuid] = f
                 try:
                     f['cid'] = map_cid[fuuid]
