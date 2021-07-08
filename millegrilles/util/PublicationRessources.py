@@ -62,7 +62,7 @@ class InvalidateurRessources:
         else:
             collection_ressources.update_many(filtre_ressource, ops, upsert=upsert)
 
-    def reset_ressources_encours(self):
+    def reset_ressources_encours(self, site_id: str = None):
         ops = {
             '$unset': {
                 ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
@@ -79,6 +79,10 @@ class InvalidateurRessources:
                 {ConstantesPublication.CHAMP_DISTRIBUTION_ERREUR: {'$exists': True}},
             ]
         }
+
+        if site_id is not None:
+            filtre['site_id'] = site_id
+
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         collection_ressources.update_many(filtre, ops)
 
@@ -709,11 +713,12 @@ class RessourcesPublication:
         res_collection = collection_ressources.find_one(filtre)
         return res_collection
 
-    def trouver_ressources_manquantes(self):
+    def trouver_ressources_manquantes(self, site_id: str = None):
         """
         Identifie et ajoute toutes les ressources manquantes a partir des siteconfigs et sections.
         :return:
         """
+        in_site_id = site_id
         date_courante = datetime.datetime.utcnow()
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
 
@@ -724,7 +729,12 @@ class RessourcesPublication:
             ConstantesPublication.CHAMP_IPNS_ID: True,
             ConstantesPublication.CHAMP_IPNS_CLE_CHIFFREE: True,
         }
-        curseur_sites = collection_sites.find(dict(), projection=projection_sites)
+
+        filtre_sites = dict()
+        if in_site_id is not None:
+            filtre_sites['site_id'] = in_site_id
+
+        curseur_sites = collection_sites.find(filtre_sites, projection=projection_sites)
         # site_ids = [s[ConstantesPublication.CHAMP_SITE_ID] for s in curseur_sites]
         for doc_site in curseur_sites:
             site_id = doc_site[ConstantesPublication.CHAMP_SITE_ID]
@@ -748,6 +758,7 @@ class RessourcesPublication:
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
                 ConstantesPublication.CHAMP_SITE_ID: site_id,
             }
+
             ops = {
                 '$set': set_ops,
                 '$setOnInsert': set_on_insert
@@ -756,7 +767,12 @@ class RessourcesPublication:
 
         # Verifier s'il manque des sections (pages, collections fichiers)
         collection_sections = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SECTIONS)
-        curseur_sections = collection_sections.find(dict())
+
+        filtre_sections = dict()
+        if in_site_id is not None:
+            filtre_sections['site_id'] = in_site_id
+
+        curseur_sections = collection_sections.find(filtre_sections)
         for section in curseur_sections:
             type_section = section[ConstantesPublication.CHAMP_TYPE_SECTION]
             ipns_id = section.get(ConstantesPublication.CHAMP_IPNS_ID)
@@ -827,7 +843,7 @@ class RessourcesPublication:
             }
             collection_ressources.update_one(filtre, ops, upsert=True)
 
-    def identifier_ressources_fichiers(self):
+    def identifier_ressources_fichiers(self, site_id: str = None):
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
         filtre_res = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
@@ -838,6 +854,9 @@ class RessourcesPublication:
             ]},
             # ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: False,
         }
+
+        if site_id is not None:
+            filtre_res['site_id'] = site_id
 
         curseur_ressources = collection_ressources.find(filtre_res)
         uuid_collections = set()
@@ -1086,10 +1105,7 @@ class RessourcesPublication:
             # ConstantesPublication.CHAMP_DATE_SIGNATURE: True,
         }
         unset_opts.update(UNSET_PUBLICATION_RESOURCES)
-        ops = {
-            '$unset': unset_opts,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
+        pull_ops = dict()
 
         infolib = dict()
 
@@ -1104,6 +1120,29 @@ class RessourcesPublication:
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: infolib,
         }
+
+        site_id = params.get('site_id')
+        if site_id is not None:
+            filtre['site_id'] = site_id
+
+        cdn_id = params.get('cdn_id')
+        if cdn_id is not None:
+            filtre['distribution_complete'] = {'$all': [cdn_id]}
+
+            # Reset unset_ops
+            unset_opts = {
+                ConstantesPublication.CHAMP_PREPARATION_RESSOURCES: True
+            }
+            # del unset_opts[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE]
+            # del unset_opts[ConstantesPublication.CHAMP_CONTENU]
+            pull_ops[ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE] = cdn_id
+
+        ops = {
+            '$unset': unset_opts,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        if len(pull_ops) > 0:
+            ops['$pull'] = pull_ops
 
         resultat = collection_ressources.update_many(filtre, ops)
 
@@ -1968,11 +2007,15 @@ class TriggersPublication:
     def generateur_transactions(self):
         return self.__cascade.generateur_transactions
 
-    def preparer_sitesparcdn(self):
+    def preparer_sitesparcdn(self, site_id: str = None):
         collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
 
         # Faire la liste de tous les CDNs utilises dans au moins 1 site
-        curseur_sites = collection_sites.find()
+        filtre_sites = dict()
+        if site_id is not None:
+            filtre_sites['site_id'] = site_id
+
+        curseur_sites = collection_sites.find(filtre_sites)
 
         cdns_associes = set()
         sites_par_cdn_dict = dict()
@@ -2017,21 +2060,22 @@ class TriggersPublication:
     def demarrer_publication_complete(self, params: dict):
         # Marquer toutes les ressources non publiees comme en cours de publication.
         # La methode continuer_publication() utilise cet etat pour publier les ressources en ordre.
+        site_id = params.get('site_id') or None
 
         # Reset le progres de toutes les ressources - permet de liberer ressources bloquees en progres = true
-        self.__cascade.invalidateur.reset_ressources_encours()
+        self.__cascade.invalidateur.reset_ressources_encours(site_id=site_id)
 
         # Generer toutes les ressources derivant de siteconfig et sections
-        self.__cascade.ressources.trouver_ressources_manquantes()
+        self.__cascade.ressources.trouver_ressources_manquantes(site_id=site_id)
 
         # Generer les ressources collection_fichiers et le contenu de sections pages pour extraire fichiers (fuuids)
         # Va aussi generer les entrees res fichiers associees aux pages
-        self.__cascade.ressources.identifier_ressources_fichiers()
+        self.__cascade.ressources.identifier_ressources_fichiers(site_id=site_id)
 
         compteur_commandes = 0
 
         # Traiter les ressources par CDN actif
-        liste_cdns = self.preparer_sitesparcdn()
+        liste_cdns = self.preparer_sitesparcdn(site_id=site_id)
         for cdn in liste_cdns:
             type_cdn = cdn[ConstantesPublication.CHAMP_TYPE_CDN]
             if type_cdn in ['hiddenService', 'manuel']:
