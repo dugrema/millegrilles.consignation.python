@@ -1014,12 +1014,13 @@ class RessourcesPublication:
         fuuids_dict = dict()
         flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
         for f in liste_fichiers:
-            for fuuid in set_fuuids:
-                fuuids_dict[fuuid] = f
-                try:
-                    f['cid'] = map_cid[fuuid]
-                except KeyError:
-                    pass  # OK, pas de CID
+            for fuuid in f['fuuids']:
+                if fuuid in set_fuuids:  # S'assurer que c'est un fuuid qu'on veut publier (e.g. pas un thumbnail)
+                    fuuids_dict[fuuid] = f
+                    try:
+                        f['cid'] = map_cid[fuuid]
+                    except KeyError:
+                        pass  # OK, pas de CID
 
         self.maj_ressources_fuuids(fuuids_dict, public=flag_public)
 
@@ -1097,6 +1098,12 @@ class RessourcesPublication:
         :return:
         """
         collection_ressources = self.document_dao.get_collection(ConstantesPublication.COLLECTION_RESSOURCES)
+
+        if params.get('supprimer') is True:
+            # On veut supprimer la collection complete
+            collection_ressources.remove()
+            return {'ok': True}
+
         unset_opts = {
             ConstantesPublication.CHAMP_DISTRIBUTION_COMPLETE: True,
             ConstantesPublication.CHAMP_DISTRIBUTION_PROGRES: True,
