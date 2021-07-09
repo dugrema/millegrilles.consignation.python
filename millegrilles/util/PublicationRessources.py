@@ -17,7 +17,7 @@ from millegrilles.MGProcessus import MGProcessus
 from millegrilles.util.Hachage import hacher
 from millegrilles.util.JSONMessageEncoders import JSONHelper
 from millegrilles.dao.Configuration import TransactionConfiguration
-from millegrilles.util.Chiffrage import CipherMsg2Chiffrer
+from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer
 from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
@@ -961,6 +961,7 @@ class RessourcesPublication:
         uuid_collection = info_collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
         set_fuuids = set()
+        thumbnails_chiffres = dict()
         for f in liste_fichiers:
             mimetype = f.get('mimetype') or 'application/stream'
             mimetype_base = mimetype.split('/')[0]
@@ -979,6 +980,11 @@ class RessourcesPublication:
                         # Ce n'est pas une image inline (chiffree)
                         fuuid_image = value['hachage']
                         fuuids_fichier.append(fuuid_image)
+                    else:
+                        info_thumbnail = value.copy()
+                        info_thumbnail['fuuid_fichier'] = fuuid_v_courante
+                        # Indexer par hachage du thumbnail - utilise pour dechiffrage
+                        thumbnails_chiffres[value['hachage']] = info_thumbnail
 
             # Recuperer differents formats videos
             videos = version_courante.get('video')
@@ -1012,9 +1018,11 @@ class RessourcesPublication:
 
         # Creer les entrees manquantes de fichiers  # ATTENTION, potentiel boucle (flag maj_section=False important)
         fuuids_dict = dict()
+        fuuids_complets = dict()
         flag_public = info_collection.get('securite') == Constantes.SECURITE_PUBLIC
         for f in liste_fichiers:
             for fuuid in f['fuuids']:
+                fuuids_complets[fuuid] = f  # Conserver pour references (e.g. thumbnails)
                 if fuuid in set_fuuids:  # S'assurer que c'est un fuuid qu'on veut publier (e.g. pas un thumbnail)
                     fuuids_dict[fuuid] = f
                     try:
@@ -1026,6 +1034,35 @@ class RessourcesPublication:
 
         info_fichiers = self.trouver_info_fuuid_fichiers(list(set_fuuids))
         contenu['fuuids'] = info_fichiers
+
+        if len(thumbnails_chiffres) > 0:
+            # Dechiffrer tous les thumbnails, remplacer le contenu dans les fichiers
+            domaine_action = 'requete.MaitreDesCles.dechiffrage'
+            hachage_bytes = [t['hachage'] for t in thumbnails_chiffres.values()]
+            requete = {'liste_hachage_bytes': hachage_bytes}
+            reponse = self.__cascade.requete_bloquante(domaine_action, requete)
+
+            if reponse['acces'] == '1.permis':
+                # Ok, on peut preparer les thumbnails
+                for cle, value in reponse['cles'].items():
+                    cle_chiffree = value['cle']
+                    cle_dechiffree = self.__cascade.dechiffrer_cle(cle_chiffree)
+                    decipher = CipherMsg2Dechiffrer(value['iv'], cle_dechiffree, value['tag'])
+                    info_thumbnails = thumbnails_chiffres[cle]
+                    thumbnail = info_thumbnails['data_chiffre']
+                    thumbnail = multibase.decode(thumbnail)
+                    thumbnail = decipher.update(thumbnail) + decipher.finalize()
+                    thumbnail = multibase.encode('base64', thumbnail).decode('utf-8')
+
+                    # Remplacer le thumbnail chiffre par le thumbnail dechiffre
+
+                    fuuid_fichier = info_thumbnails['fuuid_fichier']
+                    info_fichier = fuuids_complets[fuuid_fichier]
+                    version_courante = info_fichier['version_courante']
+                    images = version_courante['images']
+                    thumb_images = images['thumb']
+                    del thumb_images['data_chiffre']
+                    thumb_images['data'] = thumbnail
 
         set_ops = {
             'contenu': contenu,
@@ -1998,6 +2035,9 @@ class GestionnaireCascadePublication:
     @property
     def generateur_transactions(self):
         return self.__gestionnaire_domaine.generateur_transactions
+
+    def dechiffrer_cle(self, cle: str):
+        return self.__gestionnaire_domaine.dechiffrer_cle(cle)
 
 
 class TriggersPublication:

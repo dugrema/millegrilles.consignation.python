@@ -1190,6 +1190,9 @@ class GestionnaireDomaine:
         else:
             return self._contexte.signateur_transactions.chiffrage_asymmetrique(cle_secrete)
 
+    def dechiffrer_cle(self, cle_chiffree: str):
+        return self._contexte.signateur_transactions.dechiffrage_asymmetrique(cle_chiffree)
+
     @property
     def supporte_regenerer_global(self):
         """

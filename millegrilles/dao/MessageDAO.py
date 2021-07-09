@@ -1729,7 +1729,9 @@ class TraitementMQRequetesBlocking(BaseCallback):
             self.__reponse_correlation_id = correlation_id
 
             self.contexte.generateur_transactions.transmettre_requete(
-                params, domaine_action, correlation_id='requete_commande', reply_to=self.queue_name)
+                params, domaine_action, correlation_id='requete_commande', reply_to=self.queue_name,
+                ajouter_certificats=True
+            )
 
             self.__event_attente.wait(15)
 
