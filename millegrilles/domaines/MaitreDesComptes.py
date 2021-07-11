@@ -73,9 +73,9 @@ class TraitementCommandesMaitredesclesPrivees(TraitementMessageDomaineCommande):
         action = routing_key.split('.')[-1]
 
         resultat: dict
-        if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
-            resultat = self.gestionnaire.set_activation_tierce(message_dict)
-        elif action == ConstantesMaitreDesComptes.COMMANDE_CHALLENGE_COMPTEUSAGER:
+        # if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
+        #     resultat = self.gestionnaire.set_activation_tierce(message_dict)
+        if action == ConstantesMaitreDesComptes.COMMANDE_CHALLENGE_COMPTEUSAGER:
             resultat = self.gestionnaire.preparer_challenge_authentification(message_dict)
         elif action == ConstantesMaitreDesComptes.COMMANDE_SIGNER_COMPTEUSAGER:
             resultat = self.gestionnaire.signer_compte_usager(message_dict, properties, enveloppe_certificat)
@@ -622,73 +622,67 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         # Sanity check - user_id fourni par le serveur web et nom_usager fourni par le navigateur doivent correspondre
         # au meme compte dans la base de donnees.
         # NOTE : on devrait aussi charger le CSR et verifier que CN=nom_usager
-        demande_certificat = params['demandeCertificat']
-        nom_usager = demande_certificat['nomUsager']
+
         collection = self.document_dao.get_collection(ConstantesMaitreDesComptes.COLLECTION_USAGERS_NOM)
+        user_id = params['userId']
         filtre = {
-            ConstantesMaitreDesComptes.CHAMP_USER_ID: params[ConstantesMaitreDesComptes.CHAMP_USER_ID],
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+            ConstantesMaitreDesComptes.CHAMP_USER_ID: user_id,
         }
         doc_usager = collection.find_one(filtre)
 
         if doc_usager is None:
             return {'ok': False, 'err': 'Permission refusee', 'code': 3}
 
-        # Valider signature du message demandeCertificat avec webauthn
-        demande_certificat = params['demandeCertificat']
-        date_demande = demande_certificat['date']
+        try:
+            demande_certificat = params['demandeCertificat']
+        except KeyError:
+            # On n'a pas de demande. Verifier les cas d'exception.
+            # Cas 1 - nouvel usager, le compte n'aura aucun token webauthn
+            if doc_usager.get('webauthn') is not None:
+                return {'ok': False, 'err': 'Absence de signature webauthn pour creer certificat sur compte existant', 'code': 5}
+            demande_certificat = {
+                'nomUsager': doc_usager['nomUsager'],
+                'csr': params['csr'],
+            }
+        else:
+            nom_usager = demande_certificat['nomUsager']
+            if doc_usager['nomUsager'] != nom_usager:
+                return {'ok': True, 'err': 'Mismatch nom usager dans le compte', 'code': 4}
 
-        # S'assurer que la demande n'est pas trop vieille (fenetre de +/- 15 minutes)
-        date_demande = datetime.datetime.fromtimestamp(date_demande)
-        expiration = datetime.timedelta(minutes=15)
-        date_now = datetime.datetime.utcnow()
-        if not date_now <= date_demande + expiration and date_now > date_demande - expiration:
-            return {'ok': False, 'err': 'Demande expiree'}
+            # Valider signature du message demandeCertificat avec webauthn
+            date_demande = demande_certificat['date']
+            date_demande = datetime.datetime.fromtimestamp(date_demande)
 
-        challenge_serveur = params['challenge']
-        challenge_bytes: bytes = multibase.decode(challenge_serveur)
-        liste_challenge = list(challenge_bytes)
-        if challenge_bytes[0] != 0x2:
-            return {'ok': False, 'err': 'Le challenge de demande de certificat doit commencer par 0x2'}
+            # S'assurer que la demande n'est pas trop vieille (fenetre de +/- 15 minutes)
+            expiration = datetime.timedelta(minutes=15)
+            date_now = datetime.datetime.utcnow()
+            if not date_now <= date_demande + expiration and date_now > date_demande - expiration:
+                return {'ok': False, 'err': 'Demande expiree'}
 
-        # # Calculer SHA512 de la demande, remplacer bytes [1:65] du challenge
-        # # Preparer le message pour verification du hachage et de la signature
-        message_bytes = UtilCertificats.preparer_message_bytes(demande_certificat)
-        digest = hacher_to_digest(message_bytes, hashing_code='sha2-512')
-        liste_challenge_recalcule = list(digest)
+            challenge_serveur = params['challenge']
+            challenge_bytes: bytes = multibase.decode(challenge_serveur)
+            if challenge_bytes[0] != 0x2:
+                return {'ok': False, 'err': 'Le challenge de demande de certificat doit commencer par 0x2'}
 
-        # S'assurer que le digest correspond au bytes [1:65] du challenge
-        if digest != challenge_bytes[1:65]:
-            return {'ok': False, 'err': 'Le digest de la demande de signature de CSR dans le challenge est incorrect'}
+            # Calculer SHA512 de la demande, remplacer bytes [1:65] du challenge
+            # Preparer le message pour verification du hachage et de la signature
+            message_bytes = UtilCertificats.preparer_message_bytes(demande_certificat)
+            digest = hacher_to_digest(message_bytes, hashing_code='sha2-512')
 
-        # # Code pour signature de certificat
-        # challenge_bytes = bytes(0x2) + digest + challenge_bytes[66:]
-        # challenge_ajuste = multibase.encode('base64', challenge_bytes).decode('utf-8')
+            # S'assurer que le digest correspond au bytes [1:65] du challenge
+            if digest != challenge_bytes[1:65]:
+                return {'ok': False, 'err': 'Le digest de la demande de signature de CSR dans le challenge est incorrect'}
 
-        # Recalculer le debut du challenge
+            auth_response = params['clientAssertionResponse']
+            origin = params['origin']
+            url_site = origin.replace('https://', '')
+            webauthn_verif = Webauthn(self.configuration.idmg)
 
-        auth_response = params['clientAssertionResponse']
-        # auth_rr = auth_response['response']
-        #
-        # # Convertir les champs de la reponse de multibase en bytes()
-        # client_assertion_response = {
-        #     'id': multibase.decode(auth_response['id64']),
-        #     'response': {
-        #         'authenticatorData': multibase.decode(auth_rr['authenticatorData']),
-        #         'clientDataJSON': multibase.decode(auth_rr['clientDataJSON']),
-        #         'signature': multibase.decode(auth_rr['signature']),
-        #     }
-        # }
-
-        origin = params['origin']
-        url_site = origin.replace('https://', '')
-        webauthn_verif = Webauthn(self.configuration.idmg)
-
-        assertions = {
-            'challenge': challenge_serveur,
-            'rpId': url_site,
-        }
-        webauthn_verif.authenticate_complete(url_site, assertions, auth_response, doc_usager['webauthn'])
+            assertions = {
+                'challenge': challenge_serveur,
+                'rpId': url_site,
+            }
+            webauthn_verif.authenticate_complete(url_site, assertions, auth_response, doc_usager['webauthn'])
 
         # Cleanup
         try:
