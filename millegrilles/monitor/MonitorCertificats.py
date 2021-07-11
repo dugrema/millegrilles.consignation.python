@@ -754,6 +754,18 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Emettre le nouveau certificat pour conserver sous PKI
         self._service_monitor.generateur_transactions.emettre_certificat(clecert.chaine)
 
+        # Emettre commande activation_tierce si parametre present
+        if contenu.get('activationTierce') is True:
+            # Calculer le fingerprint_pk du certificat
+            fingerprint_pk = clecert.fingerprint_cle_publique
+            domaine_activation = 'commande.MaitreDesComptes.activationTierce'
+            commande_activation = {
+                'nomUsager': nom_usager,
+                'userId': user_id,
+                'fingerprint_pk': fingerprint_pk,
+            }
+            self._service_monitor.generateur_transactions.transmettre_commande(commande_activation, domaine_activation)
+
         return {
             'cert': clecert.cert_bytes.decode('utf-8'),
             'fullchain': clecert.chaine,

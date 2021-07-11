@@ -638,10 +638,11 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         demande_certificat = params['demandeCertificat']
         date_demande = demande_certificat['date']
 
-        # S'assurer que la demande n'est pas trop vieille (max 1 heure)
+        # S'assurer que la demande n'est pas trop vieille (fenetre de +/- 15 minutes)
         date_demande = datetime.datetime.fromtimestamp(date_demande)
-        expiration = datetime.timedelta(hours=1)
-        if datetime.datetime.utcnow() > date_demande + expiration:
+        expiration = datetime.timedelta(minutes=15)
+        date_now = datetime.datetime.utcnow()
+        if not date_now <= date_demande + expiration and date_now > date_demande - expiration:
             return {'ok': False, 'err': 'Demande expiree'}
 
         challenge_serveur = params['challenge']
@@ -706,6 +707,11 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         commande_signature = demande_certificat.copy()
         commande_signature['userId'] = params['userId']
         commande_signature['compte'] = doc_usager
+
+        # Ajouter flag tiers si active d'un autre appareil que l'origine du CSR
+        # Donne le droit a l'usager de faire un login initial et enregistrer son appareil.
+        if demande_certificat.get('activationTierce') is True:
+            commande_signature['activation_tierce'] = True
 
         # Emettre le compte usager pour qu'il soit signe et retourne au demandeur (serveur web)
         domaine_action = 'commande.servicemonitor.signerNavigateur'
