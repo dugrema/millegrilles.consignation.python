@@ -1,6 +1,8 @@
 import logging
 import datetime
 import pytz
+import multibase
+import json
 
 from pymongo import ReturnDocument
 
@@ -9,6 +11,8 @@ from millegrilles.Constantes import ConstantesMaitreDesComptes, ConstantesGenera
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementCommandesProtegees, \
     TraitementMessageDomaineRequete, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.util.Webauthn import Webauthn
+from millegrilles.util.Hachage import hacher_to_digest
 
 
 class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
@@ -70,6 +74,8 @@ class TraitementCommandesMaitredesclesPrivees(TraitementMessageDomaineCommande):
         resultat: dict
         if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
             resultat = self.gestionnaire.set_activation_tierce(message_dict)
+        elif action == ConstantesMaitreDesComptes.COMMANDE_CHALLENGE_COMPTEUSAGER:
+            resultat = self.gestionnaire.preparer_challenge_authentification(message_dict)
         elif action == ConstantesMaitreDesComptes.COMMANDE_SIGNER_COMPTEUSAGER:
             resultat = self.gestionnaire.signer_compte_usager(message_dict, properties, enveloppe_certificat)
         else:
@@ -612,14 +618,70 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             return {'err': 'Permission refusee', 'code': 2}
 
         # Charger l'usager de la base de donnees
+        # Sanity check - user_id fourni par le serveur web et nom_usager fourni par le navigateur doivent correspondre
+        # au meme compte dans la base de donnees.
+        # NOTE : on devrait aussi charger le CSR et verifier que CN=nom_usager
+        demande_certificat = params['demandeCertificat']
+        nom_usager = demande_certificat['nomUsager']
         collection = self.document_dao.get_collection(ConstantesMaitreDesComptes.COLLECTION_USAGERS_NOM)
         filtre = {
-            ConstantesMaitreDesComptes.CHAMP_USER_ID: params[ConstantesMaitreDesComptes.CHAMP_USER_ID]
+            ConstantesMaitreDesComptes.CHAMP_USER_ID: params[ConstantesMaitreDesComptes.CHAMP_USER_ID],
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         doc_usager = collection.find_one(filtre)
 
         if doc_usager is None:
-            return {'err': 'Permission refusee', 'code': 3}
+            return {'ok': False, 'err': 'Permission refusee', 'code': 3}
+
+        # Valider signature du message demandeCertificat avec webauthn
+        demande_certificat = params['demandeCertificat']
+        date_demande = demande_certificat['date']
+
+        # S'assurer que la demande n'est pas trop vieille (max 1 heure)
+        date_demande = datetime.datetime.fromtimestamp(date_demande)
+        expiration = datetime.timedelta(hours=1)
+        if datetime.datetime.utcnow() > date_demande + expiration:
+            return {'ok': False, 'err': 'Demande expiree'}
+
+        challenge_serveur = params['challenge']
+        challenge_bytes: bytes = multibase.decode(challenge_serveur)
+        if challenge_bytes[0] != 0x2:
+            liste_challenge = list(challenge_bytes)
+            return {'ok': False, 'err': 'Le challenge de demande de certificat doit commencer par 0x2'}
+
+        # # Calculer SHA512 de la demande, remplacer bytes [1:65] du challenge
+        # # Preparer le message pour verification du hachage et de la signature
+        # message_bytes = json.dumps(demande_certificat, sort_keys=True)
+        # digest = hacher_to_digest(message_bytes, hashing_code='sha2-512')
+        #
+        # # Code pour signature de certificat
+        # challenge_bytes = bytes(0x2) + digest + challenge_bytes[66:]
+        # challenge_ajuste = multibase.encode('base64', challenge_bytes).decode('utf-8')
+
+        # Recalculer le debut du challenge
+
+        auth_response = params['clientAssertionResponse']
+        # auth_rr = auth_response['response']
+        #
+        # # Convertir les champs de la reponse de multibase en bytes()
+        # client_assertion_response = {
+        #     'id': multibase.decode(auth_response['id64']),
+        #     'response': {
+        #         'authenticatorData': multibase.decode(auth_rr['authenticatorData']),
+        #         'clientDataJSON': multibase.decode(auth_rr['clientDataJSON']),
+        #         'signature': multibase.decode(auth_rr['signature']),
+        #     }
+        # }
+
+        origin = params['origin']
+        url_site = origin.replace('https://', '')
+        webauthn_verif = Webauthn(self.configuration.idmg)
+
+        assertions = {
+            'challenge': challenge_serveur,
+            'rpId': url_site,
+        }
+        webauthn_verif.authenticate_complete(url_site, assertions, auth_response, doc_usager['webauthn'])
 
         # Cleanup
         try:
@@ -634,15 +696,15 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             if key.startswith('_'):
                 del doc_usager[key]
 
-        # Injecter l'information dans les params
-        params['compte'] = doc_usager
-        del params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-        del params[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
+        # Creer l'information pour la commande de signature de certificat
+        commande_signature = demande_certificat.copy()
+        commande_signature['userId'] = params['userId']
+        commande_signature['compte'] = doc_usager
 
         # Emettre le compte usager pour qu'il soit signe et retourne au demandeur (serveur web)
         domaine_action = 'commande.servicemonitor.signerNavigateur'
         self.generateur_transactions.transmettre_commande(
-            params,
+            commande_signature,
             domaine_action,
             exchange=Constantes.SECURITE_PROTEGE,
             reply_to=properties.reply_to,
@@ -700,69 +762,33 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         )
         return True
 
-    # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
-    #     filtre = {
-    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-    #         ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-    #     }
-    #
-    #     set_ops = {}
-    #     document_idmg = {}
-    #     if chaine_certificats:
-    #         document_idmg[ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT] = chaine_certificats
-    #     if cle_intermediaire:
-    #         document_idmg[ConstantesMaitreDesComptes.CHAMP_CLE] = cle_intermediaire
-    #     if reset_certificats:
-    #         set_ops['certificats'] = {
-    #             idmg: document_idmg
-    #         }
-    #     else:
-    #         set_ops['certificats.%s' % idmg] = document_idmg
-    #
-    #     ops = {
-    #         '$set': set_ops,
-    #         '$currentDate': {
-    #             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-    #         }
-    #     }
-    #
-    #     collection = self.document_dao.get_collection(self.get_nom_collection())
-    #     resultat = collection.update_one(filtre, ops)
-    #     if resultat.matched_count != 1:
-    #         raise Exception("Erreur suppression mot de passe, aucun document modifie")
-    #
-    #     return {Constantes.EVENEMENT_REPONSE: True}
+    def preparer_challenge_authentification(self, params: dict):
+        nom_usager = params['nom_usager']
+        url_site = params['url_site']
 
-    # def ajouter_certificat_navigateur(self, nom_usager, info_certificat: dict):
-    #     filtre = {
-    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-    #         ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-    #     }
-    #
-    #     idmg = info_certificat['idmg']
-    #     fingerprint_navigateur = info_certificat['fingerprint']
-    #
-    #     set_ops = {}
-    #     set_ops['idmgs.%s.navigateurs.%s' % (idmg, fingerprint_navigateur)] = {
-    #         'cleChiffree': info_certificat['cleChiffree'],
-    #         'certificat': info_certificat['certificat'],
-    #         'motdepassePartiel': info_certificat['motdepassePartiel'],
-    #         'expiration': info_certificat['expiration'],
-    #     }
-    #
-    #     ops = {
-    #         '$set': set_ops,
-    #         '$currentDate': {
-    #             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-    #         }
-    #     }
-    #
-    #     collection = self.document_dao.get_collection(self.get_nom_collection())
-    #     resultat = collection.update_one(filtre, ops)
-    #     if resultat.matched_count != 1:
-    #         raise Exception("Erreur suppression mot de passe, aucun document modifie")
-    #
-    #     return {Constantes.EVENEMENT_REPONSE: True}
+        filtre = {'nomUsager': nom_usager}
+        collection_usagers = self.document_dao.get_collection(ConstantesMaitreDesComptes.COLLECTION_USAGERS_NOM)
+        doc_usager = collection_usagers.find_one(filtre)
+        creds = doc_usager[ConstantesMaitreDesComptes.CHAMP_WEBAUTHN]
+
+        # Generer un challenge aleatoire
+        wa = Webauthn()
+        challenge = wa.generer_challenge_auth(url_site, creds)
+
+        # Conserver challenge dans le compte usager (volatil)
+        info_challenge = {
+            'date': datetime.datetime.utcnow(),
+            'challenge': challenge['challenge'],
+            'rpId': challenge['rpId'],
+            'userVerification': challenge['userVerification'],
+        }
+        ops = {
+            '$set': {'webauthn_challenge': info_challenge},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection_usagers.update_one(filtre, ops)
+
+        return challenge
 
 
 class ProcessusInscrireProprietaire(MGProcessusTransaction):

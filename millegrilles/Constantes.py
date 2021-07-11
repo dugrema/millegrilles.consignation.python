@@ -1556,6 +1556,7 @@ class ConstantesMaitreDesComptes:
 
     COMMANDE_ACTIVATION_TIERCE = 'activationTierce'
     COMMANDE_SIGNER_COMPTEUSAGER = 'signerCompteUsager'
+    COMMANDE_CHALLENGE_COMPTEUSAGER = 'challengeCompteUsager'
 
     EVENEMENT_ACTIVATION_FINGERPRINTPK = 'activationFingerprintPk'
 
