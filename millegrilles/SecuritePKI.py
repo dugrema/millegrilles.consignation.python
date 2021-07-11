@@ -429,8 +429,46 @@ class UtilCertificats:
         :return: Transaction nettoyee en bytes.
         """
 
+        # transaction_temp = dict()
+        # for key, value in transaction_dict.items():
+        #     if not key.startswith('_'):
+        #         transaction_temp[key] = value
+        #
+        # # self._logger.debug("Message nettoye: %s" % str(transaction_temp))
+        #
+        # # Premiere passe, converti les dates. Les nombre floats sont incorrects.
+        # message_json = json.dumps(
+        #     transaction_temp,
+        #     ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+        #     cls=DateFormatEncoder
+        # )
+        #
+        # # HACK - Fix pour le decodage des float qui ne doivent pas finir par .0 (e.g. 100.0 doit etre 100)
+        # message_json = json.loads(message_json, parse_float=self._parse_float)
+        # message_json = json.dumps(
+        #     message_json,
+        #     ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+        #     sort_keys=True,
+        #     separators=(',', ':')
+        # )
+        #
+        # message_bytes = bytes(message_json, 'utf-8')
+        #
+        # return message_bytes
+
+        return UtilCertificats.preparer_message_bytes(transaction_dict)
+
+    @staticmethod
+    def preparer_message_bytes(message: dict):
+        """
+                Prepare une transaction (dictionnaire) pour la signature ou la verification. Retourne des bytes.
+
+                :param transaction_dict: Dictionnaire de la transaction a verifier.
+                :return: Transaction nettoyee en bytes.
+                """
+
         transaction_temp = dict()
-        for key, value in transaction_dict.items():
+        for key, value in message.items():
             if not key.startswith('_'):
                 transaction_temp[key] = value
 
@@ -439,15 +477,15 @@ class UtilCertificats:
         # Premiere passe, converti les dates. Les nombre floats sont incorrects.
         message_json = json.dumps(
             transaction_temp,
-            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+            ensure_ascii=False,  # S'assurer de supporter tous le range UTF-8
             cls=DateFormatEncoder
         )
 
         # HACK - Fix pour le decodage des float qui ne doivent pas finir par .0 (e.g. 100.0 doit etre 100)
-        message_json = json.loads(message_json, parse_float=self._parse_float)
+        message_json = json.loads(message_json, parse_float=UtilCertificats._parse_float)
         message_json = json.dumps(
             message_json,
-            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+            ensure_ascii=False,  # S'assurer de supporter tous le range UTF-8
             sort_keys=True,
             separators=(',', ':')
         )
@@ -456,7 +494,8 @@ class UtilCertificats:
 
         return message_bytes
 
-    def _parse_float(self, f: str):
+    @staticmethod
+    def _parse_float(f: str):
         """
         Permet de transformer les nombre floats qui finissent par .0 en entier. Requis pour interoperabilite avec
         la verification (hachage, signature) en JavaScript qui fait cette conversion implicitement.

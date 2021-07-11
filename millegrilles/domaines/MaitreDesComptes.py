@@ -13,6 +13,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementCommand
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.Webauthn import Webauthn
 from millegrilles.util.Hachage import hacher_to_digest
+from millegrilles.SecuritePKI import UtilCertificats
 
 
 class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
@@ -645,15 +646,20 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         challenge_serveur = params['challenge']
         challenge_bytes: bytes = multibase.decode(challenge_serveur)
+        liste_challenge = list(challenge_bytes)
         if challenge_bytes[0] != 0x2:
-            liste_challenge = list(challenge_bytes)
             return {'ok': False, 'err': 'Le challenge de demande de certificat doit commencer par 0x2'}
 
         # # Calculer SHA512 de la demande, remplacer bytes [1:65] du challenge
         # # Preparer le message pour verification du hachage et de la signature
-        # message_bytes = json.dumps(demande_certificat, sort_keys=True)
-        # digest = hacher_to_digest(message_bytes, hashing_code='sha2-512')
-        #
+        message_bytes = UtilCertificats.preparer_message_bytes(demande_certificat)
+        digest = hacher_to_digest(message_bytes, hashing_code='sha2-512')
+        liste_challenge_recalcule = list(digest)
+
+        # S'assurer que le digest correspond au bytes [1:65] du challenge
+        if digest != challenge_bytes[1:65]:
+            return {'ok': False, 'err': 'Le digest de la demande de signature de CSR dans le challenge est incorrect'}
+
         # # Code pour signature de certificat
         # challenge_bytes = bytes(0x2) + digest + challenge_bytes[66:]
         # challenge_ajuste = multibase.encode('base64', challenge_bytes).decode('utf-8')
