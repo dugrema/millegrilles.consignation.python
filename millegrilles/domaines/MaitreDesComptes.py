@@ -5,6 +5,7 @@ import multibase
 import json
 
 from pymongo import ReturnDocument
+from cryptography.x509.extensions import ExtensionNotFound
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes, ConstantesGenerateurCertificat
@@ -638,7 +639,23 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         except KeyError:
             # On n'a pas de demande. Verifier les cas d'exception.
             # Cas 1 - nouvel usager, le compte n'aura aucun token webauthn
-            if doc_usager.get('webauthn') is not None:
+            permission = params.get('permission')
+            if permission is not None:
+                # On a une permission signee - s'assurer que c'est un certificat 4.secure ou avec delegation
+                enveloppe_permission = self.validateur_message.verifier(permission)
+                try:
+                    exchanges = enveloppe_permission.get_exchanges
+                except ExtensionNotFound:
+                    exchanges = None
+                try:
+                    delegation_globale = enveloppe_permission.get_delegation_globale
+                except ExtensionNotFound:
+                    delegation_globale = None
+
+                if delegation_globale not in ['proprietaire'] and Constantes.SECURITE_SECURE not in exchanges:
+                    return {'ok': False, 'err': "La signature de la permission n'est pas faite avec un niveau d'acces approprie"}
+
+            elif doc_usager.get('webauthn') is not None:
                 return {'ok': False, 'err': 'Absence de signature webauthn pour creer certificat sur compte existant', 'code': 5}
             demande_certificat = {
                 'nomUsager': doc_usager['nomUsager'],
