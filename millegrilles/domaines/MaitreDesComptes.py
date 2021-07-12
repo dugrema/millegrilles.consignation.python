@@ -640,6 +640,11 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             # On n'a pas de demande. Verifier les cas d'exception.
             # Cas 1 - nouvel usager, le compte n'aura aucun token webauthn
             permission = params.get('permission')
+            demande_certificat = {
+                'nomUsager': doc_usager['nomUsager'],
+                'csr': params['csr'],
+            }
+
             if permission is not None:
                 # On a une permission signee - s'assurer que c'est un certificat 4.secure ou avec delegation
                 enveloppe_permission = self.validateur_message.verifier(permission)
@@ -655,12 +660,13 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
                 if delegation_globale not in ['proprietaire'] and Constantes.SECURITE_SECURE not in exchanges:
                     return {'ok': False, 'err': "La signature de la permission n'est pas faite avec un niveau d'acces approprie"}
 
+                try:
+                    demande_certificat['activationTierce'] = permission['activationTierce']
+                except KeyError:
+                    pass  # OK
+
             elif doc_usager.get('webauthn') is not None:
                 return {'ok': False, 'err': 'Absence de signature webauthn pour creer certificat sur compte existant', 'code': 5}
-            demande_certificat = {
-                'nomUsager': doc_usager['nomUsager'],
-                'csr': params['csr'],
-            }
         else:
             nom_usager = demande_certificat['nomUsager']
             if doc_usager['nomUsager'] != nom_usager:
@@ -721,7 +727,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         # Ajouter flag tiers si active d'un autre appareil que l'origine du CSR
         # Donne le droit a l'usager de faire un login initial et enregistrer son appareil.
-        if demande_certificat.get('activationTierce') is True:
+        if demande_certificat.get('activationTierce') is True or permission.get('activationTierce') is True:
             commande_signature['activation_tierce'] = True
 
         # Emettre le compte usager pour qu'il soit signe et retourne au demandeur (serveur web)

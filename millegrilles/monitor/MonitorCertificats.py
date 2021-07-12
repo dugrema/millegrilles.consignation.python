@@ -16,6 +16,7 @@ from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import asymmetric, hashes
 from certvalidator.errors import PathValidationError
+from cryptography.x509.extensions import ExtensionNotFound
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -702,22 +703,34 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
         enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
         idmg = self._service_monitor.idmg
-        roles_cert = enveloppe_cert.get_roles
+        # roles_cert = enveloppe_cert.get_roles
 
-        roles_permis = [
-            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-            ConstantesGenerateurCertificat.ROLE_DOMAINES,
-        ]
-        est_protege = enveloppe_cert.est_acces_protege(roles_permis)
+        # roles_permis = [
+        #     ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+        #     ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        # ]
+        # est_protege = enveloppe_cert.est_acces_protege(roles_permis)
 
-        if enveloppe_cert.subject_organization_name == idmg and est_protege:
-            pass
-        else:
+        try:
+            exchanges = enveloppe_cert.get_exchanges
+        except ExtensionNotFound:
+            exchanges = None
+
+        if enveloppe_cert.subject_organization_name != idmg or Constantes.SECURITE_SECURE not in exchanges:
             return {
                 'autorise': False,
-                'description': 'demandeur non autorise a demander la signateur de ce certificat',
-                'roles_demandeur': roles_cert
+                'ok': False,
+                'description': "La signature de la commande de certificat n'est pas faite avec un niveau d'acces approprie"
             }
+
+        # if enveloppe_cert.subject_organization_name == idmg and est_protege:
+        #     pass
+        # else:
+        #     return {
+        #         'autorise': False,
+        #         'description': 'demandeur non autorise a demander la signateur de ce certificat',
+        #         'roles_demandeur': roles_cert
+        #     }
 
         csr = contenu['csr'].encode('utf-8')
         # est_proprietaire = contenu.get('estProprietaire')
