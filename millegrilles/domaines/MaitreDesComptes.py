@@ -613,6 +613,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         # Verifier que l'enveloppe de certificat provient d'un serveur prive (monitor) ou protege (web_protege)
         roles = enveloppe_certificat.get_roles
         exchanges = enveloppe_certificat.get_exchanges
+        activation_tierce = False
+
         if Constantes.SECURITE_PRIVE not in exchanges and Constantes.SECURITE_PROTEGE not in exchanges:
             return {'err': 'Permission refusee', 'code': 1}
 
@@ -648,6 +650,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             if permission is not None:
                 # On a une permission signee - s'assurer que c'est un certificat 4.secure ou avec delegation
                 enveloppe_permission = self.validateur_message.verifier(permission)
+                activation_tierce = permission.get('activationTierce')
                 try:
                     exchanges = enveloppe_permission.get_exchanges
                 except ExtensionNotFound:
@@ -667,6 +670,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
             elif doc_usager.get('webauthn') is not None:
                 return {'ok': False, 'err': 'Absence de signature webauthn pour creer certificat sur compte existant', 'code': 5}
+
         else:
             nom_usager = demande_certificat['nomUsager']
             if doc_usager['nomUsager'] != nom_usager:
@@ -727,7 +731,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         # Ajouter flag tiers si active d'un autre appareil que l'origine du CSR
         # Donne le droit a l'usager de faire un login initial et enregistrer son appareil.
-        if demande_certificat.get('activationTierce') is True or permission.get('activationTierce') is True:
+        if demande_certificat.get('activationTierce') is True or activation_tierce is True:
             commande_signature['activation_tierce'] = True
 
         # Emettre le compte usager pour qu'il soit signe et retourne au demandeur (serveur web)
