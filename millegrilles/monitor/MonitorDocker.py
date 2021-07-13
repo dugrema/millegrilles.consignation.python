@@ -1332,25 +1332,6 @@ class GestionnaireModulesDocker:
 
         return dict_containers
 
-    def generer_motsdepasse(self, config_generer: dict):
-        mots_de_passe = dict()
-        if config_generer:
-            liste_motsdepasse = config_generer.get('motsdepasse')
-            for motdepasse_config in liste_motsdepasse:
-                label_motdepasse = motdepasse_config['name']
-
-                # Verifier si le mot de passe existe deja
-                try:
-                    secret_passwd = self.trouver_secret(motdepasse_config['name'])
-                except PkiCleNonTrouvee:
-                    # Generer le mot de passe
-                    motdepasse = b64encode(secrets.token_bytes(16))
-                    # Conserver mot de passe en memoire pour generer script, au besoin
-                    mots_de_passe[label_motdepasse] = motdepasse.decode('utf-8')
-                    labels = {'mg_type': 'password'}
-                    self.sauvegarder_secret(label_motdepasse, motdepasse,
-                                                                          ajouter_date=True, labels=labels)
-
     @property
     def idmg(self):
         return self.__idmg
