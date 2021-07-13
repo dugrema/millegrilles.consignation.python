@@ -130,10 +130,10 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_TRANSACTION,
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
     ConstantesServiceMonitor.MODULE_PRINCIPAL,
+    ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
-    ConstantesServiceMonitor.MODULE_REDIS,
     # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
 ]
 
