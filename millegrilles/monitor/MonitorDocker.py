@@ -5,11 +5,12 @@ import datetime
 import socket
 import docker
 import re
+import secrets
 
 from os import path
 
 from uuid import uuid4
-from base64 import b64decode
+from base64 import b64encode, b64decode
 from threading import Event, Thread
 from typing import cast
 from docker.errors import APIError
@@ -384,6 +385,8 @@ class GestionnaireModulesDocker:
                     self.generer_cle_ed25519(generateur)
                 elif type_generateur == 'rsa':
                     self.generer_cle_rsa(generateur)
+                elif type_generateur == 'motdepasse':
+                    self.generer_motdepasse(generateur)
 
     def generer_cle_ed25519(self, params: dict):
         format_cle = params['format']
@@ -416,6 +419,17 @@ class GestionnaireModulesDocker:
             self.sauvegarder_secret(nom_secret, valeur, ajouter_date=True)
         elif nom_config is not None:
             self.sauvegarder_config(nom_config, valeur)
+
+    def generer_motdepasse(self, params: dict):
+        longueur = params.get('len') or 32
+        nom_secret = params['secret']
+
+        secret_bytes = secrets.token_bytes(longueur)
+        secret_str = b64encode(secret_bytes)
+        valeur = secret_str[0:longueur]  # Tronquer a la longueur demandee
+
+        if nom_secret is not None:
+            self.sauvegarder_secret(nom_secret, valeur, ajouter_date=True)
 
     def reconfigurer_service(self, service_name: str, docker_service=None, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
@@ -603,42 +617,42 @@ class GestionnaireModulesDocker:
             # Ok, container s'est auto-supprime
             pass
 
-    def activer_hebergement(self):
-        """
-        Active les modules d'hebergement (si pas deja fait).
-        :return:
-        """
-        if not self.__hebergement_actif:
-            # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
-            path_hebergement = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES, self.__idmg, 'mounts/hebergement')
-            try:
-                os.mkdir(path_hebergement, mode=0o770)
-            except FileExistsError:
-                self.__logger.debug("Repertoire %s existe, ok" % path_hebergement)
-
-            # Ajouter modules requis
-            modules_requis = set(self.__modules_requis)
-            modules_requis.update(MonitorConstantes.MODULES_HEBERGEMENT)
-            self.__modules_requis = list(modules_requis)
-
-            for service_name in MonitorConstantes.MODULES_HEBERGEMENT:
-                module_config = MonitorConstantes.DICT_MODULES_PROTEGES[service_name]
-                self.demarrer_service(service_name, **module_config)
-
-            self.__hebergement_actif = True
-
-    def desactiver_hebergement(self):
-        if self.__hebergement_actif:
-            modules_requis = set(self.__modules_requis)
-            modules_requis.difference_update(MonitorConstantes.MODULES_HEBERGEMENT)
-            self.__modules_requis = list(modules_requis)
-
-            for service_name in MonitorConstantes.MODULES_HEBERGEMENT:
-                try:
-                    self.supprimer_service(service_name)
-                except IndexError:
-                    self.__logger.warning("Erreur retrait service %s" % service_name)
-                self.__hebergement_actif = False
+    # def activer_hebergement(self):
+    #     """
+    #     Active les modules d'hebergement (si pas deja fait).
+    #     :return:
+    #     """
+    #     if not self.__hebergement_actif:
+    #         # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
+    #         path_hebergement = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES, self.__idmg, 'mounts/hebergement')
+    #         try:
+    #             os.mkdir(path_hebergement, mode=0o770)
+    #         except FileExistsError:
+    #             self.__logger.debug("Repertoire %s existe, ok" % path_hebergement)
+    #
+    #         # Ajouter modules requis
+    #         modules_requis = set(self.__modules_requis)
+    #         modules_requis.update(MonitorConstantes.MODULES_HEBERGEMENT)
+    #         self.__modules_requis = list(modules_requis)
+    #
+    #         for service_name in MonitorConstantes.MODULES_HEBERGEMENT:
+    #             module_config = MonitorConstantes.DICT_MODULES_PROTEGES[service_name]
+    #             self.demarrer_service(service_name, **module_config)
+    #
+    #         self.__hebergement_actif = True
+    #
+    # def desactiver_hebergement(self):
+    #     if self.__hebergement_actif:
+    #         modules_requis = set(self.__modules_requis)
+    #         modules_requis.difference_update(MonitorConstantes.MODULES_HEBERGEMENT)
+    #         self.__modules_requis = list(modules_requis)
+    #
+    #         for service_name in MonitorConstantes.MODULES_HEBERGEMENT:
+    #             try:
+    #                 self.supprimer_service(service_name)
+    #             except IndexError:
+    #                 self.__logger.warning("Erreur retrait service %s" % service_name)
+    #             self.__hebergement_actif = False
 
     def force_update_service(self, service_name):
         filter = {'name': service_name}
@@ -1318,6 +1332,25 @@ class GestionnaireModulesDocker:
 
         return dict_containers
 
+    def generer_motsdepasse(self, config_generer: dict):
+        mots_de_passe = dict()
+        if config_generer:
+            liste_motsdepasse = config_generer.get('motsdepasse')
+            for motdepasse_config in liste_motsdepasse:
+                label_motdepasse = motdepasse_config['name']
+
+                # Verifier si le mot de passe existe deja
+                try:
+                    secret_passwd = self.trouver_secret(motdepasse_config['name'])
+                except PkiCleNonTrouvee:
+                    # Generer le mot de passe
+                    motdepasse = b64encode(secrets.token_bytes(16))
+                    # Conserver mot de passe en memoire pour generer script, au besoin
+                    mots_de_passe[label_motdepasse] = motdepasse.decode('utf-8')
+                    labels = {'mg_type': 'password'}
+                    self.sauvegarder_secret(label_motdepasse, motdepasse,
+                                                                          ajouter_date=True, labels=labels)
+
     @property
     def idmg(self):
         return self.__idmg
@@ -1360,6 +1393,7 @@ class GestionnaireModulesDocker:
     @property
     def docker_client(self):
         return self.__docker
+
 
 class GestionnaireImagesDocker:
 

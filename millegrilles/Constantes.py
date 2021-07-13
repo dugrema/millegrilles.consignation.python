@@ -1716,6 +1716,7 @@ class ConstantesServiceMonitor:
     MODULE_WEB_COUPDOEIL = 'web_coupdoeil'
     MODULE_PYTHON = 'mg-python'
     MODULE_MONGOEXPRESS = 'mongoxp'
+    MODULE_REDIS = 'redis'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     # MODULE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     # MODULE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
