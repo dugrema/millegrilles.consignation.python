@@ -14,6 +14,7 @@ from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.util.BackupModule import HandlerBackupDomaine
 
 from cryptography.hazmat.backends import default_backend
+from cryptography.x509.extensions import ExtensionNotFound
 from cryptography import x509
 from base64 import b64encode, b64decode
 from typing import Optional
@@ -547,12 +548,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if evenement.get('permission'):
             self._logger.debug("Verification de permission pour dechiffrer une cle : %s" % permission)
 
-            if Constantes.SECURITE_SECURE in enveloppe_permission.get_exchanges:
+            try:
+                exchanges = enveloppe_permission.get_exchanges
+            except ExtensionNotFound:
+                exchanges = list()
+
+            if Constantes.SECURITE_SECURE in exchanges:
                 # Un certificat 4.secure peut donner acces a n'importe quel domaine
                 domaines_permis = permission.get('roles_permis')
                 user_id_permis = permission.get('user_id')
                 securite_permise = permission.get(Constantes.DOCUMENT_INFODOC_SECURITE)
-            elif Constantes.SECURITE_PROTEGE in enveloppe_permission.get_exchanges:
+            elif Constantes.SECURITE_PROTEGE in exchanges:
                 # Faire l'intersection entre les roles du certificat de la permission et les roles explicitement permis
                 # Evite de donner acces a un role que le certificat d'origine n'as pas acces
                 set_domaines_evenement = set(enveloppe_permission.get_roles)
