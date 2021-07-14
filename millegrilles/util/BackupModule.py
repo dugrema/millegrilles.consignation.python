@@ -1777,12 +1777,13 @@ class ArchivesBackupParser:
                     self.__logger.warning("Fichier transaction %s, cle non dechiffrable" % nom_fichier)
                     self.__rapport_restauration.incrementer_indechiffrables(domaine)
                 else:
-                    iv = b64decode(cle_iv['iv'].encode('utf-8'))
-                    compute_tag = b64decode(cle_iv['tag'].encode('utf-8'))
-                    cle = cle_iv['cle']
+                    # iv = multibase.decode(cle_iv['iv'].encode('utf-8'))
+                    # compute_tag = multibase.decode(cle_iv['tag'].encode('utf-8'))
 
+                    cle = cle_iv['cle']
                     cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
-                    decipher = CipherMsg2Dechiffrer(iv, cle_dechiffree, compute_tag)
+
+                    decipher = CipherMsg2Dechiffrer(cle_iv['iv'], cle_dechiffree, cle_iv['tag'])
                     stream = DecipherStream(decipher, file_object)
 
                     # Wrapper le stream dans un decodeur lzma
@@ -2015,7 +2016,7 @@ class HandlerCertificatsCatalogue:
 
             # Valider le certificat
             try:
-                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+                date_reference = enveloppe.not_valid_after
                 idmg = enveloppe.subject_organization_name
                 validateur_pki.valider(pems, date_reference=date_reference, idmg=idmg)
             except certvalidator.errors.InvalidCertificateError:

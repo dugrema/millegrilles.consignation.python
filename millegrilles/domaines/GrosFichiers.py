@@ -3252,7 +3252,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
                 exchanges=[Constantes.SECURITE_PROTEGE],
                 ajouter_certificats=True
             )
-        except TypeError:
+        except (AttributeError, TypeError):
             pass  # Ok
 
 

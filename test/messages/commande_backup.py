@@ -400,7 +400,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
-        # sample.commande_regenerer()
+        sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
 
         # sample.trigger_backup_global()
@@ -443,7 +443,7 @@ class MessagesSample(BaseCallback):
 
         # sample.commande_preparer_restauration()
         # sample.commande_restaurer_transactions()
-        sample.trigger_backup_reset_grosfichiers()
+        # sample.trigger_backup_reset_grosfichiers()
 
 
 # --- MAIN ---
