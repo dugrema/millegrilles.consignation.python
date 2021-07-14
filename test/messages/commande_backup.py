@@ -241,6 +241,19 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_reset'
         )
 
+    def trigger_backup_reset_grosfichiers(self):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            'commande.GrosFichiers.resetBackup',
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_reset'
+        )
+
     def restaurer(self, domaine):
         url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + domaine
         cacert = self.configuration.mq_cafile
@@ -387,7 +400,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
-        sample.commande_regenerer()
+        # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
 
         # sample.trigger_backup_global()
@@ -430,6 +443,7 @@ class MessagesSample(BaseCallback):
 
         # sample.commande_preparer_restauration()
         # sample.commande_restaurer_transactions()
+        sample.trigger_backup_reset_grosfichiers()
 
 
 # --- MAIN ---

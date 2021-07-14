@@ -1224,8 +1224,6 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
-        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL:
-            resultat = self.gestionnaire.reset_backup(message_dict)
 
         else:
             raise ValueError("Commande inconnue: " + routing_key)
@@ -1261,6 +1259,9 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
                 resultat = self.gestionnaire.regenerer_documents()
         elif action == ConstantesDomaines.COMMANDE_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
+        elif action == ConstantesBackup.COMMANDE_BACKUP_RESET_DOMAINE:
+            resultat = self.gestionnaire.reset_backup(message_dict)
+
 
         elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
             resultat = self.gestionnaire.declencher_restauration_transactions(message_dict, properties)
@@ -2092,7 +2093,7 @@ class RestaurationTransactions(MGProcessus):
             url = 'https://%s/backup/restaurerDomaine/%s' % (hostname_fichiers, nom_domaine)
             cacert = configuration.mq_cafile
             certkey = (configuration.mq_certfile, configuration.mq_keyfile)
-            resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
+            resultat = requests.get(url, verify=cacert, cert=certkey, stream=True, timeout=30)
             self.__logger.debug("restaurerDomaines: Response code : %d" % resultat.status_code)
 
             if resultat.status_code == 200:
@@ -2106,7 +2107,7 @@ class RestaurationTransactions(MGProcessus):
                 )
 
                 # parser.start().wait(30)
-                event_attente = parser.start()
+                event_attente = parser.start(stream=resultat.iter_content(chunk_size=10 * 1024))
                 event_attente.wait(240)  # Donner 4 minutes pour traiter le domaine
                 resultat_execution = event_attente.is_set()
 
@@ -2117,6 +2118,7 @@ class RestaurationTransactions(MGProcessus):
             if resultat_execution is False:
                 evenement_fin_restauration['err'] = {'code': 1, 'message': 'Echec de restauration'}
             self.emettre_evenement_restauration(evenement_fin_restauration)
+            self.set_etape_suivante()  # Termine
         finally:
             # Conserver resultat, arreter traitement si erreur
             reponse = {

@@ -157,10 +157,11 @@ class BackupUtil:
         cipher = CipherMsg2Chiffrer(output_stream=output_stream, encoding_digest='base58btc')
         iv = multibase.encode('base64', cipher.iv).decode('utf-8')
 
-        # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
+        # Conserver iv/tag et cle chiffree avec cle de millegrille (restore dernier recours)
         enveloppe_millegrille = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
         catalogue_backup['cle'] = multibase.encode('base64', cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
         catalogue_backup['iv'] = iv
+        catalogue_backup['tag'] = '!!!REMPLACER!!!'
         catalogue_backup['format'] = 'mgs2'
 
         # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
@@ -444,8 +445,8 @@ class HandlerBackupDomaine:
             'transactions': (nom_fichier_transactions, fp_transactions, 'application/x-xz'),
             'catalogue': (nom_fichier_catalogue, fp_catalogue, 'application/x-xz'),
         }
-        # if fp_maitrecles is not None:
-        #     files['cles'] = ('cles', fp_maitrecles, 'application/x-xz'),
+        if fp_maitrecles is not None:
+            files['cles'] = ('cles', fp_maitrecles, 'application/x-xz')
 
         certfile = self._contexte.configuration.mq_certfile
         keyfile = self._contexte.configuration.mq_keyfile
@@ -591,6 +592,12 @@ class HandlerBackupDomaine:
             if information_sousgroupe.transaction_maitredescles is not None:
                 # Preparer la transaction maitredescles
                 information_sousgroupe.transaction_maitredescles[ConstantesBackup.LIBELLE_HACHAGE_BYTES] = information_sousgroupe.sha512_backup
+
+                # Remplacer le tag
+                tag = multibase.encode('base64', information_sousgroupe.cipher.tag).decode('utf-8')
+                information_sousgroupe.transaction_maitredescles['tag'] = tag
+                information_sousgroupe.catalogue_backup['tag'] = tag
+
                 # information_sousgroupe.path_fichier_maitrecles = path.join(Constantes.DEFAUT_BACKUP_WORKDIR, 'cles.json.xz')
                 fichier_maitrecles_temp = tempfile.mktemp(dir=Constantes.DEFAUT_BACKUP_WORKDIR)
                 information_sousgroupe.path_fichier_maitrecles = fichier_maitrecles_temp
