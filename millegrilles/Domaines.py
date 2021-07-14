@@ -2028,6 +2028,10 @@ class BackupHoraire(MGProcessus):
 
         date_courante = datetime.datetime.utcnow()
 
+        # S'assurer que les backup cedules sont deja executes
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=False)
+
+        # Completer avec le backup snapshot (ne sera pas conserve de facon permanente)
         gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True)
 
         self.set_etape_suivante()  # Termine
@@ -2054,6 +2058,10 @@ class BackupSnapshot(MGProcessus):
 
         date_courante = datetime.datetime.utcnow()
 
+        # S'assurer que tous les backups cedules sont executes
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=False)
+
+        # Executer le backup snapshot (ne sera pas conserve de maniere permanente)
         gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True)
 
         self.set_etape_suivante()  # Termine
