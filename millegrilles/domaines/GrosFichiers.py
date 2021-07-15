@@ -3066,6 +3066,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         ]
         collection_doc = collection_grosfichiers.find_one(filtre_collection)
 
+        if collection_doc is None:
+            self._logger.warning("generer_collectionfichiers: collection uuid:%s est inconnue" % uuid_collection)
+            return
+
         securite = collection_doc[Constantes.DOCUMENT_INFODOC_SECURITE]
         filtre_collectionfichiers = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
