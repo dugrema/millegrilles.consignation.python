@@ -103,8 +103,8 @@ class MessagesSample(BaseCallback):
         domaines = [
             # ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', 'Annuaire'),
             # 'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,

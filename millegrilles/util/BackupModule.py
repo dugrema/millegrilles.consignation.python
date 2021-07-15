@@ -1897,6 +1897,9 @@ class ArchivesBackupParser:
             ]
         }
         try:
+            requete['format'] = catalogue['format']
+            requete['tag'] = catalogue['tag']
+            requete['iv'] = catalogue['iv']
             requete['cle'] = catalogue['cle']
         except KeyError:
             pass

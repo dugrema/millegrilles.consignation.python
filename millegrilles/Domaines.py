@@ -1262,7 +1262,6 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
         elif action == ConstantesBackup.COMMANDE_BACKUP_RESET_DOMAINE:
             resultat = self.gestionnaire.reset_backup(message_dict)
 
-
         elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
             resultat = self.gestionnaire.declencher_restauration_transactions(message_dict, properties)
 
