@@ -223,7 +223,12 @@ class HandlerBackupDomaine:
         self.__niveau_securite = niveau_securite
         self.__backup_util = BackupUtil(contexte)
 
-    def backup_horaire_domaine(self, uuid_rapport: str, heure: datetime.datetime, info_cles: dict, snapshot=False, supprimer_temp=True):
+    def backup_horaire_domaine(
+            self, uuid_rapport: str, heure: datetime.datetime, info_cles: dict,
+            snapshot=False,
+            supprimer_temp=True,
+            url_serveur=None
+    ):
         """
         Effectue le backup horaire pour un domaine.
 
@@ -231,6 +236,8 @@ class HandlerBackupDomaine:
         :param heure: Heure du backup horaire
         :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         :param snapshot: Si True, effectue un snapshot plutot qu'un backup horaire
+        :param supprimer_temp:
+        :param url_serveur: Override du serveur de backup, url de base (e.g. https://localhost:3021)
         """
         debut_backup = heure
         fichiers_supprimer = list()
@@ -289,7 +296,11 @@ class HandlerBackupDomaine:
                                 if information_sousgroupe.path_fichier_maitrecles is not None:
                                     fichiers_supprimer.append(information_sousgroupe.path_fichier_maitrecles)
                                     fp_maitrecles = open(information_sousgroupe.path_fichier_maitrecles, 'rb')
-                                self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue, fp_maitrecles)
+                                self.uploader_fichiers_backup(
+                                    information_sousgroupe,
+                                    fp_transactions, fp_catalogue, fp_maitrecles,
+                                    url_consignationfichiers=url_serveur
+                                )
                                 if fp_maitrecles is not None:
                                     try:
                                         fp_maitrecles.close()
@@ -417,7 +428,10 @@ class HandlerBackupDomaine:
         return groupes_sousdomaine
 
     def uploader_fichiers_backup(
-            self, information_sousgroupe: InformationSousDomaineHoraire, fp_transactions, fp_catalogue, fp_maitrecles=None):
+            self, information_sousgroupe: InformationSousDomaineHoraire,
+            fp_transactions, fp_catalogue, fp_maitrecles=None,
+            url_consignationfichiers=None
+    ):
 
         # self.transmettre_evenement_backup(
         #     ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, information_sousgroupe.heure)
@@ -434,10 +448,11 @@ class HandlerBackupDomaine:
             pass  # Pas de grosfichiers
 
         # Preparer URL de connexion a consignationfichiers
-        url_consignationfichiers = 'https://%s:%s' % (
-            self._contexte.configuration.serveur_consignationfichiers_host,
-            self._contexte.configuration.serveur_consignationfichiers_port
-        )
+        if url_consignationfichiers is None:
+            url_consignationfichiers = 'https://%s:%s' % (
+                self._contexte.configuration.serveur_consignationfichiers_host,
+                self._contexte.configuration.serveur_consignationfichiers_port
+            )
 
         nom_fichier_catalogue = information_sousgroupe.nom_fichier_catalogue
         nom_fichier_transactions = information_sousgroupe.nom_fichier_backup
@@ -458,7 +473,8 @@ class HandlerBackupDomaine:
             files=files,
             verify=self._contexte.configuration.mq_cafile,
             cert=(certfile, keyfile),
-            test_params={'information_sousgroupe': information_sousgroupe} # Utilise pour UT
+            test_params={'information_sousgroupe': information_sousgroupe}, # Utilise pour UT
+            timeout=30
         )
 
         if r.status_code == 200:

@@ -117,12 +117,18 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         resultats = list()
-        for requete in message_dict['requetes']:
-            resultat = self.executer_requete(requete)
-            resultats.append(resultat)
+        try:
+            for requete in message_dict['requetes']:
+                resultat = self.executer_requete(requete)
+                resultats.append(resultat)
 
-        # Genere message reponse
-        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+            # Genere message reponse
+            self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+        except KeyError as ke:
+            reponse = {
+                'ok': False, 'err': str(ke)
+            }
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
     def executer_requete(self, requete):
         """
@@ -1543,6 +1549,10 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         # Verifier qu'on ne demande pas un backup de l'heure courante
         uuid_rapport = declencheur[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        url_serveur = declencheur.get('urlServeur')
+
+        if url_serveur == '':
+            url_serveur = None
 
         domaine = self.get_nom_domaine()
 
@@ -1554,6 +1564,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         parametres = {
             ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
+            'url_serveur': url_serveur,
         }
 
         self.demarrer_processus(processus, parametres)
@@ -2053,16 +2064,17 @@ class BackupSnapshot(MGProcessus):
 
     def executer_backup(self):
         uuid_rapport = self.parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        url_serveur = self.parametres['url_serveur']
         gestionnaire = self.controleur.gestionnaire
         info_cles = self.parametres['reponse'][0]
 
         date_courante = datetime.datetime.utcnow()
 
         # S'assurer que tous les backups cedules sont executes
-        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=False)
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=False, url_serveur=url_serveur)
 
         # Executer le backup snapshot (ne sera pas conserve de maniere permanente)
-        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True)
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True, url_serveur=url_serveur)
 
         self.set_etape_suivante()  # Termine
 
