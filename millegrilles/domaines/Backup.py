@@ -20,9 +20,12 @@ class TraitementRequetesBackupProtegees(TraitementRequetesProtegees):
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
         domaine_routing_key = method.routing_key.replace('requete.', '')
+        action = routing_key.split('.')[-1]
 
         if domaine_routing_key == ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE:
             reponse = self.gestionnaire.requete_backup_dernier_horaire(message_dict)
+        elif action == ConstantesBackup.REQUETE_BACKUP_DERNIERRAPPORT:
+            reponse = self.gestionnaire.get_plusrecent_rapport(message_dict)
         else:
             return super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -85,6 +88,7 @@ class TraitementEvenementsBackup(TraitementMessageDomaine):
             self.gestionnaire.maj_rapport_backup(message)
         else:
             self.__logger.error("Evenement de backup non supporte : %s\n%s" % (routing_key, str(message)))
+
 
 class GestionnaireBackup(GestionnaireDomaineStandard):
     """
@@ -248,6 +252,23 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             info_dernier_backup = dernier_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
 
         return {'dernier_backup': info_dernier_backup}
+
+    def get_plusrecent_rapport(self, params: dict):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_RAPPORT_BACKUP,
+            'termine': True,
+        }
+        sort = [
+            ('heure', -1),
+            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, -1)
+        ]
+        collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_RAPPORTS_NOM)
+        curseur = collection.find(filtre).sort(sort).limit(1)
+
+        for rapport in curseur:
+            return {'ok': True, 'rapport': rapport}
+
+        return {'ok': True, 'rapport': None}
 
     def reset_backup(self, message_dict):
         super().reset_backup(message_dict)

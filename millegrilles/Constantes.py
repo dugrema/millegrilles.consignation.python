@@ -1395,6 +1395,7 @@ class ConstantesBackup:
     COMMANDE_BACKUP_BACKUP_HORAIRE_TRANSACTIONS = 'declencherBackupHoraire'
 
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
+    REQUETE_BACKUP_DERNIERRAPPORT = 'dernierRapport'
 
     EVENEMENT_BACKUP = 'evenement.backup.backupTransaction'
     EVENEMENT_BACKUP_APPLICATION = 'evenement.backup.backupApplication'
