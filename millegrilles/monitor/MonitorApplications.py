@@ -10,7 +10,7 @@ from typing import Optional
 from threading import Event
 from typing import cast
 from base64 import b64encode, b64decode
-from os import path
+from os import path, makedirs
 from docker.errors import APIError
 from docker.types import SecretReference, RestartPolicy, ConfigReference
 
@@ -46,6 +46,8 @@ class GestionnaireApplications:
         self.__wait_event_die = Event()
 
         self.__handler_requetes: [TraitementMQRequetesBlocking] = None
+
+        self.__scripts_volume = '/var/opt/millegrilles/scripts'  # mg_scripts  # Scripts geres pas monitor
 
     def event(self, event):
         self.__logger.debug("Event docker APPS : %s", str(event))
@@ -302,12 +304,16 @@ class GestionnaireApplications:
             self.__gestionnaire_modules_docker.sauvegarder_config(config_name, configuration_docker)
 
         # Verifier si on a des scripts d'installation
-        if configuration_docker.get('scripts'):
-            self._executer_service(
-                nom_application,
-                configuration_docker,
-                'python3 -m millegrilles.util.EntretienApplication --debug'
-            )
+        try:
+            # Copier les scripts dans le sous-repertoire approprie
+            server_file_obj = io.BytesIO(b64decode(configuration_docker['scripts']))
+        except KeyError:
+            pass  # OK
+        else:
+            path_scripts_app = path.join(self.__scripts_volume, nom_application)
+            makedirs(path_scripts_app, mode=0o755, exist_ok=True)
+            tar_content = tarfile.open(fileobj=server_file_obj)
+            tar_content.extractall(path_scripts_app)
 
         # Installer toutes les dependances de l'application en ordre
         for config_image in configuration_docker['dependances']:
@@ -706,7 +712,7 @@ class GestionnaireApplications:
         # Ajouter les volumes implicites de scripts et backup
         mounts = [
             'backup_%s:/backup:rw' % nom_application,
-            'scripts_%s:/scripts:rw' % nom_application,
+            '%s/%s:/scripts:ro' % (self.__scripts_volume, nom_application),
         ]
         try:
             volumes = configuration_commande['data']['volumes']

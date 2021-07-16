@@ -59,7 +59,7 @@ class BackupApplication(ModeleConfiguration):
     def executer(self):
         self.__logger.info("Debut execution preparation")
         self.charger_environnement()
-        self.extraire_scripts_inclus()
+        # self.extraire_scripts_inclus()
 
         if self.args.backup_upload:
             self.__logger.info("Debut execution backup et upload application")
