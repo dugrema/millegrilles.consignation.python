@@ -53,7 +53,7 @@ class BackupApplication(ModeleConfiguration):
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser()
-        self.__handler_requetes = TraitementMQRequetesBlocking(self.contexte)
+        self.__handler_requetes = TraitementMQRequetesBlocking(self.contexte, self._fermeture_event)
         self.__backup_util = BackupUtil(self.contexte)
 
     def executer(self):

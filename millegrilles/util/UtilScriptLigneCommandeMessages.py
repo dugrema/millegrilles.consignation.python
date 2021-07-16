@@ -23,7 +23,7 @@ class ModeleConfiguration:
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
 
-        self.__fermeture_event = Event()
+        self._fermeture_event = Event()
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
         self.__channel = None
@@ -50,7 +50,7 @@ class ModeleConfiguration:
     def on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
         self._logger.warning("MQ Channel ferme")
-        if not self.__fermeture_event.is_set():
+        if not self._fermeture_event.is_set():
             self.contexte.message_dao.enter_error_state()
 
     def __on_return(self, channel, method, properties, body):
@@ -73,7 +73,7 @@ class ModeleConfiguration:
         self.parser.print_help()
 
     def exit_gracefully(self, signum=None, frame=None):
-        self.__fermeture_event.set()
+        self._fermeture_event.set()
         self.deconnecter()
 
     def parse(self):
@@ -122,7 +122,7 @@ class ModeleConfiguration:
 
             self._logger.info("Debut execution")
             self.executer()  # Executer le download et envoyer message
-            self.__fermeture_event.set()
+            self._fermeture_event.set()
             self._logger.info("Fin execution " + self.__class__.__name__)
 
         except Exception as e:
