@@ -1466,9 +1466,11 @@ class GestionnaireImagesDocker:
 
         image = None
         try:
-            self.__logger.info("Telechargement image %s" % image_name)
-            image = self._docker.images.pull(image_name, tag)
-            self.__logger.debug("Image telechargee : %s" % str(image))
+            image = self.get_image_locale(image_name, tag)
+            if image is None:
+                self.__logger.info("Telechargement image %s" % image_name)
+                image = self._docker.images.pull(image_name, tag)
+                self.__logger.debug("Image telechargee : %s" % str(image))
         except APIError as e:
             if e.status_code == 404:
                 self.__logger.debug("Image inconnue: %s" % e.explanation)
@@ -1532,8 +1534,9 @@ class GestionnaireImagesDocker:
         try:
             return self._docker.images.get(registry + ':' + tag)
         except APIError as apie:
-            if apie.status_code == 404:
-                return self._docker.images.pull(registry, tag)
+            # if apie.status_code == 404:
+            #     return self._docker.images.pull(registry, tag)
+            raise apie
 
 
 class GestionnaireImagesServices(GestionnaireImagesDocker):
