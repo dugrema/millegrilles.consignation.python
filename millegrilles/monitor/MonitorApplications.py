@@ -669,7 +669,9 @@ class GestionnaireApplications:
         domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP
         # generateur_transactions = self.__service_monitor.generateur_transactions
         # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
-        self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
+        reponse = self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
+        if reponse.get('ok') is not True:
+            raise Exception("Erreur upload fichier")
 
     def transmettre_commande_restaurer(self, nom_application, serveur_url: str = None):
         self.__logger.info("Transmettre commande pour downloader et dechiffrer les fichiers de %s sous /backup" % nom_application)

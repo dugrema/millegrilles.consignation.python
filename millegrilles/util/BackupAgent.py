@@ -145,14 +145,6 @@ class BackupAgent(ModeleConfiguration):
 
         return restaurateur.executer()
 
-    def download_fichier_app(self, nom_application: str):
-        """
-        Demander les cles de restauration d'un fichier chiffre.
-        :param catalogue:
-        :return:
-        """
-
-
     def upload(self, catalogue_backup: dict, transaction_maitredescles: dict, path_fichiers: str, url_serveur: str = None):
         self.__logger.info("Upload fichier backup application")
         handler_backup = HandlerBackupApplication(self.contexte, url_serveur=url_serveur)

@@ -1198,7 +1198,8 @@ class HandlerRestaurationDomaine:
                 '%s/backup/liste/backups_horaire' % url_consignationfichiers,
                 data=data,
                 verify=self._contexte.configuration.mq_cafile,
-                cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+                cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+                timeout=15
         ) as r:
 
             if r.status_code == 200:
@@ -1217,6 +1218,7 @@ class HandlerRestaurationDomaine:
                     '%s/backup/horaire/transactions/%s' % (url_consignationfichiers, path_fichier_transaction),
                     verify=self._contexte.configuration.mq_cafile,
                     cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+                    timeout=15
             ) as r:
 
                 r.raise_for_status()
@@ -1241,6 +1243,7 @@ class HandlerRestaurationDomaine:
                     '%s/backup/horaire/catalogues/%s' % (url_consignationfichiers, path_fichier_catalogue),
                     verify=self._contexte.configuration.mq_cafile,
                     cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+                    timeout=15
             ) as r:
 
                 r.raise_for_status()
@@ -1310,8 +1313,6 @@ class HandlerBackupApplication:
             fichiers = self._preparer_transactions_backup(catalogue_backup, transaction_maitredescles)
             fichiers_temporaire.extend(fichiers.values())
             self._put_backup(nom_application, fichiers, path_archive)
-        except requests.exceptions.RequestException:
-            self.__logger.exception("Erreur PUT backup application %s" % nom_application)
         finally:
             # Supprimer les archives
             for fichier in fichiers_temporaire:
@@ -1352,17 +1353,24 @@ class HandlerBackupApplication:
                         # data=data,
                         files=files,
                         verify=self.__configuration.mq_cafile,
-                        cert=(certfile, keyfile)
+                        cert=(certfile, keyfile),
+                        timeout=15
                     )
 
         if r.status_code == 200:
             self.transmettre_evenement_backup(
                 ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME, nom_application)
+            self.transmettre_evenement_backup(
+                ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE, nom_application)
         else:
             self.__logger.error("Error PUT backup application: %d" % r.status_code)
+            self.transmettre_evenement_backup(
+                ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_ERREUR,
+                nom_application,
+                info={'status': r.status_code, 'text': r.text}
+            )
 
-        self.transmettre_evenement_backup(
-            ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE, nom_application)
+        r.raise_for_status()
 
     def _preparer_transactions_backup(self, catalogue_backup: dict, transaction_maitredescles: dict):
         """
