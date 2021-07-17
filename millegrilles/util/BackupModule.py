@@ -1998,53 +1998,69 @@ class HandlerCertificatsCatalogue:
         :return:
         """
         # Preparer enveloppes intermediaires, millegrille
-        pem_par_skid = dict()
+        cert_par_skid = dict()
+        for fp, pem in self.certificats.items():
+            enveloppe = EnveloppeCertificat(certificat_pem=pem)
+            skid = enveloppe.subject_key_identifier
+            info = {'pem': pem, 'enveloppe': enveloppe, 'skid': skid}
+
+            akid = enveloppe.authority_key_identifier
+            if akid is not None:
+                info['akid'] = akid
+
+            cert_par_skid[skid] = info
+
+        # Batir chaines
+        for info_cert in cert_par_skid.values():
+            pems = [info_cert['pem']]
+            info_cert['chaine'] = pems
+            akid = info_cert.get('akid')
+            skid = info_cert['skid']
+            while akid is not None and akid != skid:
+                info_cert = cert_par_skid[akid]
+                pems.append(info_cert['pem'])
+                skid = akid
+                akid = info_cert.get('akid')
 
         # Preparer certificats millegrille
-        for fp in self.certificats_millegrille:
-            try:
-                pem_millegrille = self.certificats[fp]
-            except KeyError:
-                self.__logger.warning("Certificat de millegrille manquant du catalogue : %s" % fp)
+        # for fp in self.certificats_millegrille:
+        #     try:
+        #         pem_millegrille = self.certificats[fp]
+        #     except KeyError:
+        #         self.__logger.warning("Certificat de millegrille manquant du catalogue : %s" % fp)
+        #         continue
+        #     enveloppe_millegrille = EnveloppeCertificat(certificat_pem=pem_millegrille)
+        #     pem_par_skid[enveloppe_millegrille.subject_key_identifier] = [pem_millegrille]
+        #
+        # # Preparer certificats intermediaires
+        # for fp in self.certificats_intermediaires:
+        #     try:
+        #         pem_intermediaire = self.certificats[fp]
+        #     except KeyError:
+        #         self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+        #         continue
+        #     enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=pem_intermediaire)
+        #
+        #     # Completer la chaine
+        #     akid = enveloppe_intermediaire.authority_key_identifier
+        #     pem_millegrille = pem_par_skid[akid][0]
+        #     pem_par_skid[enveloppe_intermediaire.subject_key_identifier] = [pem_intermediaire, pem_millegrille]
+
+        for info in cert_par_skid.values():
+            enveloppe = info['enveloppe']
+            chaine = info['chaine']
+
+            if len(chaine) == 1:
+                # On ne valide pas le certificat de millegrille
                 continue
-            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=pem_millegrille)
-            pem_par_skid[enveloppe_millegrille.subject_key_identifier] = [pem_millegrille]
-
-        # Preparer certificats intermediaires
-        for fp in self.certificats_intermediaires:
-            try:
-                pem_intermediaire = self.certificats[fp]
-            except KeyError:
-                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
-                continue
-            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=pem_intermediaire)
-
-            # Completer la chaine
-            akid = enveloppe_intermediaire.authority_key_identifier
-            pem_millegrille = pem_par_skid[akid][0]
-            pem_par_skid[enveloppe_intermediaire.subject_key_identifier] = [pem_intermediaire, pem_millegrille]
-
-        for fp, pem in self.certificats.items():
-            try:
-                pem = self.certificats[fp]
-            except KeyError:
-                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
-                continue
-            enveloppe = EnveloppeCertificat(certificat_pem=pem)
-
-            # Completer la chaine
-            akid = enveloppe.authority_key_identifier
-            pems_inter = pem_par_skid[akid]
-            pems = [pem]
-            pems.extend(pems_inter)
 
             # Valider le certificat
             try:
                 date_reference = enveloppe.not_valid_after
                 idmg = enveloppe.subject_organization_name
-                validateur_pki.valider(pems, date_reference=date_reference, idmg=idmg)
+                validateur_pki.valider(chaine, date_reference=date_reference, idmg=idmg)
             except certvalidator.errors.InvalidCertificateError:
-                if len(pems) >= 3:
+                if len(chaine) >= 3:
                     self.__logger.warning("Certificat non valide provient de backup : %s" % enveloppe.fingerprint)
                 else:
                     self.__logger.debug("Ignorer certificat millegrille/intermediaire pour restauration : %s" % enveloppe.fingerprint)
@@ -2054,7 +2070,7 @@ class HandlerCertificatsCatalogue:
                 continue
 
             # Ajouter la chaine complete a la liste
-            self.chaine_pems[enveloppe.fingerprint] = pems
+            self.chaine_pems[enveloppe.fingerprint] = chaine
 
     def emettre_certificats(self, generateur_transactions):
         for fp, pems in self.chaine_pems.items():

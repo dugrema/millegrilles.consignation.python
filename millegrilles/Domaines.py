@@ -2093,15 +2093,15 @@ class RestaurationTransactions(MGProcessus):
         nom_domaine = gestionnaire.get_nom_domaine()
         configuration = self.controleur.configuration
 
-        hostname_fichiers = self.parametres.get('hostname_fichiers')
+        hostname_fichiers = self.parametres.get('url_serveur')
         if hostname_fichiers is None or hostname_fichiers == '':
             host = self.controleur.configuration.serveur_consignationfichiers_host
             port = self.controleur.configuration.serveur_consignationfichiers_port
-            hostname_fichiers = host + ':' + str(port)
+            hostname_fichiers = 'https://' + host + ':' + str(port)
 
         resultat_execution = False
         try:
-            url = 'https://%s/backup/restaurerDomaine/%s' % (hostname_fichiers, nom_domaine)
+            url = '%s/backup/restaurerDomaine/%s' % (hostname_fichiers, nom_domaine)
             cacert = configuration.mq_cafile
             certkey = (configuration.mq_certfile, configuration.mq_keyfile)
             resultat = requests.get(url, verify=cacert, cert=certkey, stream=True, timeout=30)
