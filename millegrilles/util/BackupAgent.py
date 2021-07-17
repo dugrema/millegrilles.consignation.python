@@ -6,16 +6,19 @@ import lzma
 import datetime
 import multibase
 import glob
+import requests
+import shutil
 
 from typing import Optional
 from os import listdir, path, makedirs, remove
 from threading import Event
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
-from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication, WrapperDownload
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking, BaseCallback
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesBackupApplications
+from millegrilles.Constantes import ConstantesBackup, ConstantesBackupApplications, ConstantesMaitreDesCles
+from millegrilles.util.Chiffrage import CipherMsg2Dechiffrer, DecipherStream
 
 
 class BackupAgent(ModeleConfiguration):
@@ -129,7 +132,26 @@ class BackupAgent(ModeleConfiguration):
             return {'ok': True}
 
     def executer_restaurer(self, params: dict):
-        pass
+        nom_application = params['nom_application']
+        url_serveur = params.get('url_serveur')
+
+        restaurateur = RestaurerApplication(
+            self.contexte,
+            self.__handler_requetes,
+            self.__backup_util,
+            nom_application,
+            self.__path_backup,
+            url_serveur)
+
+        return restaurateur.executer()
+
+    def download_fichier_app(self, nom_application: str):
+        """
+        Demander les cles de restauration d'un fichier chiffre.
+        :param catalogue:
+        :return:
+        """
+
 
     def upload(self, catalogue_backup: dict, transaction_maitredescles: dict, path_fichiers: str, url_serveur: str = None):
         self.__logger.info("Upload fichier backup application")
@@ -248,7 +270,7 @@ class TraiterMessage(BaseCallback):
         self.__logger.debug("Message recu : %s" % message_dict)
         if action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP:
             reponse = self.__agent.executer_backup(message_dict)
-        elif action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP:
+        elif action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER:
             reponse = self.__agent.executer_restaurer(message_dict)
         else:
             self.__logger.error("Type de message inconnu : %s" % action)
@@ -265,6 +287,126 @@ class TraiterMessage(BaseCallback):
 
         self.contexte.generateur_transactions.transmettre_reponse(
             resultats, replying_to, correlation_id, ajouter_certificats=ajouter_certificats)
+
+
+class RestaurerApplication:
+    """
+    Classe utilitaire de restauration d'une application
+    """
+
+    def __init__(
+            self, contexte,
+            handler_requetes: TraitementMQRequetesBlocking,
+            backup_util: BackupUtil,
+            nom_application: str,
+            path_output: str,
+            url_serveur: str = None
+    ):
+        self.__contexte = contexte
+        self.__handler_requetes: Optional[TraitementMQRequetesBlocking] = None
+        self.__backup_util: Optional[BackupUtil] = None
+        self.__nom_application = nom_application
+        self.__path_output = path_output
+        self.__url_serveur = url_serveur
+
+        self.__logger = logging.getLogger('millegrilles.util.' + self.__class__.__name__)
+        self.__configuration_application: Optional[dict] = None
+
+        self.__catalogue_backup = dict()
+        self.__transaction_maitredescles: Optional[dict] = None
+
+        # Pipe d'output
+        self.__output_stream = None
+        self.__cipher = None
+        self.__lzma_compressor = None
+        self.__tar_output = None
+
+        self.__handler_requetes = handler_requetes
+        self.__backup_util = backup_util
+
+    def executer(self):
+        try:
+            self.__logger.info("Debut execution restauration application")
+            decipher_stream = self.preparer_decipher()
+            self.extraire_archive(decipher_stream)
+            return {'ok': True}
+        except Exception as e:
+            self.__logger.exception("Erreur traitement restauration")
+            return {'ok': False, 'err': str(e)}
+
+    def preparer_decipher(self):
+        # Preparer URL de connexion a consignationfichiers
+        contexte = self.__handler_requetes.contexte
+        configuration = contexte.configuration
+
+        url_consignationfichiers = self.__url_serveur
+        if url_consignationfichiers is None:
+            url_consignationfichiers = 'https://%s:%s' % (
+                configuration.serveur_consignationfichiers_host,
+                configuration.serveur_consignationfichiers_port
+            )
+
+        # Telecharger l'archive de backup la plus recente pour cette application
+        certfile = configuration.mq_certfile
+        keyfile = configuration.mq_keyfile
+
+        r = requests.get(
+            '%s/backup/application/%s' % (url_consignationfichiers, self.__nom_application),
+            verify=configuration.mq_cafile,
+            cert=(certfile, keyfile),
+            timeout=5.0
+        )
+
+        headers = r.headers
+        self.__logger.debug("Headers recus : %s" % str(headers))
+        archive_hachage = r.headers.get('archive_hachage')
+        cle_header = r.headers.get('cle')
+        iv_header = r.headers.get('iv')
+        tag_header = r.headers.get('tag')
+        format_header = r.headers.get('format_chiffrage')
+
+        # Demander la cle pour dechiffrer l'archive
+        chaine_certs = contexte.signateur_transactions.chaine_certs
+        requete = {
+            'certificat': chaine_certs,
+
+            # Ajouter params pour recuperation de la cle
+            ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLE: cle_header,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv_header,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: tag_header,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: format_header,
+
+            # Info pour trouver la cle
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesBackup.DOMAINE_NOM,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [archive_hachage],
+        }
+        resultat_cle = self.__handler_requetes.requete(
+            'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE, requete)
+        if resultat_cle['acces'] != '1.permis':
+            raise Exception("Acces refuse a la cle pour le backup d'application %s: %s" % (self.__nom_application, resultat_cle))
+        cle = resultat_cle['cles'][archive_hachage]
+        cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(cle['cle'])
+        decipher = CipherMsg2Dechiffrer(cle['iv'], cle_dechiffree, compute_tag=cle['tag'])
+
+        wrapper = WrapperDownload(r.iter_content(chunk_size=10 * 1024))
+        decipher_stream = DecipherStream(decipher, wrapper)
+
+        return decipher_stream
+
+    def extraire_archive(self, decipher_stream):
+        path_output_app = path.join(self.__path_output, self.__nom_application)
+
+        rm_files = glob.glob(path.join(path_output_app, '*'))
+        for rm_f in rm_files:
+            if path.isdir(rm_f):
+                shutil.rmtree(rm_f)
+            else:
+                remove(rm_f)
+
+        self.__logger.debug("Extraction de l'archive vers %s" % path_output_app)
+        with lzma.open(decipher_stream, 'r') as xz:
+            with tarfile.open(fileobj=xz, mode='r|') as tar:
+                tar.extractall(path_output_app)
 
 
 if __name__ == '__main__':

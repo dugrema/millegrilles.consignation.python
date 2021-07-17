@@ -112,8 +112,22 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup'
         )
 
+    def trigger_restaurer_redmine(self):
+        commande_backup = {
+            'nom_application': 'redmine_mariadb',
+            'url_serveur': 'https://mg-dev4:3021',
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup,
+            'commande.backupApplication.' + ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER,
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_restaurer'
+        )
+
     def executer(self):
-        sample.trigger_backup_redmine()
+        # sample.trigger_backup_redmine()
+        sample.trigger_restaurer_redmine()
 
 
 # --- MAIN ---
