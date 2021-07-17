@@ -1422,6 +1422,7 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_APPLICATIONS_TERMINE = 'backupApplicationsTermine'
 
     EVENEMENT_RESTAURATION_TERMINEE = 'restaurationTerminee'
+    EVENEMENT_RESTAURATION_ERREUR = 'restaurationErreur'
 
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'

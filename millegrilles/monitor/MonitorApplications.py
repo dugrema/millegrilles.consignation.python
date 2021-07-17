@@ -237,24 +237,32 @@ class GestionnaireApplications:
                 info=reponse_info)
 
     def copier_volume_vers_backup(self, nom_application, volumes: list, path_backup='/var/opt/millegrilles/consignation/backup_app_work'):
-        # nom_application = 'redmine_mariadb'
-
-        # volumes = ['redmine_files']
-        mounts = list()
-
-        # Mount /bakcup,
-        mounts.append(Mount(type='bind', source=path.join(path_backup, nom_application), target='/backup'))
-        cmd = ''
+        mount_backup = Mount(type='bind', source=path.join(path_backup, nom_application), target='/backup')
+        docker_client = self.__gestionnaire_modules_docker.docker_client
         for v in volumes:
             path_target = path.join('/', v)
             m = Mount(type='volume', target=path_target, source=v, read_only=True)
-            mounts.append(m)
+
+            mounts = [mount_backup, m]
 
             # Creer liste de commandes de copie des fichiers de volumes vers /backup
-            cmd = cmd + 'cp -ru %s /backup; ' % path_target
+            cmd = 'cp -ru %s /backup' % path_target
+            docker_client.containers.run('alpine', cmd, auto_remove=True, mounts=mounts, name='docker_volume_copy')
 
+    def copier_backup_vers_volume(self, nom_application, volumes: list, path_backup='/var/opt/millegrilles/consignation/backup_app_work'):
+        backup_src = path.join(path_backup, nom_application)
+        mount_backup = Mount(type='bind', source=backup_src, target='/backup')
         docker_client = self.__gestionnaire_modules_docker.docker_client
-        docker_client.containers.run('alpine', cmd, auto_remove=True, mounts=mounts, name='docker_volume_copy')
+        for v in volumes:
+            path_target = path.join('/', v)
+            m = Mount(type='volume', target=path_target, source=v)
+
+            mounts = [mount_backup, m]
+
+            # Creer liste de commandes de copie des fichiers de volumes vers /backup
+            docker_client.containers.run('alpine', 'find /backup', auto_remove=True, mounts=mounts, name='docker_volume_copy')
+            cmd = 'cp -r /backup%s /' % path_target
+            docker_client.containers.run('alpine', cmd, auto_remove=True, mounts=mounts, name='docker_volume_copy')
 
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
@@ -639,9 +647,21 @@ class GestionnaireApplications:
             'url_serveur': 'https://mg-dev4:3021',
             'nom_application': nom_application,
         }
-        domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER
+        domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP
         generateur_transactions = self.__service_monitor.generateur_transactions
         generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
+
+    def transmettre_commande_restaurer(self, nom_application):
+        self.__logger.info("Transmettre commande pour downloader et dechiffrer les fichiers de %s sous /backup" % nom_application)
+
+        commande_backup_agent = {
+            'url_serveur': 'https://mg-dev4:3021',
+            'nom_application': nom_application,
+        }
+        domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER
+        # generateur_transactions = self.__service_monitor.generateur_transactions
+        # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
+        self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
 
     def effectuer_restauration(self, nom_application: str, configuration_docker):
         try:
@@ -651,8 +671,16 @@ class GestionnaireApplications:
             configuration_backup = configuration_docker['backup']
 
             # Restaurer les fichiers
-            commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
-            self._executer_service(nom_application, configuration_backup, commande)
+            self.transmettre_commande_restaurer(nom_application)
+
+            try:
+                volumes = configuration_backup['data']['volumes']
+                self.copier_backup_vers_volume(nom_application, volumes)
+            except KeyError:
+                pass  # OK
+
+            # commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
+            # self._executer_service(nom_application, configuration_backup, commande)
 
             # Verifier si on a des dependances (scripts) de backup
             try:
@@ -673,9 +701,16 @@ class GestionnaireApplications:
                     self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
                     self._executer_service(nom_application, dep, commande_backup, image_info)
 
+            self.transmettre_evenement_backup(nom_application, Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_TERMINEE)
             return {'ok': True}
+
         except Exception as e:
             self.__logger.exception("Erreur traitement backup")
+            self.transmettre_evenement_backup(
+                nom_application,
+                Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_ERREUR,
+                info={'err': str(e)}
+            )
             return {'ok': False, 'err': str(e)}
 
     def executer_commande(self, nom_application: str, commande: str):
@@ -868,7 +903,9 @@ class GestionnaireApplications:
         :param contexte:
         :return:
         """
-        self.__handler_requetes = TraitementMQRequetesBlocking(contexte, self.__service_monitor.fermeture_event)
+        if self.__handler_requetes is None:
+            self.__handler_requetes = TraitementMQRequetesBlocking(contexte, self.__service_monitor.fermeture_event)
+            self.__wait_container_event.wait(3)
         return self.__handler_requetes
 
 

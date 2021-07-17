@@ -1685,10 +1685,12 @@ class TraitementMQRequetesBlocking(BaseCallback):
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+        self.preparer_connexion()
+
+    def preparer_connexion(self):
         lock_init = Barrier(2)
         self.__connexion.connecter(lock_init=lock_init)
         lock_init.wait(30)
-        # contexte.message_dao.register_channel_listener(self)
         self.__connexion.register_channel_listener(self)
 
     def traiter_message(self, ch, method, properties, body):
@@ -1706,6 +1708,12 @@ class TraitementMQRequetesBlocking(BaseCallback):
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
     def requete(self, domaine_action: str, params: dict = None):
+        return self.transmettre(domaine_action, params)
+
+    def commande(self, domaine_action: str, params: dict = None, timeout=30, ack_initial=None):
+        return self.transmettre(domaine_action, params, est_commande=True, timeout=timeout, ack_initial=ack_initial)
+
+    def transmettre(self, domaine_action: str, params: dict = None, est_commande=False, timeout=15, ack_initial=None):
         """
         Requete blocking - ne supporte pas plusieur requetes a la fois (lance exception)
         :param domaine_action:
@@ -1716,6 +1724,9 @@ class TraitementMQRequetesBlocking(BaseCallback):
             self.__event_q_ready.wait(10)
         if not self.__event_q_ready.is_set():
             raise Exception("Q n'est pas prete")
+
+        if self.queue_name is None:
+            raise ValueError("Q reception n'est pas configuree correctement")
 
         correlation_id = 'requete_commande'
         if self.__reponse_correlation_id is not None:
@@ -1728,12 +1739,29 @@ class TraitementMQRequetesBlocking(BaseCallback):
             self.__event_attente.clear()
             self.__reponse_correlation_id = correlation_id
 
-            self.contexte.generateur_transactions.transmettre_requete(
-                params, domaine_action, correlation_id='requete_commande', reply_to=self.queue_name,
-                ajouter_certificats=True
-            )
+            if est_commande:
+                self.contexte.generateur_transactions.transmettre_commande(
+                    params, domaine_action,
+                    correlation_id='requete_commande',
+                    reply_to=self.queue_name,
+                    ajouter_certificats=True
+                )
+            else:
+                self.contexte.generateur_transactions.transmettre_requete(
+                    params, domaine_action, correlation_id='requete_commande', reply_to=self.queue_name,
+                    ajouter_certificats=True
+                )
 
-            self.__event_attente.wait(15)
+            if ack_initial is not None:
+                self.__event_attente.wait(ack_initial)
+                if not self.__event_attente.is_set():
+                    raise ReponseTimeout(domaine_action)
+                self.__event_attente.clear()
+
+                if self.__reponse.get('ok') is not True or self.__reponse.get('event') != 'debut':
+                    raise Exception('Erreur ack initial sur commande')
+
+            self.__event_attente.wait(timeout)
 
             if self.__event_attente.is_set():
                 # On a recu une reponse

@@ -271,6 +271,8 @@ class TraiterMessage(BaseCallback):
         if action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP:
             reponse = self.__agent.executer_backup(message_dict)
         elif action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER:
+            ack_init = {'ok': True, 'event': 'debut'}
+            self.transmettre_reponse(message_dict, ack_init, properties.reply_to, properties.correlation_id)
             reponse = self.__agent.executer_restaurer(message_dict)
         else:
             self.__logger.error("Type de message inconnu : %s" % action)
