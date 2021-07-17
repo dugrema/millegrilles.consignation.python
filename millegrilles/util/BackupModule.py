@@ -1307,12 +1307,6 @@ class HandlerBackupApplication:
 
         fichiers_temporaire = [path_archive]
         try:
-            # nom_fichier_backup, digest_archive, transaction_maitredescles = self._chiffrer_archive(
-            #     nom_application, path_archive, catalogue_backup)
-            # fichiers_temporaire.append(nom_fichier_backup)  # Permet de supprimer le fichier a la fin
-            # self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (nom_fichier_backup, digest_archive))
-            # catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
-
             fichiers = self._preparer_transactions_backup(catalogue_backup, transaction_maitredescles)
             fichiers_temporaire.extend(fichiers.values())
             self._put_backup(nom_application, fichiers, path_archive)

@@ -5,9 +5,10 @@ import tarfile
 import lzma
 import datetime
 import multibase
+import glob
 
 from typing import Optional
-from os import listdir, path, makedirs
+from os import listdir, path, makedirs, remove
 from threading import Event
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
@@ -79,40 +80,53 @@ class BackupAgent(ModeleConfiguration):
         url_serveur = params.get('url_serveur')
         rep_src = path.join(self.__path_backup, nom_application)
 
-        catalogue_backup = self.preparer_catalogue(nom_application)
+        try:
+            catalogue_backup = self.preparer_catalogue(nom_application)
 
-        path_output = path.join(
-            '/tmp/mg_backup_app',
-            catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
-        )
+            path_output = path.join(
+                '/tmp/mg_backup_app',
+                catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
+            )
 
-        makedirs('/tmp/mg_backup_app', mode=0o700, exist_ok=True)
+            makedirs('/tmp/mg_backup_app', mode=0o700, exist_ok=True)
 
-        streams = self.preparer_cipher(nom_application, catalogue_backup, path_output)
-        cipher = streams['cipher']
-        transaction_maitredescles = streams['maitredescles']
-        lzma_compressor = streams['lzma']
-        tar_output = streams['tar']
+            streams = self.preparer_cipher(nom_application, catalogue_backup, path_output)
+            cipher = streams['cipher']
+            transaction_maitredescles = streams['maitredescles']
+            lzma_compressor = streams['lzma']
+            tar_output = streams['tar']
 
-        # self.executer_script_inclus()  # Le script est maintenant execute separement
-        self.archiver_volumes(rep_src, tar_output)
+            # self.executer_script_inclus()  # Le script est maintenant execute separement
+            self.archiver_volumes(rep_src, tar_output)
 
-        tar_output.close()
-        lzma_compressor.close()
-        cipher.close()
+            tar_output.close()
+            lzma_compressor.close()
+            cipher.close()
 
-        digest_archive = cipher.digest
-        tag = multibase.encode('base64', cipher.tag).decode('utf-8')
+            digest_archive = cipher.digest
+            tag = multibase.encode('base64', cipher.tag).decode('utf-8')
 
-        # Mettre digest et tag dans catalogue
-        catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
-        catalogue_backup[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = tag
+            # Mettre digest et tag dans catalogue
+            catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
+            catalogue_backup[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = tag
 
-        # Mettre digest et tag dans transaction de maitre des cles
-        transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = digest_archive
-        transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = tag
+            # Mettre digest et tag dans transaction de maitre des cles
+            transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = digest_archive
+            transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = tag
 
-        self.upload(catalogue_backup, transaction_maitredescles, path_output, url_serveur=url_serveur)
+            self.upload(catalogue_backup, transaction_maitredescles, path_output, url_serveur=url_serveur)
+
+            # Cleanup tmp
+            rm_files = glob.glob('/tmp/mg_backup_app/*')
+            for rm_f in rm_files:
+                try:
+                    remove(rm_f)
+                except IOError:
+                    pass  # ok
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
+        else:
+            return {'ok': True}
 
     def executer_restaurer(self, params: dict):
         pass
@@ -230,15 +244,28 @@ class TraiterMessage(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         action = routing_key.split('.').pop()
-        correlation_id = properties.correlation_id
 
         self.__logger.debug("Message recu : %s" % message_dict)
         if action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP:
-            self.__agent.executer_backup(message_dict)
+            reponse = self.__agent.executer_backup(message_dict)
         elif action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP:
-            self.__agent.executer_restaurer(message_dict)
+            reponse = self.__agent.executer_restaurer(message_dict)
         else:
             self.__logger.error("Type de message inconnu : %s" % action)
+            return
+
+        if reponse:
+            if not isinstance(reponse, dict):
+                reponse = {'resultat': reponse}
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None, ajouter_certificats=False):
+        if correlation_id is None:
+            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        self.contexte.generateur_transactions.transmettre_reponse(
+            resultats, replying_to, correlation_id, ajouter_certificats=ajouter_certificats)
+
 
 if __name__ == '__main__':
     runner = BackupAgent()
