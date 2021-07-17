@@ -12,7 +12,7 @@ from typing import cast
 from base64 import b64encode, b64decode
 from os import path, makedirs
 from docker.errors import APIError
-from docker.types import SecretReference, RestartPolicy, ConfigReference
+from docker.types import SecretReference, RestartPolicy, ConfigReference, Mount
 
 from millegrilles import Constantes
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, \
@@ -235,6 +235,26 @@ class GestionnaireApplications:
                 Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_TERMINE,
                 type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
                 info=reponse_info)
+
+    def copier_volume_vers_backup(self, nom_application, volumes: list, path_backup='/var/opt/millegrilles/consignation/backup_app_work'):
+        # nom_application = 'redmine_mariadb'
+
+        # volumes = ['redmine_files']
+        mounts = list()
+
+        # Mount /bakcup,
+        mounts.append(Mount(type='bind', source=path.join(path_backup, nom_application), target='/backup'))
+        cmd = ''
+        for v in volumes:
+            path_target = path.join('/', v)
+            m = Mount(type='volume', target=path_target, source=v, read_only=True)
+            mounts.append(m)
+
+            # Creer liste de commandes de copie des fichiers de volumes vers /backup
+            cmd = cmd + 'cp -ru %s /backup; ' % path_target
+
+        docker_client = self.__gestionnaire_modules_docker.docker_client
+        docker_client.containers.run('alpine', cmd, auto_remove=True, mounts=mounts, name='docker_volume_copy')
 
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
@@ -582,14 +602,10 @@ class GestionnaireApplications:
             try:
                 dependances = configuration_backup['dependances']
             except KeyError:
-                # Aucunes dependances - on lance le backup avec volumes dans la liste
-                commande = "python3 -m millegrilles.util.EntretienApplication --debug --backup"
-                self._executer_service(nom_application, configuration_backup, commande)
+                pass  # Aucunes dependances, OK
             else:
                 # On a des dependances, preparer les scripts
                 self.__logger.info("Preparer scripts de backup")
-                commande = "python3 -m millegrilles.util.EntretienApplication --debug"
-                self._executer_service(nom_application, configuration_backup, commande)
 
                 for dep in dependances:
                     commande_backup = dep['commande_backup']
@@ -601,14 +617,31 @@ class GestionnaireApplications:
                     self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
                     self._executer_service(nom_application, dep, commande_backup, image_info)
 
-                self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
-                commande = "python3 -m millegrilles.util.EntretienApplication --debug --backup"
-                self._executer_service(nom_application, configuration_backup, commande)
+            try:
+                # Lancer un container pour copier les volumes vers le repertoire de backup
+                volumes = configuration_backup['data']['volumes']
+                self.copier_volume_vers_backup(nom_application, volumes)
+            except KeyError:
+                pass  # OK
+
+            # Emettre commande pour l'agent de backup d'applications, indique que tous les fichiers sont prets
+            self.transmettre_commande_upload(nom_application)
 
             return {'ok': True}
         except Exception as e:
             self.__logger.exception("Erreur traitement backup")
             return {'ok': False, 'err': str(e)}
+
+    def transmettre_commande_upload(self, nom_application):
+        self.__logger.info("Transmettre commande pour chiffrer et uploader les s fichiers sous /backup")
+
+        commande_backup_agent = {
+            'url_serveur': 'https://mg-dev4:3021',
+            'nom_application': nom_application,
+        }
+        domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER
+        generateur_transactions = self.__service_monitor.generateur_transactions
+        generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
 
     def effectuer_restauration(self, nom_application: str, configuration_docker):
         try:

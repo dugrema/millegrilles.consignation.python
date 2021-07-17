@@ -282,6 +282,9 @@ class TraiterMessage(BaseCallback):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
     def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None, ajouter_certificats=False):
+        if replying_to is None:
+            return  # Rien a faire
+
         if correlation_id is None:
             correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
