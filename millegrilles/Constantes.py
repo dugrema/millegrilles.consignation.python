@@ -1468,6 +1468,12 @@ class ConstantesBackup:
     CHAMP_UUID_RAPPORT = 'uuid_rapport'
 
 
+class ConstantesBackupApplications:
+
+    COMMANDE_BACKUP_DECLENCHER_BACKUP = 'backup'
+    COMMANDE_BACKUP_DECLENCHER_RESTAURER = 'restaurer'
+
+
 class ConstantesHebergement:
 
     DOMAINE_NOM = 'Hebergement'

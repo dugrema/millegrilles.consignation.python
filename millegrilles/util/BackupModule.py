@@ -1286,7 +1286,7 @@ class HandlerRestaurationDomaine:
 
 class HandlerBackupApplication:
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, url_serveur: str = None):
         # self.__handler_requetes = handler_requetes
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -1294,6 +1294,7 @@ class HandlerBackupApplication:
         self.__backup_util = BackupUtil(self.__contexte)
         self.__generateur_transactions = self.__contexte.generateur_transactions
         self.__configuration = self.__contexte.configuration
+        self.__url_serveur = url_serveur
 
     def upload_backup(self, catalogue_backup: dict, transaction_maitredescles: dict, path_archive: str):
         """
@@ -1330,10 +1331,12 @@ class HandlerBackupApplication:
             ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET, nom_application)
 
         # Preparer URL de connexion a consignationfichiers
-        url_consignationfichiers = 'https://%s:%s' % (
-            self.__configuration.serveur_consignationfichiers_host,
-            self.__configuration.serveur_consignationfichiers_port
-        )
+        url_consignationfichiers = self.__url_serveur
+        if url_consignationfichiers is None:
+            url_consignationfichiers = 'https://%s:%s' % (
+                self.__configuration.serveur_consignationfichiers_host,
+                self.__configuration.serveur_consignationfichiers_port
+            )
 
         nom_fichier_catalogue = fichiers['fichier_catalogue']
         nom_fichier_maitrecles = fichiers['fichier_maitredescles']

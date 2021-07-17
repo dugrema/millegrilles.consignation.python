@@ -48,6 +48,7 @@ class GestionnaireApplications:
         self.__handler_requetes: [TraitementMQRequetesBlocking] = None
 
         self.__scripts_volume = '/var/opt/millegrilles/scripts'  # mg_scripts  # Scripts geres pas monitor
+        self.__backup_volume = '/var/opt/millegrilles/consignation/backup_app_work'  # Rep backup app
 
     def event(self, event):
         self.__logger.debug("Event docker APPS : %s", str(event))
@@ -710,10 +711,19 @@ class GestionnaireApplications:
         ]
 
         # Ajouter les volumes implicites de scripts et backup
+        rep_scripts = path.join(self.__scripts_volume, nom_application)
+        rep_backup = path.join(self.__backup_volume, nom_application)
+
+        # S'assurer que les repertoires existent
+        makedirs(rep_scripts, mode=0o755, exist_ok=True)
+        makedirs(rep_backup, mode=0o755, exist_ok=True)
+
         mounts = [
-            'backup_%s:/backup:rw' % nom_application,
-            '%s/%s:/scripts:ro' % (self.__scripts_volume, nom_application),
+            # 'backup_%s:/backup:rw' % nom_application,
+            '%s:/scripts:ro' % rep_scripts,
+            '%s:/backup:rw' % rep_backup,
         ]
+
         try:
             volumes = configuration_commande['data']['volumes']
         except KeyError:
