@@ -282,10 +282,11 @@ class GestionnaireApplications:
 
             applications = self.trouver_applications_backup(commande.contenu)
             nom_application = commande.contenu['nom_application']
+            serveur_url = commande.contenu.get('serveur_url')
             nom_config_app = 'app.cfg.' + nom_application
             configuration_docker = [a for a in applications if a['name'] == nom_config_app][0]
 
-            self.effectuer_restauration(nom_application, configuration_docker)
+            self.effectuer_restauration(nom_application, configuration_docker, serveur_url=serveur_url)
             reponse_info['ok'] = True
 
             self.transmettre_evenement_backup(
@@ -670,11 +671,17 @@ class GestionnaireApplications:
         # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
         self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
 
-    def transmettre_commande_restaurer(self, nom_application):
+    def transmettre_commande_restaurer(self, nom_application, serveur_url: str = None):
         self.__logger.info("Transmettre commande pour downloader et dechiffrer les fichiers de %s sous /backup" % nom_application)
 
+        if serveur_url is None:
+            configuration = self.__service_monitor.connexion_middleware.configuration
+            host = configuration.serveur_consignationfichiers_host
+            port = configuration.serveur_consignationfichiers_port
+            serveur_url = 'https://%s:%s' % (host, port)
+
         commande_backup_agent = {
-            'url_serveur': 'https://mg-dev4:3021',
+            'url_serveur': serveur_url,
             'nom_application': nom_application,
         }
         domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER
@@ -682,14 +689,14 @@ class GestionnaireApplications:
         # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
         self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
 
-    def effectuer_restauration(self, nom_application: str, configuration_docker):
+    def effectuer_restauration(self, nom_application: str, configuration_docker, serveur_url: str = None):
         configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
             'app.cfg.' + nom_application)
         configuration_docker = json.loads(configuration_docker_bytes)
         configuration_backup = configuration_docker['backup']
 
         # Restaurer les fichiers
-        self.transmettre_commande_restaurer(nom_application)
+        self.transmettre_commande_restaurer(nom_application, serveur_url=serveur_url)
 
         try:
             volumes = configuration_backup['data']['volumes']
