@@ -208,7 +208,12 @@ class GestionnaireApplications:
             try:
                 nom_image_docker = commande.contenu['nom_application']
                 configuration_docker = commande.contenu.get('configuration')
-                applications.append({'nom_application': nom_image_docker, 'configuration': configuration_docker})
+                serveur_url = commande.contenu.get('serveur_url')
+                applications.append({
+                    'nom_application': nom_image_docker,
+                    'configuration': configuration_docker,
+                    'serveur_url': serveur_url
+                })
             except KeyError:
                 # On n'a pas d'application en particulier, lancer le backup de toutes les applications
                 applications = self.trouver_applications_backup(commande.contenu)
@@ -566,6 +571,7 @@ class GestionnaireApplications:
         for app in applications:
             configuration_docker = app.get('configuration')
             nom_application = app.get('nom_application')
+            serveur_url = app.get('serveur_url')
 
             self.transmettre_evenement_backup(
                 nom_application, Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_DEBUT)
@@ -587,9 +593,10 @@ class GestionnaireApplications:
 
             # tar_scripts = self.preparer_script_file(app)
             try:
-                self.effectuer_backup(nom_application)
+                self.effectuer_backup(nom_application, serveur_url)
                 self.transmettre_evenement_backup(nom_application, Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
             except Exception as e:
+                self.__logger.exception("Erreur backup application")
                 info = {'ok': False, 'err': str(e)}
                 self.transmettre_evenement_backup(
                     nom_application,
@@ -610,7 +617,7 @@ class GestionnaireApplications:
             exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
         )
 
-    def effectuer_backup(self, nom_application: str):
+    def effectuer_backup(self, nom_application: str, serveur_url: str):
         configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
             'app.cfg.' + nom_application)
         configuration_docker = json.loads(configuration_docker_bytes)
@@ -643,13 +650,19 @@ class GestionnaireApplications:
             pass  # OK
 
         # Emettre commande pour l'agent de backup d'applications, indique que tous les fichiers sont prets
-        self.transmettre_commande_upload(nom_application)
+        self.transmettre_commande_upload(nom_application, serveur_url=serveur_url)
 
-    def transmettre_commande_upload(self, nom_application):
+    def transmettre_commande_upload(self, nom_application, serveur_url: str = None):
         self.__logger.info("Transmettre commande pour chiffrer et uploader les s fichiers sous /backup")
 
+        if serveur_url is None:
+            configuration = self.__service_monitor.connexion_middleware.configuration
+            host = configuration.serveur_consignationfichiers_host
+            port = configuration.serveur_consignationfichiers_port
+            serveur_url = 'https://%s:%s' % (host, port)
+
         commande_backup_agent = {
-            'url_serveur': 'https://mg-dev4:3021',
+            'url_serveur': serveur_url,
             'nom_application': nom_application,
         }
         domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP
@@ -921,3 +934,4 @@ class GestionnaireImagesApplications(GestionnaireImagesDocker):
     @property
     def config(self):
         return self._versions_images
+
