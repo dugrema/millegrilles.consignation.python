@@ -1420,6 +1420,7 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME = 'backupApplicationUploadConfirme'
     EVENEMENT_BACKUP_APPLICATION_TERMINE = 'backupApplicationTermine'
     EVENEMENT_BACKUP_APPLICATIONS_TERMINE = 'backupApplicationsTermine'
+    EVENEMENT_BACKUP_APPLICATIONS_ERREUR = 'backupApplicationsErreur'
 
     EVENEMENT_RESTAURATION_TERMINEE = 'restaurationTerminee'
     EVENEMENT_RESTAURATION_ERREUR = 'restaurationErreur'

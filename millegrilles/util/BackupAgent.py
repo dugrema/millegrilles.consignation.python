@@ -269,10 +269,10 @@ class TraiterMessage(BaseCallback):
 
         self.__logger.debug("Message recu : %s" % message_dict)
         if action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP:
+            self.ack_init(message_dict, properties)
             reponse = self.__agent.executer_backup(message_dict)
         elif action == ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER:
-            ack_init = {'ok': True, 'event': 'debut'}
-            self.transmettre_reponse(message_dict, ack_init, properties.reply_to, properties.correlation_id)
+            self.ack_init(message_dict, properties)
             reponse = self.__agent.executer_restaurer(message_dict)
         else:
             self.__logger.error("Type de message inconnu : %s" % action)
@@ -282,6 +282,10 @@ class TraiterMessage(BaseCallback):
             if not isinstance(reponse, dict):
                 reponse = {'resultat': reponse}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+    def ack_init(self, message, properties):
+        ack_init = {'ok': True, 'event': 'debut'}
+        self.transmettre_reponse(message, ack_init, properties.reply_to, properties.correlation_id)
 
     def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None, ajouter_certificats=False):
         if replying_to is None:

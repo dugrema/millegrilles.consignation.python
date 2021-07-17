@@ -223,7 +223,6 @@ class GestionnaireApplications:
             self.transmettre_evenement_backup(
                 'global',
                 Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_TERMINE,
-                type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
                 info=reponse_info)
 
         except Exception as e:
@@ -232,8 +231,7 @@ class GestionnaireApplications:
 
             self.transmettre_evenement_backup(
                 'global',
-                Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_TERMINE,
-                type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
+                Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_ERREUR,
                 info=reponse_info)
 
     def copier_volume_vers_backup(self, nom_application, volumes: list, path_backup='/var/opt/millegrilles/consignation/backup_app_work'):
@@ -285,16 +283,23 @@ class GestionnaireApplications:
             self.effectuer_restauration(nom_application, configuration_docker)
             reponse_info['ok'] = True
 
+            self.transmettre_evenement_backup(
+                commande.contenu['nom_application'],
+                Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_TERMINEE,
+                type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
+                info=reponse_info
+            )
+
         except Exception as e:
-            self.__logger.exception("Erreur demarrage application")
+            self.__logger.exception("Erreur restauration application")
             reponse_info['err'] = str(e)
 
-        self.transmettre_evenement_backup(
-            commande.contenu['nom_application'],
-            Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_TERMINEE,
-            type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
-            info=reponse_info
-        )
+            self.transmettre_evenement_backup(
+                commande.contenu['nom_application'],
+                Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_ERREUR,
+                type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
+                info=reponse_info
+            )
 
     def charger_dependances_restauration(self, configuration_docker):
         """
@@ -581,10 +586,16 @@ class GestionnaireApplications:
             )
 
             # tar_scripts = self.preparer_script_file(app)
-            self.effectuer_backup(nom_application)
-
-            self.transmettre_evenement_backup(nom_application,
-                                              Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
+            try:
+                self.effectuer_backup(nom_application)
+                self.transmettre_evenement_backup(nom_application, Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
+            except Exception as e:
+                info = {'ok': False, 'err': str(e)}
+                self.transmettre_evenement_backup(
+                    nom_application,
+                    Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_ERREUR,
+                    info=info
+                )
 
     def transmettre_evenement_backup(self, nom_application: str, action: str, info: dict = None,
                                      type_event=Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION):
@@ -600,45 +611,39 @@ class GestionnaireApplications:
         )
 
     def effectuer_backup(self, nom_application: str):
+        configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
+            'app.cfg.' + nom_application)
+        configuration_docker = json.loads(configuration_docker_bytes)
+        configuration_backup = configuration_docker['backup']
+
+        # Verifier si on a des dependances de backup
         try:
-            configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
-                'app.cfg.' + nom_application)
-            configuration_docker = json.loads(configuration_docker_bytes)
-            configuration_backup = configuration_docker['backup']
+            dependances = configuration_backup['dependances']
+        except KeyError:
+            pass  # Aucunes dependances, OK
+        else:
+            # On a des dependances, preparer les scripts
+            self.__logger.info("Preparer scripts de backup")
 
-            # Verifier si on a des dependances de backup
-            try:
-                dependances = configuration_backup['dependances']
-            except KeyError:
-                pass  # Aucunes dependances, OK
-            else:
-                # On a des dependances, preparer les scripts
-                self.__logger.info("Preparer scripts de backup")
+            for dep in dependances:
+                commande_backup = dep['commande_backup']
+                try:
+                    image_info = configuration_docker['images'][dep['image']]
+                except KeyError:
+                    image_info = None
+                self.__logger.info("Executer script dependance " + commande_backup)
+                self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
+                self._executer_service(nom_application, dep, commande_backup, image_info)
 
-                for dep in dependances:
-                    commande_backup = dep['commande_backup']
-                    try:
-                        image_info = configuration_docker['images'][dep['image']]
-                    except KeyError:
-                        image_info = None
-                    self.__logger.info("Executer script dependance " + commande_backup)
-                    self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
-                    self._executer_service(nom_application, dep, commande_backup, image_info)
+        try:
+            # Lancer un container pour copier les volumes vers le repertoire de backup
+            volumes = configuration_backup['data']['volumes']
+            self.copier_volume_vers_backup(nom_application, volumes)
+        except KeyError:
+            pass  # OK
 
-            try:
-                # Lancer un container pour copier les volumes vers le repertoire de backup
-                volumes = configuration_backup['data']['volumes']
-                self.copier_volume_vers_backup(nom_application, volumes)
-            except KeyError:
-                pass  # OK
-
-            # Emettre commande pour l'agent de backup d'applications, indique que tous les fichiers sont prets
-            self.transmettre_commande_upload(nom_application)
-
-            return {'ok': True}
-        except Exception as e:
-            self.__logger.exception("Erreur traitement backup")
-            return {'ok': False, 'err': str(e)}
+        # Emettre commande pour l'agent de backup d'applications, indique que tous les fichiers sont prets
+        self.transmettre_commande_upload(nom_application)
 
     def transmettre_commande_upload(self, nom_application):
         self.__logger.info("Transmettre commande pour chiffrer et uploader les s fichiers sous /backup")
@@ -648,8 +653,9 @@ class GestionnaireApplications:
             'nom_application': nom_application,
         }
         domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_BACKUP
-        generateur_transactions = self.__service_monitor.generateur_transactions
-        generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
+        # generateur_transactions = self.__service_monitor.generateur_transactions
+        # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
+        self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
 
     def transmettre_commande_restaurer(self, nom_application):
         self.__logger.info("Transmettre commande pour downloader et dechiffrer les fichiers de %s sous /backup" % nom_application)
@@ -664,54 +670,43 @@ class GestionnaireApplications:
         self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
 
     def effectuer_restauration(self, nom_application: str, configuration_docker):
+        configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
+            'app.cfg.' + nom_application)
+        configuration_docker = json.loads(configuration_docker_bytes)
+        configuration_backup = configuration_docker['backup']
+
+        # Restaurer les fichiers
+        self.transmettre_commande_restaurer(nom_application)
+
         try:
-            configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
-                'app.cfg.' + nom_application)
-            configuration_docker = json.loads(configuration_docker_bytes)
-            configuration_backup = configuration_docker['backup']
+            volumes = configuration_backup['data']['volumes']
+            self.copier_backup_vers_volume(nom_application, volumes)
+        except KeyError:
+            pass  # OK
 
-            # Restaurer les fichiers
-            self.transmettre_commande_restaurer(nom_application)
+        # commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
+        # self._executer_service(nom_application, configuration_backup, commande)
 
-            try:
-                volumes = configuration_backup['data']['volumes']
-                self.copier_backup_vers_volume(nom_application, volumes)
-            except KeyError:
-                pass  # OK
+        # Verifier si on a des dependances (scripts) de backup
+        try:
+            dependances = configuration_backup['dependances']
+        except KeyError:
+            # Aucunes dependances - rien a faire
+            pass
+        else:
+            # On a des dependances, les scripts ont deja ete prepares par la restauration des fichiers
+            dependances.reverse()  # On va executer les dependances dans l'ordre inverse du backup
+            for dep in dependances:
+                commande_backup = dep['commande_restore']
+                try:
+                    image_info = configuration_docker['images'][dep['image']]
+                except KeyError:
+                    image_info = None
+                self.__logger.info("Executer script dependance " + commande_backup)
+                self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
+                self._executer_service(nom_application, dep, commande_backup, image_info)
 
-            # commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
-            # self._executer_service(nom_application, configuration_backup, commande)
-
-            # Verifier si on a des dependances (scripts) de backup
-            try:
-                dependances = configuration_backup['dependances']
-            except KeyError:
-                # Aucunes dependances - rien a faire
-                pass
-            else:
-                # On a des dependances, les scripts ont deja ete prepares par la restauration des fichiers
-                dependances.reverse()  # On va executer les dependances dans l'ordre inverse du backup
-                for dep in dependances:
-                    commande_backup = dep['commande_restore']
-                    try:
-                        image_info = configuration_docker['images'][dep['image']]
-                    except KeyError:
-                        image_info = None
-                    self.__logger.info("Executer script dependance " + commande_backup)
-                    self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
-                    self._executer_service(nom_application, dep, commande_backup, image_info)
-
-            self.transmettre_evenement_backup(nom_application, Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_TERMINEE)
-            return {'ok': True}
-
-        except Exception as e:
-            self.__logger.exception("Erreur traitement backup")
-            self.transmettre_evenement_backup(
-                nom_application,
-                Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_ERREUR,
-                info={'err': str(e)}
-            )
-            return {'ok': False, 'err': str(e)}
+        return {'ok': True}
 
     def executer_commande(self, nom_application: str, commande: str):
         configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config('app.cfg.' + nom_application)
