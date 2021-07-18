@@ -1747,6 +1747,28 @@ class GenerateurCertificatBackup(GenerateurCertificateParClePublique):
         return builder
 
 
+class GenererAgentBackup(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ('%s' % Constantes.SECURITE_SECURE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_BACKUP).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class RenouvelleurCertificat:
 
     def __init__(self, idmg, dict_ca: dict, clecert_intermediaire: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None, generer_password=False):
@@ -1769,6 +1791,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
             ConstantesGenerateurCertificat.ROLE_VITRINE: GenererVitrine,
+            ConstantesGenerateurCertificat.ROLE_BACKUP: GenererAgentBackup,
 
             # Monitors de service pour noeuds middleware
             ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,

@@ -357,8 +357,10 @@ class RestaurerApplication:
             timeout=5.0
         )
 
+        r.raise_for_status()
+
         headers = r.headers
-        self.__logger.debug("Headers recus : %s" % str(headers))
+        self.__logger.info("Headers recus : %s" % str(headers))
         archive_hachage = r.headers.get('archive_hachage')
         cle_header = r.headers.get('cle')
         iv_header = r.headers.get('iv')

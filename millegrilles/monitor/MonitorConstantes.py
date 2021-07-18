@@ -91,7 +91,7 @@ DICT_MODULES_PROTEGES = {
     ConstantesServiceMonitor.MODULE_AGENT_BACKUP: {
         'nom': ConstantesServiceMonitor.MODULE_AGENT_BACKUP,
         'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-        'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,  # ROLE_AGENT_BACKUP
+        'role': ConstantesGenerateurCertificat.ROLE_BACKUP,
     },
     # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
     #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
