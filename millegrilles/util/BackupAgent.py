@@ -11,7 +11,6 @@ import shutil
 
 from typing import Optional
 from os import listdir, path, makedirs, remove
-from threading import Event
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication, WrapperDownload
@@ -39,7 +38,7 @@ class BackupAgent(ModeleConfiguration):
 
         self.__path_backup = '/var/opt/millegrilles/consignation/backup_app_work'
 
-        self.__event_fermeture = Event()
+        # self.__event_fermeture = Event()
 
         self.queue_name = None
         self.__traitement_message = None
@@ -63,7 +62,7 @@ class BackupAgent(ModeleConfiguration):
         super().initialiser()
         self.__handler_requetes = TraitementMQRequetesBlocking(self.contexte, self._fermeture_event)
         self.__backup_util = BackupUtil(self.contexte)
-        self.__traitement_message = TraiterMessage(self.contexte, self.__event_fermeture, self)
+        self.__traitement_message = TraiterMessage(self.contexte, self._fermeture_event, self)
 
         self.contexte.message_dao.register_channel_listener(self.__traitement_message)
 
@@ -72,9 +71,9 @@ class BackupAgent(ModeleConfiguration):
         self.charger_environnement()
         # self.extraire_scripts_inclus()
 
-        while not self.__event_fermeture.is_set():
+        while not self._fermeture_event.is_set():
             # Entretien
-            self.__event_fermeture.wait(30)
+            self._fermeture_event.wait(30)
 
         self.__logger.info("Execution terminee")
 
