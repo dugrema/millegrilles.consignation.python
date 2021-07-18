@@ -2101,6 +2101,13 @@ class RestaurationTransactions(MGProcessus):
 
         resultat_execution = False
         try:
+            evenement_debut_restauration = {
+                'evenement': 'debut_restauration',
+                'url_serveur': hostname_fichiers,
+                'domaine': nom_domaine,
+            }
+            self.emettre_evenement_restauration(evenement_debut_restauration)
+
             url = '%s/backup/restaurerDomaine/%s' % (hostname_fichiers, nom_domaine)
             cacert = configuration.mq_cafile
             certkey = (configuration.mq_certfile, configuration.mq_keyfile)
@@ -2109,8 +2116,8 @@ class RestaurationTransactions(MGProcessus):
 
             if resultat.status_code == 200:
                 # Reponse "initiale" - permet d'executer le traitement de manier asynchrone cote client
-                self.transmettre_reponse({'action': 'restauration_demarree'})
-                self.emettre_evenement_restauration({'action': 'debut_restauration'})
+                self.transmettre_reponse({'evenement': 'restauration_demarree', 'domaine': nom_domaine})
+                self.emettre_evenement_restauration({'evenement': 'debut_restauration', 'domaine': nom_domaine})
 
                 parser = ArchivesBackupParser(
                     self.controleur.contexte
@@ -2123,11 +2130,16 @@ class RestaurationTransactions(MGProcessus):
                 resultat_execution = event_attente.is_set()
 
             evenement_fin_restauration = {
-                'action': 'fin_restauration',
+                'evenement': 'fin_restauration',
+                'domaine': nom_domaine,
                 'execution_complete': resultat_execution,
+                # 'ok': True,
             }
             if resultat_execution is False:
-                evenement_fin_restauration['err'] = {'code': 1, 'message': 'Echec de restauration'}
+                evenement_fin_restauration['ok'] = False
+                evenement_fin_restauration['evenement'] = 'restauration_annulee'
+                evenement_fin_restauration['code'] = resultat.status_code
+                evenement_fin_restauration['err'] = resultat.text
             self.emettre_evenement_restauration(evenement_fin_restauration)
             self.set_etape_suivante()  # Termine
         finally:
@@ -2140,12 +2152,14 @@ class RestaurationTransactions(MGProcessus):
                 # Regenerer les documents du domaine
                 if self.parametres['global'] is True and self.controleur.gestionnaire.supporte_regenerer_global is False:
                     self.__logger.info("Skip regeneration globale")
-                    reponse['action'] = 'restauration_terminee'
+                    reponse['evenement'] = 'restauration_terminee'
                     reponse['documents_regeneres'] = False
                     self.transmettre_reponse(reponse)
                     self.emettre_evenement_restauration({
-                        'action': 'fin_regeneration',
+                        'evenement': 'fin_regeneration',
+                        'domaine': nom_domaine,
                         'documents_regeneres': True,
+                        'ok': True,
                     })
 
                     self.set_etape_suivante()  # Termine
@@ -2154,15 +2168,16 @@ class RestaurationTransactions(MGProcessus):
                     reponse['regeneration'] = True
 
             else:
-                reponse['action'] = 'restauration_annulee'
+                reponse['evenement'] = 'restauration_annulee'
                 reponse['err'] = {'code': 1, 'message': 'Echec de restauration'}
+                reponse['ok'] = False
                 self.transmettre_reponse(reponse)
 
         return reponse
 
     def regenerer(self):
         self.emettre_evenement_restauration({
-            'action': 'debut_regeneration',
+            'evenement': 'debut_regeneration',
         })
 
         erreur = None
@@ -2170,19 +2185,19 @@ class RestaurationTransactions(MGProcessus):
             self.controleur.gestionnaire.regenerer_documents()
 
             self.emettre_evenement_restauration({
-                'action': 'fin_regeneration',
+                'evenement': 'fin_regeneration',
                 'documents_regeneres': True,
             })
         except Exception as e:
             erreur = {'code': 2, 'message': str(e)}
             self.emettre_evenement_restauration({
-                'action': 'fin_regeneration',
+                'evenement': 'fin_regeneration',
                 'documents_regeneres': True,
                 'err': erreur
             })
 
         reponse = {
-            'action': 'restauration_terminee',
+            'evenement': 'restauration_terminee',
             'transactions_restaurees': self.parametres['transactions_restaurees'],
             'documents_regeneres': True,
         }
@@ -2200,9 +2215,9 @@ class RestaurationTransactions(MGProcessus):
         :param event:
         :return:
         """
-        domaine_action = 'evenement.backup.restaurationTransactions'
+        domaine_action = 'evenement.Backup.' + ConstantesBackup.EVENEMENT_BACKUP_RESTAURATION_MAJ
         event['domaine'] = self.controleur.gestionnaire.get_nom_domaine()
-        self.controleur.generateur_transactions.emettre_message(event, domaine_action, [Constantes.SECURITE_PROTEGE])
+        self.controleur.generateur_transactions.emettre_message(event, domaine_action, exchanges=[Constantes.SECURITE_PROTEGE])
 
     def transmettre_reponse(self, reponse: dict):
         reply_q = self.parametres['reply_to']

@@ -27,7 +27,7 @@ from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback
-from millegrilles.util.Hachage import hacher, Hacheur, VerificateurHachage
+from millegrilles.util.Hachage import hacher, Hacheur, VerificateurHachage, ErreurHachage
 
 
 # class CipherIOWriter(RawIOBase):
@@ -1870,14 +1870,12 @@ class ArchivesBackupParser:
                 self.callback_transactions(domaine, catalogue, transaction)
 
             try:
-                digest_transactions = stream.digest()
                 digest_transactions_catalogue = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
-                if digest_transactions == digest_transactions_catalogue:
-                    self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
-                else:
-                    self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s",
-                                          digest_transactions)
-                    self.__rapport_restauration.incrementer_digest_invalide(domaine)
+                stream.verify(digest_transactions_catalogue)
+                self.__logger.debug("Digest calcule du fichier de transaction est OK")
+            except ErreurHachage:
+                self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions_catalogue)
+                self.__rapport_restauration.incrementer_digest_invalide(domaine)
             except AttributeError:
                 self.__logger.warning("Digest ne peut pas etre calcul pour transactions domaine %s" % domaine)
         except EOFError as e:

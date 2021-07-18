@@ -1402,6 +1402,7 @@ class ConstantesBackup:
     EVENEMENT_RESTAURATION_APPLICATION = 'evenement.backup.restaurationApplication'
 
     EVENEMENT_BACKUP_MAJ = 'backupMaj'
+    EVENEMENT_BACKUP_RESTAURATION_MAJ = 'restaurationMaj'
     EVENEMENT_BACKUP_HORAIRE_DEBUT = 'backupHoraireDebut'
     EVENEMENT_BACKUP_HORAIRE_TERMINE = 'backupHoraireTermine'
     EVENEMENT_BACKUP_QUOTIDIEN_DEBUT = 'backupQuotidienDebut'

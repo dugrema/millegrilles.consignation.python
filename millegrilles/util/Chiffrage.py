@@ -15,7 +15,7 @@ from base64 import b64decode
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.SecuritePKI import EnveloppeCertificat
-from millegrilles.util.Hachage import Hacheur
+from millegrilles.util.Hachage import Hacheur, VerificateurHachage
 
 
 class CipherMgs1(RawIOBase):
@@ -307,6 +307,11 @@ class DigestStream(RawIOBase):
     def digest(self):
         digest_result = self.__digest.finalize()
         return 'sha512_b64:' + b64encode(digest_result).decode('utf-8')
+
+    def verify(self, digest_other: str):
+        verif = VerificateurHachage(digest_other)
+        verif.update(self.__digest.finalize())
+        return verif.verify()
 
 
 class DecipherStream(DigestStream):
