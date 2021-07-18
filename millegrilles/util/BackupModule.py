@@ -89,6 +89,9 @@ class InformationSousDomaineHoraire:
         self.uuid_transactions = list()      # UUID des transactions inclues dans le backup
         self.liste_uuids_invalides = list()  # UUID des transactions qui ne peuvent etre traitees
 
+        # Certificats PEM utilises par les transactions indexes par fingerprint (sha256 en multibase/base58btc)
+        self.enveloppes_certificats = dict()
+
     @property
     def nom_fichier_backup(self) -> str:
         return path.basename(self.path_fichier_backup)
@@ -100,6 +103,12 @@ class InformationSousDomaineHoraire:
     @property
     def backup_workdir(self) -> str:
         return path.dirname(self.path_fichier_backup)
+
+    def merge_enveloppes(self, enveloppes: list):
+        for e in enveloppes:
+            fingerprint = e.fingerprint
+            if self.enveloppes_certificats.get(fingerprint) is None:
+                self.enveloppes_certificats[fingerprint] = e
 
     def cleanup(self):
         """
@@ -643,6 +652,7 @@ class HandlerBackupDomaine:
             try:
                 # Extraire metadonnees de la transaction
                 info_transaction = self._extraire_certificats(transaction, information_sousgroupe.heure)
+                information_sousgroupe.merge_enveloppes(info_transaction['liste_enveloppes'])
                 for cle in InformationSousDomaineHoraire.CLES_SET:
                     try:
                         groupe_cles_backup = information_sousgroupe.catalogue_backup[cle]
@@ -785,6 +795,15 @@ class HandlerBackupDomaine:
     def persister_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier_catalogue):
         catalogue_backup = information_sousgroupe.catalogue_backup
 
+        # Ajouter certificats PEMs manquants
+        certificats_pem = catalogue_backup['certificats_pem']
+        for fingerprint, e in information_sousgroupe.enveloppes_certificats.items():
+            try:
+                certificats_pem[fingerprint]
+            except KeyError:
+                # Le certificat n'est pas dans la liste, on l'ajoute
+                certificats_pem[fingerprint] = e.certificat_pem
+
         catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE] = information_sousgroupe.sha512_backup
         catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = information_sousgroupe.nom_fichier_backup
         # Changer les set() par des list() pour extraire en JSON
@@ -906,10 +925,14 @@ class HandlerBackupDomaine:
         # Extraire liste de fingerprints
         liste_cas = [enveloppe.fingerprint for enveloppe in liste_enveloppes_cas]
 
+        liste_enveloppes = liste_enveloppes_cas.copy()
+        liste_enveloppes.append(enveloppe)
+
         return {
             'certificats': [enveloppe.fingerprint],
             'certificats_intermediaires': liste_cas[1:-1],
             'certificats_millegrille': [liste_cas[-1]],
+            'liste_enveloppes': liste_enveloppes,
         }
 
     def marquer_transactions_backup_complete(self, nom_collection_mongo: str, uuid_transactions: list):
