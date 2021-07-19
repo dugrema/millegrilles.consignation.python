@@ -677,9 +677,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
             cle_secrete = self.decrypter_cle(document_cle['cles'])
             if cle_secrete is None:
-                self._logger.debug("Cle non dechiffrable : "
-                                   "%s" % str(evenement))
+                self._logger.debug("Cle non dechiffrable : %s" % str(evenement))
+                try:
+                    evenement['cle']
+                except KeyError:
+                    pass
+                else:
+                    if len(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]) == 1:
+                        self.sauvegarder_cle_fournie(evenement)
+
                 return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INDECHIFFRABLE}
+
             cle_secrete_reencryptee, fingerprint = self.crypter_cle(cle_secrete, enveloppe_rechiffrage.certificat)
 
             cles[hachage_bytes] = {
@@ -700,36 +708,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if len(cles) == 0:
             self._logger.debug("Le dechiffrage n'a pas trouve de cle correspondant a : "
                                "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES])
-            cle_fournie = evenement.get('cle')
             try:
-                if cle_fournie and len(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]) == 1:
-                    domaine = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-                    hachage_bytes = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES][0]
-                    iv = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV]
-                    tag = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG]
-                    format_chiffrage = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT]
-                    self._logger.info("On insere la cle dans le maitre des cles pour permettre un "
-                                      "rechiffrage subsequent de la cle %s, %s" % (domaine, hachage_bytes))
-
-                    fingerprint_millegrille = self.configuration.certificat_millegrille.fingerprint
-
-                    information_cle = {
-                        Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
-                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                            'adhoc': True,
-                        },
-                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
-                        "cles": {
-                            fingerprint_millegrille: cle_fournie,
-                        },
-                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv,
-                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: tag,
-                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: format_chiffrage,
-                    }
-
-                    self.sauvegarder_cle(information_cle)
-            except KeyError as ke:
-                self._logger.warning("Erreur sauvegarde cle fournie %s" % str(ke))
+                evenement['cle']
+            except KeyError:
+                pass
+            else:
+                if len(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]) == 1:
+                    self.sauvegarder_cle_fournie(evenement)
 
             return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
@@ -743,6 +728,45 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             'cles': cles,
             Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
         }
+
+    def sauvegarder_cle_fournie(self, evenement: dict):
+        """
+        Permet de sauvegarder une cle qui a ete fournie avec une requete. C'est toujours une cle dechiffrable
+        par la cle de millegrille.
+
+        :param cle:
+        :param evenement:
+        :return:
+        """
+        cle = evenement['cle']
+        try:
+            domaine = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            hachage_bytes = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES][0]
+            iv = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV]
+            tag = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG]
+            format_chiffrage = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT]
+            self._logger.info("On insere la cle dans le maitre des cles pour permettre un "
+                              "rechiffrage subsequent de la cle %s, %s" % (domaine, hachage_bytes))
+
+            fingerprint_millegrille = self.configuration.certificat_millegrille.fingerprint
+
+            information_cle = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    'adhoc': True,
+                },
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+                "cles": {
+                    fingerprint_millegrille: cle,
+                },
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: tag,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: format_chiffrage,
+            }
+
+            self.sauvegarder_cle(information_cle)
+        except KeyError as ke:
+            self._logger.warning("Erreur sauvegarde cle fournie %s" % str(ke))
 
     def extraire_certificat(self, evenement):
         # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
