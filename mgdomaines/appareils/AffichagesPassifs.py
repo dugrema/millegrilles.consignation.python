@@ -424,8 +424,8 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
                     ts_app = doc_appareil['timestamp']
                     date_courante = datetime.datetime.utcnow()
                     date_lecture = datetime.datetime.fromtimestamp(ts_app)
-                    exp_1 = datetime.timedelta(seconds=10)
-                    exp_2 = datetime.timedelta(seconds=30)
+                    exp_1 = datetime.timedelta(minutes=5)
+                    exp_2 = datetime.timedelta(minutes=30)
                     if date_lecture + exp_2 < date_courante:
                         flag = '!'
                     elif date_lecture + exp_1 < date_courante:
