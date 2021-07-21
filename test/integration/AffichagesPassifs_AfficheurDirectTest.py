@@ -9,6 +9,8 @@ from threading import Thread
 
 from millegrilles.Constantes import SenseursPassifsConstantes
 
+CONST_NOEUD_ID = '48c7c654-b896-4362-a5a1-9b2c7cfdf5c4'
+
 
 class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
 
@@ -21,8 +23,10 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
         self.thread_ioloop = Thread(name="MQ-ioloop", target=contexte.message_dao.run_ioloop)
         self.thread_ioloop.start()
 
+        self.noeud_id = CONST_NOEUD_ID
+
         print("super.init")
-        super().__init__(contexte, intervalle_secs=5)
+        super().__init__(contexte, noeud_id=self.noeud_id, intervalle_secs=5)
 
     def test(self):
         for document_id in self.get_documents():
@@ -55,7 +59,7 @@ class AffichageAvecConfigurationTest(AffichageAvecConfiguration):
         self.thread_ioloop.start()
 
         self.__logger.info("super.init")
-        super().__init__(contexte, intervalle_secs=5)
+        super().__init__(contexte, noeud_id=CONST_NOEUD_ID, intervalle_secs=5)
 
     def maj_affichage(self, lignes_affichage):
         super().maj_affichage(lignes_affichage)
@@ -75,16 +79,17 @@ class AffichageAvecConfigurationTest(AffichageAvecConfiguration):
 
 
 # Demarrer test
-logging.basicConfig(level=logging.WARNING)
-logging.getLogger('millegrilles').setLevel(logging.INFO)
-logging.getLogger('mgdomaines.appareils').setLevel(logging.DEBUG)
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.WARNING)
+    logging.getLogger('millegrilles').setLevel(logging.INFO)
+    logging.getLogger('mgdomaines.appareils').setLevel(logging.DEBUG)
 
-logger = logging.getLogger('__main__')
+    logger = logging.getLogger('__main__')
 
-# Test simple
-#test = AfficheurDocumentMAJDirecteTest()
-#test.test()
+    # Test simple
+    #test = AfficheurDocumentMAJDirecteTest()
+    #test.test()
 
-# Test avec affichage simule dans log, thread
-test = AffichageAvecConfigurationTest()
-test.test()
+    # Test avec affichage simule dans log, thread
+    test = AffichageAvecConfigurationTest()
+    test.test()

@@ -14,7 +14,7 @@ class AfficheurSenseurPassifTemperatureHumiditePressionTest(AfficheurSenseurPass
         contexte.initialiser()
 
         # self.document_ids = ['514951f2f43211e99259b827eb53ee51']
-        self.noeud_id = '909155d3-1dd2-4870-823c-83e9e25e8b11'
+        self.noeud_id = '48c7c654-b896-4362-a5a1-9b2c7cfdf5c4'
 
         super().__init__(contexte, noeud_id=self.noeud_id, timezone_horloge='America/Toronto', intervalle_secs=5)
 
@@ -36,20 +36,21 @@ class AfficheurSenseurPassifTemperatureHumiditePressionTest(AfficheurSenseurPass
 
 # Demarrer test
 
-logging.basicConfig()
-logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
+if __name__ == '__main__':
+    logging.basicConfig()
+    logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
 
-test = AfficheurSenseurPassifTemperatureHumiditePressionTest()
-try:
-    print("Test debut")
-    test.start()
+    test = AfficheurSenseurPassifTemperatureHumiditePressionTest()
+    try:
+        print("Test debut")
+        test.start()
 
-    test.test()
+        test.test()
 
-    print("Test termine")
-except Exception as e:
-    print("Erreur main: %s" % e)
-    traceback.print_exc()
-finally:
-    test.fermer()
-    # test.contexte.deconnecter()
+        print("Test termine")
+    except Exception as e:
+        print("Erreur main: %s" % e)
+        traceback.print_exc()
+    finally:
+        test.fermer()
+        # test.contexte.deconnecter()

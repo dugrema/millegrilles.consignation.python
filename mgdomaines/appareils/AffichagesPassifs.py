@@ -49,6 +49,9 @@ class DocumentCallback(BaseCallback):
         if correlation_id == 'affichage_lcd' or action == 'majNoeudConfirmee':
             self.__logger.debug("Recu configuration LCD : %s", message_json)
             self.afficheur.maj_configuration(message_json)
+        elif correlation_id == 'senseurs_par_uuid':
+            self.__logger.debug("Recu maj liste senseurs : %s", message_json)
+            self.afficheur.maj_liste_senseurs(message_json)
         elif action in ['lecture', 'lectureConfirmee']:
             # Probablement une mise a jour d'un document existant
             noeud_id = message_json['noeud_id']
@@ -165,10 +168,30 @@ class AfficheurDocumentMAJDirecte:
                 requete,
                 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD,
                 'affichage_lcd',
-                self._queue_reponse
+                self._queue_reponse,
+                ajouter_certificats=True
             )
         except Exception as e:
             self.__logger.exception("Erreur transmission requete documents", e)
+
+    def rafraichir_senseurs(self):
+        configuration_affichage = self._configuration_affichage_lcd
+        try:
+            config_lcd = configuration_affichage['lcd_affichage']
+        except KeyError:
+            pass
+        else:
+            uuid_senseurs = [s['uuid'] for s in config_lcd if s.get('uuid') is not None]
+            requete = {'uuid_senseurs': uuid_senseurs}
+            try:
+                self._contexte.generateur_transactions.transmettre_requete(
+                    requete,
+                    'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_LISTE_SENSEURS_PAR_UUID,
+                    'senseurs_par_uuid',
+                    self._queue_reponse
+                )
+            except Exception as e:
+                self.__logger.exception("Erreur transmission requete rafraichir senseurs", e)
 
     def traiter_lecture(self, noeud_id: str, uuid_senseur: str, senseurs: dict):
         cle_senseur = uuid_senseur
@@ -231,6 +254,19 @@ class AfficheurDocumentMAJDirecte:
                     cles_senseurs_supportes.add(uuid_senseur)
 
         self._cles_senseurs_supportes = list(cles_senseurs_supportes)
+
+        # Hook pour rafraichir les senseurs (e.g. utile si nouveau senseur ajoute dans la configuration)
+        self.rafraichir_senseurs()
+
+    def maj_liste_senseurs(self, params: dict):
+        for s in params['senseurs']:
+            try:
+                noeud_id = s['noeud_id']
+                uuid_senseur = s['uuid_senseur']
+                senseurs = s['senseurs']
+                self.traiter_lecture(noeud_id, uuid_senseur, senseurs)
+            except KeyError:
+                pass
 
     def get_documents(self):
         return self._documents
@@ -380,9 +416,22 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
         if uuid_senseur is not None and uuid_senseur != '' and \
                 cle_appareil is not None and cle_appareil != '':
 
+            flag = ''
             try:
                 doc_senseur = self._documents[cle_senseur]
                 doc_appareil = doc_senseur['senseurs'][cle_appareil]
+                try:
+                    ts_app = doc_appareil['timestamp']
+                    date_courante = datetime.datetime.utcnow()
+                    date_lecture = datetime.datetime.fromtimestamp(ts_app)
+                    exp_1 = datetime.timedelta(seconds=10)
+                    exp_2 = datetime.timedelta(seconds=30)
+                    if date_lecture + exp_2 < date_courante:
+                        flag = '!'
+                    elif date_lecture + exp_1 < date_courante:
+                        flag = '?'
+                except KeyError:
+                    pass
                 valeur = doc_appareil['valeur']
             except KeyError:
                 # Noeud/senseur/appareil inconnu
@@ -390,7 +439,7 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
                 return 'N/A'
 
             try:
-                return format.format(valeur,)
+                return format.format(valeur,) + flag
             except KeyError:
                 return '!' + format
 

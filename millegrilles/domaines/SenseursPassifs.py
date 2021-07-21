@@ -25,6 +25,8 @@ class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete
             reponse = self.gestionnaire.get_vitrine_dashboard()
         elif routing_key == 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD:
             reponse = self.gestionnaire.get_affichage_lcd_noeud(message_dict)
+        elif routing_key == 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_LISTE_SENSEURS_PAR_UUID:
+            reponse = self.gestionnaire.get_liste_senseurs_par_uuid(message_dict)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
@@ -45,8 +47,10 @@ class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_vitrine_dashboard()
         elif routing_key == 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD:
             reponse = self.gestionnaire.get_affichage_lcd_noeud(message_dict)
+        elif routing_key == 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_LISTE_SENSEURS_PAR_UUID:
+            reponse = self.gestionnaire.get_liste_senseurs_par_uuid(message_dict)
         else:
-            super().traiter_requete(ch, method, properties, body, message_dict)
+            super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
             return
 
         self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -207,7 +211,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         requetes_publiques_handler = TraitementRequetesPubliquesSenseursPassifs(self)
 
         self.__handler_requetes_noeuds = {
-            Constantes.SECURITE_PUBLIC: requetes_publiques_handler,
+            # Constantes.SECURITE_PUBLIC: requetes_publiques_handler,
             Constantes.SECURITE_PRIVE: requetes_publiques_handler,
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesSenseursPassifs(self)
         }
@@ -437,12 +441,35 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             'descriptif': 1,
         }
 
-        seneurs = list()
+        senseurs = list()
         for senseur in collection.find(filtre, projection):
             del senseur['_id']
-            seneurs.append(senseur)
+            senseurs.append(senseur)
 
-        return seneurs
+        return senseurs
+
+    def get_liste_senseurs_par_uuid(self, params: dict):
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
+            'uuid_senseur': {'$in': params['uuid_senseurs']},
+        }
+        projection = {
+            'noeud_id': 1,
+            Constantes.DOCUMENT_INFODOC_SECURITE: 1,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+            'uuid_senseur': 1,
+            'senseurs': 1,
+            'descriptif': 1,
+        }
+
+        senseurs = list()
+        for senseur in collection.find(filtre, projection):
+            del senseur['_id']
+            senseurs.append(senseur)
+
+        return {'senseurs': senseurs}
 
     def declencher_rapports(self, type_rapport):
         commande = {

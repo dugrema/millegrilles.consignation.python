@@ -1328,6 +1328,7 @@ class SenseursPassifsConstantes:
     REQUETE_LISTE_NOEUDS = 'listeNoeuds'
     REQUETE_LISTE_SENSEURS_NOEUD = 'listeSenseursPourNoeud'
     REQUETE_AFFICHAGE_LCD_NOEUD = 'affichageLcdNoeud'
+    REQUETE_LISTE_SENSEURS_PAR_UUID = 'listeSenseursParUuid'
 
     COMMANDE_RAPPORT_HEBDOMADAIRE = '%s.rapportHebdomadaire' % DOMAINE_NOM
     COMMANDE_RAPPORT_ANNUEL = '%s.rapportAnnuel' % DOMAINE_NOM
