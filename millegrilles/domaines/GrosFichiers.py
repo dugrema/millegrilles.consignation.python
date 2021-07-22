@@ -3307,8 +3307,9 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         }
 
         # Verifier s'il y a un traitement supplementaire a faire
-        mimetype = self.transaction['mimetype'].split('/')[0]
-        if mimetype in ['video', 'image']:
+        mimetype = self.transaction['mimetype']
+        mimetype_prefix = mimetype.split('/')[0]
+        if mimetype_prefix in ['video', 'image'] or mimetype in ['application/pdf']:
             self._traiter_media(resultat)
         elif document_uuid is not None:
             # Le fichier pourrait avoir ete ajoute dans une collection publique
@@ -3323,11 +3324,14 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
     def _traiter_media(self, info: dict):
         # # Transmettre une commande de transcodage
-        mimetype = info['mimetype'].split('/')[0]
+        mimetype = info['mimetype']
+        mimetype_prefix = mimetype.split('/')[0]
         commande_preview = self.controleur.gestionnaire.preparer_generer_poster(info)
-        if mimetype == 'video':
+        if mimetype_prefix == 'video':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
-        elif mimetype == 'image':
+        elif mimetype_prefix == 'image':
+            self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
+        elif mimetype == 'application/pdf':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
 
 
