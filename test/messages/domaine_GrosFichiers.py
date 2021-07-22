@@ -558,6 +558,14 @@ class MessagesSample(BaseCallback):
             commande, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def commande_indexer_fichiers(self):
+        commande = {
+            # 'uuids': ['a6dc3ee7-0df6-4058-a6b4-bd2a40cf9bcd'],
+        }
+        self.generateur.transmettre_commande(
+            commande, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_INDEXER_FICHIERS,
+            reply_to=self.queue_name, correlation_id='abcd')
+
     def requete_transferts_en_cours(self):
         self.generateur.transmettre_requete(
             dict(),
@@ -614,7 +622,7 @@ class MessagesSample(BaseCallback):
         # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe = sample.requete_activite()
         # enveloppe = sample.requete_corbeille()
-        enveloppe = sample.requete_documents_collection()
+        # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
@@ -641,6 +649,7 @@ class MessagesSample(BaseCallback):
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()
         # sample.commande_regenerer_collectionfichiers()
+        sample.commande_indexer_fichiers()
 
         pass
 

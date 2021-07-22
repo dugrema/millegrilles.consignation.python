@@ -1144,6 +1144,8 @@ class ConstantesGrosFichiers:
     CHAMP_DATE_MODIFICATION = 'dateModification'
     CHAMP_FUUID_MIMETYPES = 'fuuidMimetypes'
     CHAMP_UUID_COLLECTION = 'uuid_collection'
+    CHAMP_DATE_INDEXATION = 'dateIndexation'
+    CHAMP_DESCRIPTION = 'description'
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion' % DOMAINE_NOM
     TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE = '%s.demandeThumbnailProtege' % DOMAINE_NOM
@@ -1220,6 +1222,7 @@ class ConstantesGrosFichiers:
     COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES = 'uploadCollectionsPubliques'
     COMMANDE_REGENERER_COLLECTIONFICHIERS = 'regenererCollectionFichiers'
     COMMANDE_ASSOCIER_COLLECTION = 'associerCollection'
+    COMMANDE_INDEXER_FICHIERS = 'indexerFichiers'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {

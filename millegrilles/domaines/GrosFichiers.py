@@ -6,6 +6,7 @@ import uuid
 import pytz
 import gzip
 import multibase
+import requests
 
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -54,6 +55,8 @@ class TraitementEvenementProtege(TraitementMessageDomaineEvenement):
             self.gestionnaire.traiter_evenement_fichiers(message_dict, routing_key)
         elif action == 'transcodageErreur':
             self.gestionnaire.traiter_evenement_fichiers(message_dict, routing_key)
+        elif action == 'indexationFichier':
+            self.gestionnaire.traiter_evenement_indexation(message_dict, routing_key)
         else:
             raise Exception("GrosFichiers evenement protege inconnu : " + routing_key)
 
@@ -143,6 +146,8 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
             self.gestionnaire.creer_trigger_collectionfichiers(message_dict)
         elif action == ConstantesGrosFichiers.COMMANDE_ASSOCIER_COLLECTION:
             self.gestionnaire.associer_fichier_collection(message_dict)
+        elif action == ConstantesGrosFichiers.COMMANDE_INDEXER_FICHIERS:
+            return self.gestionnaire.declencher_indexation_fichiers(message_dict)
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -239,6 +244,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 'evenement.fichiers.publicAwsS3',
                 'evenement.fichiers.*.transcodageProgres',
                 'evenement.fichiers.*.transcodageErreur',
+                'evenement.fichiers.indexationFichier',
             ],
             'exchange': self.configuration.exchange_protege,
             'ttl': 300000,
@@ -2998,6 +3004,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.update_one(filtre, ops)
 
+    def traiter_evenement_indexation(self, params: dict, routing_key: str = None):
+        uuid_fichier = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+        }
+        ops = {
+            '$currentDate': {
+                ConstantesGrosFichiers.CHAMP_DATE_INDEXATION: True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
+        }
+        collection_fichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_fichiers.update_one(filtre, ops)
+
     def creer_trigger_collectionfichiers(self, params: dict, reply_to: str = None, correlation_id: str = None):
         """
         Genere un evenement de trigger pour regenerer la collectionFichiers
@@ -3048,6 +3069,59 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             }
             domaine_action = ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION
             self.generateur_transactions.soumettre_transaction(transaction, domaine_action)
+
+    def declencher_indexation_fichiers(self, params: dict):
+        """
+        Declenceh l'indexation des fichiers.
+        :param params:
+        :return:
+        """
+        collection_fichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        try:
+            uuid_fichiers = params['uuids']
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+                'uuid': {'$in': uuid_fichiers}
+            }
+            curseur = collection_fichiers.find(filtre)
+        except KeyError:
+            # Aucun fichiers specifies, on va chercher une batch a soumettre
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+                '$or': [
+                    {ConstantesGrosFichiers.CHAMP_DATE_INDEXATION: {'$exists': False}},
+                    {'$expr': {'$lt': [ConstantesGrosFichiers.CHAMP_DATE_INDEXATION, Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION]}},
+                ]
+            }
+            curseur = collection_fichiers.find(filtre).limit(100)
+
+        # Declencher le processus d'indexation pour tous les fichiers du curseur
+        liste_uuids = list()
+        for doc_fichier in curseur:
+            uuid_fichier = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+            liste_uuids.append(uuid_fichier)
+            try:
+                mimetype = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+            except KeyError:
+                pass  # OK
+            else:
+                if mimetype == 'application/pdf':
+                    # Indexer document via consignationfichiers
+                    doc_index = self.filtrer_doc_pour_indexer(doc_fichier)
+                    fuuid_v_courante = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE]
+                    commande_indexer = {
+                        'uuid': uuid_fichier,
+                        'fuuid': fuuid_v_courante,
+                        'doc': doc_index,
+                    }
+                    domaine_action = 'commande.fichiers.indexerContenu'
+                    self.generateur_transactions.transmettre_commande(commande_indexer, domaine_action)
+
+            # Indexer les metadonnees uniquement en lancant un processus
+            params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_fichier
+            self.demarrer_processus('millegrilles_domaines_GrosFichiers:ProcessusIndexerFichierMetadata', params)
+
+        return {'uuids': liste_uuids}
 
     def generer_collectionfichiers(self, params: dict, enveloppes_rechiffrage: dict = None):
         collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -3193,6 +3267,46 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             commande_maitrecles, 'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
         contenu_chiffre = multibase.encode('base64', contenu).decode('utf-8')
         return contenu_chiffre, hachage_bytes
+
+    def filtrer_doc_pour_indexer(self, doc_fichier: dict):
+        champs_index = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TITRE,
+            ConstantesGrosFichiers.CHAMP_DESCRIPTION,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS,
+        ]
+
+        doc_index = {
+            'modification': int(doc_fichier[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION].timestamp())
+        }
+        for key, value in doc_fichier.items():
+            if key in champs_index:
+                if isinstance(value, dict):
+                    value_avec_combinee = value.copy()
+                    value_avec_combinee['_combine'] = [v for v in value.values()]
+                    doc_index[key] = value_avec_combinee
+                else:
+                    doc_index[key] = value
+            elif key in [ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE]:
+                doc_index[key] = int(value.timestamp())
+
+        return doc_index
+
+    def soumettre_fichier_indexation(self, uuid_fichier: str):
+        doc_fichier = self.get_fichier_par_uuid(uuid_fichier)
+        doc_index = self.filtrer_doc_pour_indexer(doc_fichier)
+        headers = {"Content-Type": "application/json"}
+        rep = requests.put(
+            'http://mg-dev4:9200/grosfichiers/_doc/' + uuid_fichier,
+            data=json.dumps(doc_index),
+            headers=headers
+        )
+
+        rep.raise_for_status()
+        self.traiter_evenement_indexation({'uuid': uuid_fichier})
+
+        self._logger.debug("Ajout fichier %s dans l'index grosfichiers, rep (%d) = %s" % (uuid_fichier, rep.status_code, rep.text))
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
@@ -4342,6 +4456,18 @@ class ProcessusGenererCollectionFichiers(MGProcessus):
 
         self.controleur.gestionnaire.generer_collectionfichiers(params, enveloppes_rechiffrage)
 
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusIndexerFichierMetadata(MGProcessus):
+    """
+    Processus pour indexer un fichier avec ElasticSearch
+    Seulement les metadonnes, pas le contenu du document.
+    """
+
+    def initiale(self):
+        uuid_fichier = self.parametres['uuid']
+        self.controleur.gestionnaire.soumettre_fichier_indexation(uuid_fichier)
         self.set_etape_suivante()  # Termine
 
 
