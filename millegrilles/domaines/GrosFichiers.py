@@ -3447,6 +3447,8 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
                 exchanges=[Constantes.SECURITE_PROTEGE],
                 ajouter_certificats=True
             )
+
+            self.controleur.gestionnaire.declencher_indexation_fichiers({'uuids': [uuid_fichier]})
         except TypeError:
             pass  # None, pas de collections publiques
 
