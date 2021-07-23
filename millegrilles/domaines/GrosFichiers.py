@@ -1001,6 +1001,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         fichier_maj['version_courante'] = fichier_maj['versions'][fuuid]
 
+        # Declencher indexation pour ce fichier/version de fichier
+        self.declencher_indexation_fichiers({'uuids': [uuid_fichier]})
+
         return {
             'plus_recent': plus_recente_version,
             'uuid_fichier': uuid_fichier,
@@ -3098,6 +3101,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         :return:
         """
         collection_fichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        if params.get('reset') is True:
+            filtre_reset = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER}
+            ops_reset = {'$unset': {ConstantesGrosFichiers.CHAMP_DATE_INDEXATION: True}}
+            collection_fichiers.update_many(filtre_reset, ops_reset)
+
         try:
             uuid_fichiers = params['uuids']
             filtre = {
