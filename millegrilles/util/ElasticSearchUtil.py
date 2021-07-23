@@ -45,6 +45,16 @@ INDEX_GROSFICHIERS = {
                     "search_analyzer": "filename_search",
                     "analyzer": "filename_index"
                 },
+                "titre._combine": {
+                    "type": "text",
+                    "search_analyzer": "filename_search",
+                    "analyzer": "filename_index"
+                },
+                "description._combine": {
+                    "type": "text",
+                    "search_analyzer": "filename_search",
+                    "analyzer": "filename_index"
+                },
                 "mimetype": {"type": "keyword"},
                 "contenu": {"type": "text"},
                 "date_v_courante": {"type": "date", "format": "strict_date_optional_time||epoch_second"},

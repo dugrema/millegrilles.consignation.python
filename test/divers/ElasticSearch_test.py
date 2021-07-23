@@ -287,12 +287,12 @@ def search_grosfichiers():
 
 
 def main():
-    # delete_template1()
-    # creer_template_grosfichiers()
+    delete_template1()
+    creer_template_grosfichiers()
     # creer_template_2()
     # ajouter_docs()
     # analyse_template2()
-    search_1()
+    # search_1()
     # search_grosfichiers()
 
 
