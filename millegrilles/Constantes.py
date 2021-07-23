@@ -1224,7 +1224,7 @@ class ConstantesGrosFichiers:
     COMMANDE_REGENERER_COLLECTIONFICHIERS = 'regenererCollectionFichiers'
     COMMANDE_ASSOCIER_COLLECTION = 'associerCollection'
     COMMANDE_INDEXER_FICHIERS = 'indexerFichiers'
-    COMMANDE_REGENERER_IMAGES = 'regenererImages'
+    # COMMANDE_REGENERER_IMAGES = 'regenererImages'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {

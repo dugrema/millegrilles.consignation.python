@@ -37,7 +37,7 @@ INDEX_GROSFICHIERS = {
         },
         "mappings": {
             "_source": {
-                "enabled": True
+                "enabled": False
             },
             "properties": {
                 "nom_fichier": {

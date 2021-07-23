@@ -569,7 +569,6 @@ class MessagesSample(BaseCallback):
         commande = {
             # 'uuids': ['a6dc3ee7-0df6-4058-a6b4-bd2a40cf9bcd'],
             # 'reset': True,
-            # 'from_idx': 0,
         }
         self.generateur.transmettre_commande(
             commande, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_INDEXER_FICHIERS,
@@ -578,6 +577,7 @@ class MessagesSample(BaseCallback):
     def requete_rechercher_index(self):
         params = {
             'mots_cles': 'Canada bank interest'
+            # 'from_idx': 0,
         }
         self.generateur.transmettre_requete(
             params,
