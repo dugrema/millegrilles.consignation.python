@@ -93,6 +93,10 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_BACKUP,
     },
+    ConstantesServiceMonitor.MODULE_ELASTICSEARCH: {
+        'nom': ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
+        'nom_image': ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
+    },
     # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
     #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
     #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
@@ -139,6 +143,7 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
     ConstantesServiceMonitor.MODULE_AGENT_BACKUP,
+    ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
     # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
 ]
 

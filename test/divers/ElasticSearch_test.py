@@ -7,6 +7,8 @@ from millegrilles.util.ElasticSearchUtil import INDEX_GROSFICHIERS
 
 CONST_HEADERS = {"Content-Type": "application/json"}
 
+hostname = 'mg-dev4'
+
 
 def creer_template_grosfichiers():
     """
@@ -14,7 +16,7 @@ def creer_template_grosfichiers():
     :return:
     """
     rep = requests.put(
-        'http://localhost:9200/_index_template/grosfichiers',
+        'http://%s:9200/_index_template/grosfichiers' % hostname,
         data=json.dumps(INDEX_GROSFICHIERS),
         headers=CONST_HEADERS
     )
@@ -24,7 +26,7 @@ def creer_template_grosfichiers():
 
 def delete_template1():
     rep = requests.delete(
-        'http://localhost:9200/grosfichiers'
+        'http://%s:9200/grosfichiers' % hostname
     )
     print("Reponse delete %d : %s" % (rep.status_code, rep.text))
 

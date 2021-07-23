@@ -1737,6 +1737,7 @@ class ConstantesServiceMonitor:
     MODULE_MONGOEXPRESS = 'mongoxp'
     MODULE_REDIS = 'redis'
     MODULE_AGENT_BACKUP = 'agent_backup'
+    MODULE_ELASTICSEARCH = 'elasticsearch'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     # MODULE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     # MODULE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
