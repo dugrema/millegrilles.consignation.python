@@ -541,6 +541,13 @@ class MessagesSample(BaseCallback):
             evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_REGENERER_COLLECTIONFICHIERS,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def commande_regenerer_images(self):
+        commande = {
+        }
+        self.generateur.transmettre_commande(
+            commande, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_REGENERER_IMAGES,
+            reply_to=self.queue_name, correlation_id='abcd')
+
     def transaction_supprimer_fichier_usager(self):
         evenement = {
             'fuuid': 'z8VvTURY8zhxx5ahBuk47WHjP8s6PwqnGvR5TFgP6Jy8b9c9iWxzTZFU4PynmPuWfYGzKgyjVa9Jw4y4a8XX3NkRbMy',
@@ -645,7 +652,7 @@ class MessagesSample(BaseCallback):
         # sample.requete_permission_dechiffrage_fichier_public()
         # sample.requete_collections_publiques()
         # sample.requete_detail_collections_publiques()
-        # sample.commande_regenerer_previews()
+        sample.commande_regenerer_previews()
         # sample.requete_fichier_par_fuuid()
         # sample.commande_transcoder_video()
         # sample.evenement_progres_fichier()
@@ -661,7 +668,7 @@ class MessagesSample(BaseCallback):
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()
         # sample.commande_regenerer_collectionfichiers()
-        sample.commande_indexer_fichiers()
+        # sample.commande_indexer_fichiers()
         # sample.requete_rechercher_index()
 
         pass

@@ -461,6 +461,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         if minutes % 15 == 3:
             self.resoumettre_conversions_manquantes()
+        elif minutes % 15 == 7:
+            self.declencher_indexation_fichiers(dict())
 
     def creer_regenerateur_documents(self):
         return RegenerateurGrosFichiers(self)
@@ -1763,10 +1765,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
                         current_date['previews.%s.derniere_activite' % fuuid] = True
 
-                        mimetype = doc['mimetype'].split('/')[0]
-                        if mimetype == 'video':
+                        mimetype = doc['mimetype']
+                        mimetype_base = mimetype.split('/')[0]
+                        if mimetype_base == 'video':
                             routing_key = 'commande.fichiers.genererPreviewVideo'
-                        elif mimetype == 'image':
+                        elif mimetype_base == 'image':
+                            routing_key = 'commande.fichiers.genererPreviewImage'
+                        elif mimetype == 'application/pdf':
                             routing_key = 'commande.fichiers.genererPreviewImage'
                         else:
                             routing_key = None
@@ -2528,7 +2533,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: {'$regex': '^(video|image)'},
+            '$or': [
+                {ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: {'$in': ['application/pdf']}},
+                {ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: {'$regex': '^(video|image)'}},
+            ],
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
 
@@ -2557,6 +2565,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             info = f.copy()
             fuuid_courant = f[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE]
             info.update(f[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid_courant])
+            # info['version_courante'] = f[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid_courant]
 
             mimetype = info['mimetype'].split('/')[0]
             commande_preview = self.preparer_generer_poster(info)
@@ -2564,6 +2573,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             if mimetype == 'video':
                 domaine_action = 'commande.fichiers.genererPreviewVideo'
             elif mimetype == 'image':
+                domaine_action = 'commande.fichiers.genererPreviewImage'
+            elif info['mimetype'] == 'application/pdf':
                 domaine_action = 'commande.fichiers.genererPreviewImage'
             else:
                 continue  # Type inconnu
