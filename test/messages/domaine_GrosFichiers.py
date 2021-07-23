@@ -566,6 +566,16 @@ class MessagesSample(BaseCallback):
             commande, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_INDEXER_FICHIERS,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def requete_rechercher_index(self):
+        params = {
+            'mots_cles': 'Canada bank interest'
+        }
+        self.generateur.transmettre_requete(
+            params,
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_RECHERCHE_INDEX,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
+
     def requete_transferts_en_cours(self):
         self.generateur.transmettre_requete(
             dict(),
@@ -649,7 +659,8 @@ class MessagesSample(BaseCallback):
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()
         # sample.commande_regenerer_collectionfichiers()
-        sample.commande_indexer_fichiers()
+        # sample.commande_indexer_fichiers()
+        sample.requete_rechercher_index()
 
         pass
 

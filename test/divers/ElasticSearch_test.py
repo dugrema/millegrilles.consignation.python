@@ -200,24 +200,30 @@ def search_grosfichiers():
 
     req = {
         'query': {
-            # 'match_all': {},
-            'bool': {
-                'should': [
-                    {'match': {
-                        'contenu': motscles,
-                    }},
-                    # {'match': {
-                    #     'collections': 'a',
-                    # }},
-                    {'match': {
-                        'nom_fichier': motscles,
-                    }},
-                    # {'match': {
-                    #     # 'mimetype': 'application/pdf',
-                    #     'mimetype': 'video/mp4',
-                    # }},
-                ]
-            }
+            'match_all': {},
+            # 'bool': {
+            #     'should': [
+            #         {'match': {
+            #             'contenu': motscles,
+            #         }},
+            #         # {'match': {
+            #         #     'collections': 'a',
+            #         # }},
+            #         {'match': {
+            #             'nom_fichier': motscles,
+            #         }},
+            #         {'match': {
+            #             'titre._combine': motscles,
+            #         }},
+            #         {'match': {
+            #             'description._combine': motscles,
+            #         }},
+            #         # {'match': {
+            #         #     # 'mimetype': 'application/pdf',
+            #         #     'mimetype': 'video/mp4',
+            #         # }},
+            #     ]
+            # }
         },
     }
 

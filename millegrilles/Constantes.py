@@ -1213,6 +1213,7 @@ class ConstantesGrosFichiers:
     REQUETE_TRANSFERTS_EN_COURS = 'transfertsEnCours'
     REQUETE_COLLECTION_PERSONNELLE = 'getCollectionPersonnelle'
     REQUETE_CONVERSIONS_MEDIA_ENCOURS = 'conversionsMediaEnCours'
+    REQUETE_RECHERCHE_INDEX = 'rechercheIndex'
 
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
     COMMANDE_REGENERER_PREVIEWS = 'regenererPreviews'

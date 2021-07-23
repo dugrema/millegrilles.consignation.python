@@ -115,6 +115,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_transferts_en_cours()
         elif domaine_action == ConstantesGrosFichiers.REQUETE_CONVERSIONS_MEDIA_ENCOURS:
             reponse = self.gestionnaire.get_conversion_media_en_cours()
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_RECHERCHE_INDEX:
+            reponse = self.gestionnaire.rechercher_index(message_dict, enveloppe_certificat)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict, enveloppe_certificat)
             return
@@ -762,6 +764,25 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         documents = self.mapper_fichier_version(curseur_documents)
 
         return documents
+
+    def get_fichiers_ordonnes(self, uuids: list):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuids},
+        }
+        hint = [(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1)]
+
+        curseur_documents = collection_domaine.find(filtre).hint(hint)
+        documents = self.mapper_fichier_version(curseur_documents)
+
+        # Remettre les fichiers dans l'ordre de la liste en parametre
+        doc_par_uuid = dict()
+        for f in documents:
+            doc_par_uuid[f['uuid']] = f
+        liste_ordonnee = [doc_par_uuid[uuid_fichier] for uuid_fichier in uuids]
+
+        return liste_ordonnee
 
     def get_document_par_fuuid(self, params: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -3307,6 +3328,73 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.traiter_evenement_indexation({'uuid': uuid_fichier})
 
         self._logger.debug("Ajout fichier %s dans l'index grosfichiers, rep (%d) = %s" % (uuid_fichier, rep.status_code, rep.text))
+
+    def rechercher_index(self, params: dict, certificat: EnveloppeCertificat):
+        mots_cles = params.get('mots_cles')
+        from_idx = params.get('from_idx') or 0
+        size = params.get('size') or 20
+
+        should = list()
+
+        if mots_cles is not None:
+            should.extend([
+                {'match': {
+                    'contenu': mots_cles,
+                }},
+                {'match': {
+                    'nom_fichier': mots_cles,
+                }},
+                {'match': {
+                    'titre._combine': mots_cles,
+                }},
+                {'match': {
+                    'description._combine': mots_cles,
+                }},
+            ])
+
+        query = {
+            'bool': {
+                'should': should,
+            }
+        }
+
+        doc_query = {'query': query}
+
+        headers = {"Content-Type": "application/json"}
+        rep = requests.get(
+            'http://mg-dev4:9200/grosfichiers/_search?from=%d&size=%d' % (from_idx, size),
+            data=json.dumps(doc_query),
+            headers=headers
+        )
+        if rep.status_code != 200:
+            self._logger.debug("Reponse recherche %d %s" % (rep.status_code, rep.text))
+            return {'ok': False}
+
+        # Batir la reponse avec le contenu des documents
+        contenu_reponse = rep.json()
+        liste_fichiers = list()
+        resultat = {
+            'ok': True,
+            'total': contenu_reponse['hits']['total']['value'],
+            'hits': liste_fichiers,
+        }
+        try:
+            hit_list = contenu_reponse['hits']['hits']
+        except KeyError:
+            pass  # 0 hit
+        else:
+            hits_par_uuid = dict()
+            for h in hit_list:
+                hits_par_uuid[h['_id']] = h
+            doc_fichiers = self.get_fichiers_ordonnes(list(hits_par_uuid.keys()))
+
+            # Combiner fichier avec meta de recherche
+            for d in doc_fichiers:
+                uuid_fichier = d['uuid']
+                meta = hits_par_uuid[uuid_fichier]
+                liste_fichiers.append({'search': meta, 'doc': d})
+
+        return resultat
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
