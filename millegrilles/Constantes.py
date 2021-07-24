@@ -861,6 +861,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES = 'liste_hachage_bytes'
     TRANSACTION_CHAMP_PERMISSION = 'permission'
     TRANSACTION_CHAMP_USERID = 'user_id'
+    TRANSACTION_CHAMP_LISTE_FINGERPRINTS = 'liste_fingerprints'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 

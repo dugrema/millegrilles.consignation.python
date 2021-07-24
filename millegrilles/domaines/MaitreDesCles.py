@@ -227,6 +227,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__encryption_helper = None
         self.__handler_backup = HandlerBackupMaitreDesCles(self._contexte)
 
+        self.__periode_rechiffrage = datetime.timedelta(minutes=15)
+        self.__dernier_rechiffrage = None
+
     def configurer(self):
         super().configurer()
 
@@ -263,10 +266,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Index pour trouver rapidement cles non dechiffrables
         collection_cles.create_index(
             [
+                (ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_FINGERPRINTS, 1),
                 (ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE, 1),
                 (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1),
             ],
-            name='flag_non_dechiffrable',
+            name='flag_non_dechiffrable_2',
         )
 
     def demarrer(self):
@@ -275,7 +279,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def executer_entretien(self):
         super().executer_entretien()
-        self.rechiffrer_cles_apres_rotation()
+
+        date_courante = datetime.datetime.utcnow()
+
+        if self.__dernier_rechiffrage is None or date_courante > self.__dernier_rechiffrage + self.__periode_rechiffrage:
+            self.__dernier_rechiffrage = date_courante
+            self.rechiffrer_cles_apres_rotation()
 
     def charger_ca_chaine(self):
         self.__dict_ca = dict()
@@ -796,11 +805,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
         condition_actif = [
-            {'non_dechiffrable': True}
+            {'non_dechiffrable': True},
         ]
         for fp in fingerprint_b64_actifs:
-            fp_avec_fonction = fp
-            condition_actif.append({'cles.%s' % fp_avec_fonction: {'$exists': False}})
+            # Exclure les cles qu'on est capable de dechiffrer automatiquement
+            condition_actif.append({'liste_fingerprint': {'$not': {'$all': [fp]}}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
@@ -808,9 +817,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
-            '$or': condition_actif,
-            'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
-            'domaine': {'$ne': None},
+            # '$or': condition_actif,
+            'non_dechiffrable': True,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_FINGERPRINTS: {'$all': [fingerprint_b64_dechiffrage]},
+            # 'domaine': {'$ne': None},
         }
         compte = collection.count(filtre)
         reponse = {
@@ -839,10 +849,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
-        condition_actif = list()
-
-        for fp in fingerprint_b64_actifs:
-            condition_actif.append({'cles.%s' % fp: {'$exists': False}})
+        # condition_actif = list()
+        #
+        # for fp in fingerprint_b64_actifs:
+        #     condition_actif.append({'cles.%s' % fp: {'$exists': False}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
@@ -851,14 +861,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: True,
-            '$or': condition_actif,
-            'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
-            'domaine': {'$ne': None},
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_FINGERPRINTS: {'$all': [fingerprint_b64_dechiffrage]},
+            # '$or': condition_actif,
+            # 'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
+            # 'domaine': {'$ne': None},
         }
         if hachages_ignorer is not None:
             filtre['hachage_bytes'] = {'$nin': hachages_ignorer}
 
         hint = [
+            (ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_FINGERPRINTS, 1),
             (ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE, 1),
             (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1),
         ]
@@ -1361,16 +1373,21 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             contenu_on_insert['non_dechiffrable'] = True
 
-        hachage_sha256 = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT]
+        fingerprint_cert_cle = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT]
 
         champ_cles = '.'.join([
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES,
-            hachage_sha256
+            fingerprint_cert_cle
         ])
         set_ops[champ_cles] = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLE_INDIVIDUELLE]
 
+        add_to_set = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_FINGERPRINTS: fingerprint_cert_cle
+        }
+
         operations_mongo = {
             '$set': set_ops,
+            '$addToSet': add_to_set,
             '$setOnInsert': contenu_on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
