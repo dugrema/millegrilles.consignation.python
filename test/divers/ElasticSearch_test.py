@@ -319,7 +319,7 @@ def search_grosfichiers():
 def main():
     delete_template_grosfichiers()
     delete_index_grosfichiers()
-    creer_template_grosfichiers()
+    # creer_template_grosfichiers()
 
     # creer_template_2()
     # analyse_template2()
