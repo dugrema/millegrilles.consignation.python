@@ -226,7 +226,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Flags pour full-text indexing
         # self.__index_pret = False
         # self.__index_url = 'http://mg-dev4:9200'
-        self.__index_helper = ESIndexHelper('http://mg-dev4:9200')
+        url_config_indexation = self.configuration.serveur_indexation_url
+        self.__index_helper = ESIndexHelper(url_config_indexation)
 
     @staticmethod
     def extension_fichier(nom_fichier):

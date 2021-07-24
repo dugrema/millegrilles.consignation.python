@@ -103,6 +103,7 @@ class TransactionConfiguration:
         self._serveurs = {
             Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_HOST: Constantes.DEFAUT_CONSIGNATIONFICHIERS_HOST,
             Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT: Constantes.DEFAUT_CONSIGNATIONFICHIERS_PORT,
+            Constantes.CONFIG_SERVEUR_INDEXATION_URL: Constantes.DEFAUT_INDEXATION_URL,
         }
 
         self._backup = {
@@ -472,6 +473,10 @@ class TransactionConfiguration:
     @property
     def serveur_consignationfichiers_port(self):
         return self._serveurs[Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT]
+
+    @property
+    def serveur_indexation_url(self):
+        return self._serveurs[Constantes.CONFIG_SERVEUR_INDEXATION_URL]
 
     @property
     def backup_workdir(self):

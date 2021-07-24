@@ -61,6 +61,7 @@ DEFAUT_VAR_MILLEGRILLES = '/var/opt/millegrilles'
 
 DEFAUT_CONSIGNATIONFICHIERS_HOST = 'fichiers'
 DEFAUT_CONSIGNATIONFICHIERS_PORT = '443'
+DEFAUT_INDEXATION_URL = 'http://elasticsearch:9200'
 
 DEFAUT_BACKUP_WORKDIR = '/tmp/mgbackup'
 
@@ -97,6 +98,7 @@ CONFIG_EMAIL_FROM = 'email_from'
 # Serveurs et liens externes
 CONFIG_SERVEUR_CONSIGNATIONFICHIERS_HOST = 'consignationfichiers_host'
 CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT = 'consignationfichiers_port'
+CONFIG_SERVEUR_INDEXATION_URL = 'indexation_url'
 
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'
