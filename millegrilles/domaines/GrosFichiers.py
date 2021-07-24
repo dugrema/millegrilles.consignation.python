@@ -1010,7 +1010,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fichier_maj['version_courante'] = fichier_maj['versions'][fuuid]
 
         # Declencher indexation pour ce fichier/version de fichier
-        self.declencher_indexation_fichiers({'uuids': [uuid_fichier]})
+        # self.declencher_indexation_fichiers({'uuids': [uuid_fichier]})
 
         return {
             'plus_recent': plus_recente_version,
@@ -3426,7 +3426,9 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
                 ajouter_certificats=True
             )
 
-            self.controleur.gestionnaire.declencher_indexation_fichiers({'uuids': [uuid_fichier]})
+            if self.controleur.is_regeneration is False:
+                # On n'est pas en mode de regeneration, indexation immediate
+                self.controleur.gestionnaire.declencher_indexation_fichiers({'uuids': [uuid_fichier]})
         except TypeError:
             pass  # None, pas de collections publiques
 
@@ -3500,7 +3502,10 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         # Verifier s'il y a un traitement supplementaire a faire
         mimetype = self.transaction['mimetype']
         mimetype_prefix = mimetype.split('/')[0]
-        if mimetype_prefix in ['video', 'image'] or mimetype in ['application/pdf']:
+
+        # Traiter le media (si on n'est pas en mode de regeneration)
+        if self.controleur.is_regeneration is False and \
+                (mimetype_prefix in ['video', 'image'] or mimetype in ['application/pdf']):
             self._traiter_media(resultat)
         elif document_uuid is not None:
             # Le fichier pourrait avoir ete ajoute dans une collection publique
