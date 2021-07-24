@@ -671,6 +671,7 @@ class GestionnaireApplications:
         # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
         reponse = self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
         if reponse.get('ok') is not True:
+            self.__logger.error("Erreur upload backup application %s\n%s" % (nom_application, str(reponse)))
             raise Exception("Erreur upload fichier")
 
     def transmettre_commande_restaurer(self, nom_application, serveur_url: str = None):

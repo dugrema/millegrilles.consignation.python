@@ -126,6 +126,7 @@ class BackupAgent(ModeleConfiguration):
                 except IOError:
                     pass  # ok
         except Exception as e:
+            self.__logger.exception("Erreur demarrage backup")
             return {'ok': False, 'err': str(e)}
         else:
             return {'ok': True}
