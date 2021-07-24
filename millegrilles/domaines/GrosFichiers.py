@@ -6,14 +6,13 @@ import uuid
 import pytz
 import gzip
 import multibase
-import requests
 
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from cryptography import x509
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres, ConstantesSecurite, ConstantesMaitreDesCles
+from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesSecurite, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
     TraitementMessageDomaineRequete, HandlerBackupDomaine, RegenerateurDeDocuments, GroupeurTransactionsARegenerer, \
     TraitementCommandesProtegees, TraitementMessageDomaineEvenement, MGProcessus
@@ -21,7 +20,8 @@ from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 from millegrilles.util.Chiffrage import CipherMsg2Chiffrer
 from millegrilles.util.JSONMessageEncoders import JSONHelper
 from millegrilles.SecuritePKI import EnveloppeCertificat
-
+from millegrilles.util.ElasticSearchUtil import ESIndexHelper
+from requests.exceptions import HTTPError
 
 # class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
 #
@@ -222,6 +222,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.__handler_evenements_proteges = TraitementEvenementProtege(self)
 
         self.__handler_backup = HandlerBackupGrosFichiers(self._contexte)
+
+        # Flags pour full-text indexing
+        # self.__index_pret = False
+        # self.__index_url = 'http://mg-dev4:9200'
+        self.__index_helper = ESIndexHelper('http://mg-dev4:9200')
 
     @staticmethod
     def extension_fichier(nom_fichier):
@@ -3310,6 +3315,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return contenu_chiffre, hachage_bytes
 
     def filtrer_doc_pour_indexer(self, doc_fichier: dict):
+
+        # S'assurer que l'index est pret
+        self.__index_helper.assurer_index_pret()
+
         champs_index = [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
@@ -3337,61 +3346,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def soumettre_fichier_indexation(self, uuid_fichier: str):
         doc_fichier = self.get_fichier_par_uuid(uuid_fichier)
         doc_index = self.filtrer_doc_pour_indexer(doc_fichier)
-        headers = {"Content-Type": "application/json"}
-        rep = requests.put(
-            'http://mg-dev4:9200/grosfichiers/_doc/' + uuid_fichier,
-            data=json.dumps(doc_index),
-            headers=headers
-        )
-
-        rep.raise_for_status()
+        self.__index_helper.indexer('grosfichiers', uuid_fichier, doc_index)
         self.traiter_evenement_indexation({'uuid': uuid_fichier})
-
-        self._logger.debug("Ajout fichier %s dans l'index grosfichiers, rep (%d) = %s" % (uuid_fichier, rep.status_code, rep.text))
+        self._logger.debug("Ajout fichier %s dans l'index grosfichiers" % uuid_fichier)
 
     def rechercher_index(self, params: dict, certificat: EnveloppeCertificat):
-        mots_cles = params.get('mots_cles')
-        from_idx = params.get('from_idx') or 0
-        size = params.get('size') or 20
-
-        should = list()
-
-        if mots_cles is not None:
-            should.extend([
-                {'match': {
-                    'contenu': mots_cles,
-                }},
-                {'match': {
-                    'nom_fichier': mots_cles,
-                }},
-                {'match': {
-                    'titre._combine': mots_cles,
-                }},
-                {'match': {
-                    'description._combine': mots_cles,
-                }},
-            ])
-
-        query = {
-            'bool': {
-                'should': should,
-            }
-        }
-
-        doc_query = {'query': query}
-
-        headers = {"Content-Type": "application/json"}
-        rep = requests.get(
-            'http://mg-dev4:9200/grosfichiers/_search?from=%d&size=%d' % (from_idx, size),
-            data=json.dumps(doc_query),
-            headers=headers
-        )
-        if rep.status_code != 200:
-            self._logger.debug("Reponse recherche %d %s" % (rep.status_code, rep.text))
+        try:
+            contenu_reponse = self.__index_helper.rechercher('grosfichiers', params)
+        except HTTPError:
+            self._logger.exception("Erreur recherche indexee")
             return {'ok': False}
 
         # Batir la reponse avec le contenu des documents
-        contenu_reponse = rep.json()
         liste_fichiers = list()
         resultat = {
             'ok': True,
@@ -3467,7 +3433,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         """
         Verifie si le changement a un impact sur les collections publiques et transmet un evenement
         pour chaque collection publique affectee.
-        :param uuid_fichier: fichier qui a ete mis a jour
+        :param uuid_collection: fichier qui a ete mis a jour
         :return:
         """
         doc_collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)

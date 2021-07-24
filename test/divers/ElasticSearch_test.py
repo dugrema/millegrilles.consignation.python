@@ -24,7 +24,14 @@ def creer_template_grosfichiers():
     print("Reponse creation template 1 %d : %s" % (rep.status_code, rep.text))
 
 
-def delete_template1():
+def delete_template_grosfichiers():
+    rep = requests.delete(
+        'http://%s:9200/_index_template/grosfichiers' % hostname
+    )
+    print("Reponse delete %d : %s" % (rep.status_code, rep.text))
+
+
+def delete_index_grosfichiers():
     rep = requests.delete(
         'http://%s:9200/grosfichiers' % hostname
     )
@@ -37,10 +44,10 @@ def creer_template_2():
     :return:
     """
 
-    rep = requests.delete(
-        'http://localhost:9200/template_2'
-    )
-    print("Reponse delete %d : %s" % (rep.status_code, rep.text))
+    rep = requests.delete('http://localhost:9200/template_2')
+    print("Reponse delete index %d : %s" % (rep.status_code, rep.text))
+    rep = requests.delete('http://localhost:9200/_index_template/template_2')
+    print("Reponse delete template %d : %s" % (rep.status_code, rep.text))
 
     template_1 = {
       "index_patterns": ["template_2"],
@@ -50,7 +57,10 @@ def creer_template_2():
               "analyzer": {
                   "filename_index": {
                       'tokenizer': 'filename_index',
-                      'filter': ['file_edge']
+                      'filter': [
+                          'my_ascii_folding',
+                          # 'file_edge'
+                      ]
                   },
                   "filename_search": {
                       "tokenizer": "filename_index",
@@ -83,6 +93,10 @@ def creer_template_2():
                           "digit"
                       ]
                   },
+                  "my_ascii_folding": {
+                      "type": "asciifolding",
+                      "preserve_original": True
+                  }
               }
               # "filter": {
               #     "edge_ngram": {
@@ -135,8 +149,22 @@ def creer_template_2():
 
 def analyse_template2():
     data = {
+        'tokenizer': 'standard',
+        'filter': ['lowercase', 'asciifolding'],
+        'text': 'mon_fichiér-deux-2020-02-01.AAjd.jpg',
+    }
+    rep = requests.post(
+        'http://localhost:9200/_analyze',
+        data=json.dumps(data),
+        headers=CONST_HEADERS
+    )
+    print("Reponse analyzer %d %s" % (rep.status_code, json.dumps(rep.json(), indent=2)))
+
+
+def analyse_index2():
+    data = {
         'analyzer': 'filename_index',
-        'text': 'mon_fichier-deux-2020-02-01.AAjd.jpg',
+        'text': 'mon_fichiér-deux-2020-02-01.AAjd.jpg',
     }
     rep = requests.post(
         'http://localhost:9200/template_2/_analyze',
@@ -150,7 +178,7 @@ def ajouter_docs():
     date_courante = int(datetime.datetime.utcnow().timestamp())
 
     doc_1 = {
-        'nom_fichier': 'Document 1.pdf',
+        'nom_fichier': 'Documenté 1.pdf',
         'mimetype': 'application/pdf',
         'date_v_courante': date_courante,
         'collections': ['a', 'b'],
@@ -162,7 +190,7 @@ def ajouter_docs():
         'contenu': "Ceci est du contenu en free text.\nJ'ai plutot trouve autre chose, ye!"
     }
     doc_2 = {
-        'nom_fichier': 'Document 2.pdf',
+        'nom_fichier': 'Documente 2.pdf',
         'mimetype': 'application/pdf',
         'date_v_courante': date_courante,
         'contenu': "Du text supplementaire. Moui!"
@@ -289,11 +317,15 @@ def search_grosfichiers():
 
 
 def main():
-    delete_template1()
+    delete_template_grosfichiers()
+    delete_index_grosfichiers()
     creer_template_grosfichiers()
+
     # creer_template_2()
-    # ajouter_docs()
     # analyse_template2()
+    # ajouter_docs()
+    # analyse_index2()
+
     # search_1()
     # search_grosfichiers()
 
