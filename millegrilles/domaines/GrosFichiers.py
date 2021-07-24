@@ -3139,7 +3139,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     {'$expr': {'$lt': [ConstantesGrosFichiers.CHAMP_DATE_INDEXATION, Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION]}},
                 ]
             }
-            curseur = collection_fichiers.find(filtre).limit(100)
+            curseur = collection_fichiers.find(filtre).limit(250)
 
         # Declencher le processus d'indexation pour tous les fichiers du curseur
         liste_uuids = list()
