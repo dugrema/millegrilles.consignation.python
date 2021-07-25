@@ -355,7 +355,8 @@ class RestaurerApplication:
             '%s/backup/application/%s' % (url_consignationfichiers, self.__nom_application),
             verify=configuration.mq_cafile,
             cert=(certfile, keyfile),
-            timeout=5.0
+            timeout=5.0,
+            stream=True,
         )
 
         r.raise_for_status()
