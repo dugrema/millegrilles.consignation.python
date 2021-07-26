@@ -788,7 +788,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         doc_par_uuid = dict()
         for f in documents:
             doc_par_uuid[f['uuid']] = f
-        liste_ordonnee = [doc_par_uuid[uuid_fichier] for uuid_fichier in uuids]
+
+        liste_ordonnee = list()
+        for uuid_fichier in uuids:
+            try:
+                liste_ordonnee.append(doc_par_uuid[uuid_fichier])
+                # liste_ordonnee = [doc_par_uuid[uuid_fichier] for uuid_fichier in uuids]
+            except KeyError:
+                self._logger.warning("Fichier indexe %s n'est pas trouve dans la base de donnees" % uuid_fichier)
 
         return liste_ordonnee
 

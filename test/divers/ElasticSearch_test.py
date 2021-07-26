@@ -7,8 +7,8 @@ from millegrilles.util.ElasticSearchUtil import INDEX_GROSFICHIERS, ESIndexHelpe
 
 CONST_HEADERS = {"Content-Type": "application/json"}
 
-# hostname = 'mg-dev4'
-hostname = 'http://192.168.2.137:9200'  # 'mg.maple.maceroc.com'
+hostname = 'http://mg-dev4:9200'
+# hostname = 'http://192.168.2.137:9200'  # 'mg.maple.maceroc.com'
 
 index_helper = ESIndexHelper(hostname)
 
@@ -311,8 +311,8 @@ def main():
     # analyse_index2()
 
     # search_1()
-    search_grosfichiers()
-    # recreer_index_grosfichiers()
+    # search_grosfichiers()
+    recreer_index_grosfichiers()
     # settings_index_grosfichiers('grosfichiers')
 
 
