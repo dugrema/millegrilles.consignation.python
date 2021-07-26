@@ -90,7 +90,7 @@ class BackupAgent(ModeleConfiguration):
                 catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
             )
 
-            makedirs('/tmp/mg_backup_app', mode=0o700, exist_ok=True)
+            makedirs('/tmp/mg_backup_app', mode=0o770, exist_ok=True)
 
             streams = self.preparer_cipher(nom_application, catalogue_backup, path_output)
             cipher = streams['cipher']
