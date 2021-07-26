@@ -1439,6 +1439,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def ajouter_documents_collection(self, uuid_collection: str, uuid_documents: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
+        # Dedupe - bug #1530
+        uuid_documents = list(set(uuid_documents))
+
         filtre_documents = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_documents},
             Constantes.DOCUMENT_INFODOC_LIBELLE: {
@@ -1456,8 +1459,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
 
         resultats = collection_domaine.update_many(filtre_documents, ops)
-        if resultats.matched_count != len(uuid_documents):
-            raise Exception("Erreur association collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
+        if resultats.matched_count != len(set(uuid_documents)):
+            self.__logger.error("Erreur association collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
 
         self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
 
@@ -1528,6 +1531,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         if uuid_documents is None:
             uuid_documents = list()
+        else:
+            # Dedupe - bug #1530
+            uuid_documents = list(set(uuid_documents))
 
         if fuuid_documents is not None:
             filtre_fuuids = {
@@ -1558,7 +1564,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         resultats = collection_domaine.update_many(filtre_documents, ops)
         if resultats.matched_count != len(uuid_documents):
-            raise Exception("Erreur retrait collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
+            self._logger.error("Erreur retrait collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
 
         self.creer_trigger_collectionfichiers({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection})
 
