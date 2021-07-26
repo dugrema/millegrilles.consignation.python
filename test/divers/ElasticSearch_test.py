@@ -2,12 +2,15 @@ import requests
 import json
 import datetime
 
-from millegrilles.util.ElasticSearchUtil import INDEX_GROSFICHIERS
+from millegrilles.util.ElasticSearchUtil import INDEX_GROSFICHIERS, ESIndexHelper
 
 
 CONST_HEADERS = {"Content-Type": "application/json"}
 
-hostname = 'mg-dev4'
+# hostname = 'mg-dev4'
+hostname = 'http://192.168.2.137:9200'  # 'mg.maple.maceroc.com'
+
+index_helper = ESIndexHelper(hostname)
 
 
 def creer_template_grosfichiers():
@@ -16,7 +19,7 @@ def creer_template_grosfichiers():
     :return:
     """
     rep = requests.put(
-        'http://%s:9200/_index_template/grosfichiers' % hostname,
+        '%s/_index_template/grosfichiers' % hostname,
         data=json.dumps(INDEX_GROSFICHIERS),
         headers=CONST_HEADERS
     )
@@ -26,14 +29,14 @@ def creer_template_grosfichiers():
 
 def delete_template_grosfichiers():
     rep = requests.delete(
-        'http://%s:9200/_index_template/grosfichiers' % hostname
+        '%s/_index_template/grosfichiers' % hostname
     )
     print("Reponse delete %d : %s" % (rep.status_code, rep.text))
 
 
 def delete_index_grosfichiers():
     rep = requests.delete(
-        'http://%s:9200/grosfichiers' % hostname
+        '%s/grosfichiers' % hostname
     )
     print("Reponse delete %d : %s" % (rep.status_code, rep.text))
 
@@ -229,7 +232,7 @@ def put_doc(doc, doc_id):
     # {"_index":"doc_test","_type":"_doc","_id":"abcd-1234","_version":2,"result":"updated","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":3,"_primary_term":1}
 
     return requests.put(
-        'http://localhost:9200/template_2/_doc/' + doc_id,
+        '%s/template_2/_doc/%s' % (hostname, doc_id),
         data=json.dumps(doc),
         headers=CONST_HEADERS
     )
@@ -268,57 +271,38 @@ def search_1():
     }
 
     res = requests.get(
-        'http://localhost:9200/template_2/_search?from=0&size=10',
+        '%s/template_2/_search?from=0&size=10' % hostname,
         data=json.dumps(req),
         headers=CONST_HEADERS,
     )
     print("Resultat recherche %d\n%s" % (res.status_code, json.dumps(json.loads(res.text), indent=2)))
+
+
+def settings_index_grosfichiers(nom_index: str):
+
+    res = requests.get(
+        '%s/%s/_settings' % (hostname, nom_index),
+        timeout=2,
+    )
+    print("Settings index %s (%d) %s" % (nom_index, res.status_code, json.dumps(res.json(), indent=2)))
+
+
+def recreer_index_grosfichiers():
+    delete_index_grosfichiers()
+    delete_template_grosfichiers()
+    index_helper.assurer_index_pret()
 
 
 def search_grosfichiers():
 
-    motscles = 'CIBC'
-
-    req = {
-        'query': {
-            # 'match_all': {},
-            'bool': {
-                'should': [
-                    # {'match': {
-                    #     'contenu': motscles,
-                    # }},
-                    # {'match': {
-                    #     'collections': 'a',
-                    # }},
-                    {'match': {
-                        'nom_fichier': motscles,
-                    }},
-                    # {'match': {
-                    #     'titre._combine': motscles,
-                    # }},
-                    # {'match': {
-                    #     'description._combine': motscles,
-                    # }},
-                    # {'match': {
-                    #     # 'mimetype': 'application/pdf',
-                    #     'mimetype': 'video/mp4',
-                    # }},
-                ]
-            }
-        },
-    }
-
-    res = requests.get(
-        'http://localhost:9200/grosfichiers/_search?from=0&size=10',
-        data=json.dumps(req),
-        headers=CONST_HEADERS,
-    )
-    print("Resultat recherche %d\n%s" % (res.status_code, json.dumps(json.loads(res.text), indent=2)))
+    motscles = 'unwelcome'
+    resultat = index_helper.rechercher('grosfichiers', {'mots_cles': motscles})
+    print("Resultat recherche %s" % resultat)
 
 
 def main():
-    delete_template_grosfichiers()
-    delete_index_grosfichiers()
+    # delete_template_grosfichiers()
+    # delete_index_grosfichiers()
     # creer_template_grosfichiers()
 
     # creer_template_2()
@@ -327,7 +311,9 @@ def main():
     # analyse_index2()
 
     # search_1()
-    # search_grosfichiers()
+    search_grosfichiers()
+    # recreer_index_grosfichiers()
+    # settings_index_grosfichiers('grosfichiers')
 
 
 if __name__ == '__main__':

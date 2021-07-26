@@ -45,6 +45,9 @@ INDEX_GROSFICHIERS = {
                 "enabled": False
             },
             "properties": {
+                "contenu": {
+                    "type": "text",
+                },
                 "nom_fichier": {
                     "type": "text",
                     "search_analyzer": "filename_search",
@@ -90,7 +93,8 @@ class ESIndexHelper:
             rep = requests.put(
                 '%s/_index_template/%s' % (self.__url, k),
                 data=json.dumps(template),
-                headers=CONST_HEADERS
+                headers=CONST_HEADERS,
+                timeout=15
             )
             # Rep OK = 200 : {"acknowledged":true}
             rep.raise_for_status()
@@ -109,7 +113,8 @@ class ESIndexHelper:
         rep = requests.put(
             '%s/%s/_doc/%s' % (self.__url, nom_index, id_doc),
             data=json.dumps(doc),
-            headers=CONST_HEADERS
+            headers=CONST_HEADERS,
+            timeout=15
         )
 
         rep.raise_for_status()
@@ -151,7 +156,8 @@ class ESIndexHelper:
         rep = requests.get(
             '%s/%s/_search?from=%d&size=%d' % (self.__url, nom_index, from_idx, size),
             data=json.dumps(doc_query),
-            headers=headers
+            headers=headers,
+            timeout=15
         )
 
         rep.raise_for_status()
