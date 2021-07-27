@@ -219,9 +219,10 @@ class GestionnaireModulesDocker:
         except IndexError:
             self.__logger.error("Erreur configuration service monitor avec nouvelles valeurs (OK si dev)")
 
-    def entretien_services(self):
+    def entretien_services(self, nom_service: str = None):
         """
         Verifie si les services sont actifs, les demarre au besoin.
+        :param nom_service: Nom du service a entretenir (opt)
         :return:
         """
         try:
@@ -229,9 +230,11 @@ class GestionnaireModulesDocker:
         except Exception as e:
             self.__logger.warning("Erreur chargement params dynamiques pour docker : %s" % str(e))
 
-        # filtre = {'name': self.idmg_tronque + '_'}
+        filtre = dict()
+        if nom_service is not None:
+            filtre = {'name': nom_service}
         # liste_services = self.__docker.services.list(filters=filtre)
-        liste_services = self.__docker.services.list()
+        liste_services = self.__docker.services.list(filters=filtre)
         dict_services = dict()
         for service in liste_services:
             # Enlever prefix avec IDMG
@@ -241,6 +244,10 @@ class GestionnaireModulesDocker:
 
         entretien_compte_complete = True
         for service_name in self.__modules_requis:
+            if nom_service is not None and service_name != nom_service:
+                # On skip ce service
+                continue
+
             try:
                 params = self.get_configuration_services()[service_name]
                 service = dict_services.get(service_name)

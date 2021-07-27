@@ -629,12 +629,17 @@ class ServiceMonitor:
         self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
 
     def _entretien_modules(self):
+
+        # Entretien du middleware MQ
+        # S'assurer que MQ est demarre
+        self._gestionnaire_docker.entretien_services('mq')
+
+        # S'assurer que le compte administrateur est configure et MQ est disponible
+        self._gestionnaire_mq.entretien()
+
         if not self.limiter_entretien:
             # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
             self._gestionnaire_docker.entretien_services()
-
-            # Entretien du middleware
-            self._gestionnaire_mq.entretien()
 
             date_now = pytz.utc.localize(datetime.datetime.utcnow())
 

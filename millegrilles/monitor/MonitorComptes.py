@@ -64,6 +64,8 @@ class GestionnaireComptesMQ:
         # Supprimer le user guest
         self._admin_api.delete_user('guest')
 
+        return True
+
     def attendre_mq(self, attente_sec=300):
         """
         Attendre que le container et rabbitmq soit disponible. Effectue un ping a rabbitmq pour confirmer.
@@ -78,7 +80,13 @@ class GestionnaireComptesMQ:
                 resultat_healthcheck = self._admin_api.healthchecks()
                 if resultat_healthcheck.get('status') == 'ok':
                     self.__logger.debug("MQ est pret")
-                    mq_pret = True
+                    try:
+                        self.initialiser_motdepasse_admin()
+                        mq_pret = True
+                    except HTTPError as httpe:
+                        if httpe.response.status_code in [401, 403]:
+                            # OK, on a deja un mot de passe configure
+                            mq_pret = True
                     break
             except MaxRetryError:
                 self.__logger.warning("MQ Max Retry error, on va reessayer plus tard")
@@ -174,7 +182,7 @@ class GestionnaireComptesMQ:
         except SSLError:
             self.__logger.exception("SSL Erreur sur MQ, initialisation incorrecte")
         except HTTPError as httpe:
-            if httpe.response.status_code == 401:
+            if httpe.response.status_code in [401, 403]:
                 # Erreur authentification, tenter d'initialiser avec compte guest
                 self.initialiser_motdepasse_admin()
                 self.__entretien_comptes_mq()
