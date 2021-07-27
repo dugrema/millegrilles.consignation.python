@@ -949,7 +949,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
             ConstantesGrosFichiers.DOCUMENT_SECURITE,
         ]
-        date_version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT].get('_estampille')
+        try:
+            date_version = transaction[ConstantesGrosFichiers.DOCUMENT_DATE_FICHIER]
+            date_version = datetime.datetime.fromtimestamp(date_version)
+        except KeyError:
+            date_version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT].get('_estampille')
         info_version = {
             ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: date_version
         }

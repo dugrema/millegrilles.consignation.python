@@ -1060,6 +1060,7 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_SECURITE = 'securite'
     DOCUMENT_COMMENTAIRES = 'commentaires'
+    DOCUMENT_DATE_FICHIER = 'dateFichier'
 
     DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
 
