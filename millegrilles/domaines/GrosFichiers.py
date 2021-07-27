@@ -465,9 +465,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         minutes = evenement['timestamp']['UTC'][4]
 
-        if minutes % 15 == 3:
+        if minutes == 18:
             self.resoumettre_conversions_manquantes()
-        elif minutes % 15 == 7:
+        elif minutes % 30 == 7:
             self.declencher_indexation_fichiers(dict())
 
     def creer_regenerateur_documents(self):
