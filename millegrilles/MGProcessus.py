@@ -851,62 +851,60 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         regenerateur = self._gestionnaire.creer_regenerateur_documents()
 
-        # Creer un dict pour conserver les transactions avec token resumer
-        # Ces transactions doivent etre executees apres les transactions d'initialisation
-        # tokens_resumer = dict()
-
         # Deconnecter les Q (channel - consumer tags)
         if stop_consuming:
             self.gestionnaire.stop_consuming()
 
-        # Supprimer le contenu de la collection de documents
-        regenerateur.supprimer_documents()
+        filtre_doc_regeneration = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_REGENERATION
+        }
+        collection_documents = self.get_collection_documents()
+        doc_regeneration = collection_documents.find_one(filtre_doc_regeneration)
+
+        if doc_regeneration is not None:
+            try:
+                if doc_regeneration['regeneration_completee'] is True:
+                    # On reset, c'est une regeneration complete
+                    doc_regeneration = None
+                    # Supprimer le contenu de la collection de documents
+                    regenerateur.supprimer_documents()
+            except KeyError:
+                # On remet le document en place
+                pass  # On resume la regeneration en cours
+        else:
+            # Supprimer le contenu de la collection de documents
+            regenerateur.supprimer_documents()
 
         # Grouper et executer les transactions de regeneration
-        generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
+        generateur_groupes_transactions = regenerateur.creer_generateur_transactions(doc_regeneration)
         try:
             for transaction in generateur_groupes_transactions:
+                idx_courant = generateur_groupes_transactions.index_transaction_courante
+                nombre_transactions = generateur_groupes_transactions.nombre_transactions
+                self.__logger.debug("Regenerer transaction %d de %d" % (idx_courant, nombre_transactions))
+
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
+                info_regeneration = {
+                    'idx_courant': idx_courant,
+                    'nombre_transactions': nombre_transactions,
+                    'uuid_transaction': uuid_transaction,
+                    'date_traitement': date_traitement,
+                    'complete': False,
+                    'regeneration_completee': False,
+                }
+                ops = {
+                    '$set': info_regeneration,
+                    '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+                }
+
+                # Conserver information de traitement de transaction dans le document de regeneration
+                collection_documents.update_one(filtre_doc_regeneration, ops, upsert=True)
+
                 transactions_a_resumer = list()
 
                 if transaction is not None:
                     traiter = True
-
-                    # # Verifier si la transaction a un token resumer / attente
-                    # try:
-                    #     evenements = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT]
-                    #     evenements_idmg = evenements[self.configuration.idmg]
-                    #
-                    #     try:
-                    #         resumer_transaction = evenements_idmg[Constantes.EVENEMENT_TOKEN_RESUMER]
-                    #         for dict_token in resumer_transaction:
-                    #             cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
-                    #             # tokens_resumer[cle_token] = transaction
-                    #             self.ajouter_transaction_resumer(cle_token, transaction)
-                    #             traiter = False
-                    #             self.__logger.debug("Transaction %s, mise en attente" % uuid_transaction)
-                    #     except KeyError:
-                    #         # Ok, aucuns tokens resumer
-                    #         pass
-                    #
-                    #     # try:
-                    #     #     attente_transactions = evenements_idmg[Constantes.EVENEMENT_TOKEN_ATTENTE]
-                    #     #     for dict_token in attente_transactions:
-                    #     #         try:
-                    #     #             cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
-                    #     #             transaction_resumer = tokens_resumer[cle_token]
-                    #     #             transactions_a_resumer.append(transaction_resumer)
-                    #     #             del tokens_resumer[cle_token]
-                    #     #         except KeyError:
-                    #     #             # Aucun token resumer pour ce token attente specifique
-                    #     #             pass
-                    #     # except KeyError:
-                    #     #     # Aucuns tokens attente
-                    #     #     pass
-                    #
-                    # except KeyError:
-                    #     # Aucune info d'evenements
-                    #     pass
 
                     if traiter:
                         self.traiter_transaction_wrapper(transaction)
@@ -915,6 +913,9 @@ class MGPProcesseurRegeneration(MGPProcesseur):
                             self.__logger.debug("Transaction master completee, resumer transaction " + str(transaction_resumer))
                             self.traiter_transaction_wrapper(transaction_resumer)
 
+                    info_regeneration['complete'] = True
+                    collection_documents.update_one(filtre_doc_regeneration, ops)
+
         except StopIteration as se:
             self.__logger.info("Traitement transactions termine - StopIteration")
 
@@ -922,6 +923,10 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         # Re-soumettre les notifications pour toutes les transactions non traitees, en ordre de persistance.
         # Inclure notification pour regenerer l'information a date (e.g. trigger des cedules)
         self.gestionnaire.resoumettre_transactions()
+
+        # Mettre a jour le document de regeneration pour indiquer que toutes les operations sont completes
+        ops = {'$set': {'regeneration_completee': True}}
+        collection_documents.update_one(filtre_doc_regeneration, ops, upsert=True)
 
         # Reconnecter les Q
         if stop_consuming:

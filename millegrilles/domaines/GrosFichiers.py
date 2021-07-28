@@ -470,8 +470,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         elif minutes % 30 == 7:
             self.declencher_indexation_fichiers(dict())
 
-    def creer_regenerateur_documents(self):
-        return RegenerateurGrosFichiers(self)
+    # def creer_regenerateur_documents(self):
+    #     return RegenerateurGrosFichiers(self)
 
     def get_fichier_par_uuid(self, uuid_fichier):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -3401,18 +3401,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return resultat
 
 
-class RegenerateurGrosFichiers(RegenerateurDeDocuments):
-
-    def __init__(self, gestionnaire_domaine):
-        super().__init__(gestionnaire_domaine)
-
-    def creer_generateur_transactions(self):
-
-        transactions_a_ignorer = [
-            # ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER,
-        ]
-
-        return GroupeurTransactionsARegenerer(self._gestionnaire_domaine, transactions_a_ignorer)
+# class RegenerateurGrosFichiers(RegenerateurDeDocuments):
+#
+#     def __init__(self, gestionnaire_domaine):
+#         super().__init__(gestionnaire_domaine)
+#
+#     def creer_generateur_transactions(self):
+#
+#         transactions_a_ignorer = [
+#             # ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER,
+#         ]
+#
+#         return GroupeurTransactionsARegenerer(self._gestionnaire_domaine, transactions_a_ignorer)
 
 
 # ******************* Processus *******************

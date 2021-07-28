@@ -899,17 +899,8 @@ class GestionnaireDomaine:
     def regenerer_documents(self, stop_consuming=True):
         self.__logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
 
-        # Desactiver temporairement toutes les threads de watchers
-        # try:
-            # for watcher in self._watchers:
-            #     watcher.stop()
-
         processeur_regeneration = MGPProcesseurRegeneration(self, self.__contexte)
         processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
-        # finally:
-        #     # Reactiver les watchers
-        #     for watcher in self._watchers:
-        #         watcher.start()
 
         self.__logger.info("Fin regeneration des documents de %s" % self.get_nom_domaine())
 
@@ -1870,8 +1861,8 @@ class RegenerateurDeDocuments:
             collection_documents = self._gestionnaire_domaine.get_collection_par_nom(nom_collection_documents)
             collection_documents.delete_many({})
 
-    def creer_generateur_transactions(self):
-        return GroupeurTransactionsARegenerer(self._gestionnaire_domaine)
+    def creer_generateur_transactions(self, document_regeneration: dict = None):
+        return GroupeurTransactionsARegenerer(self._gestionnaire_domaine, document_regeneration=document_regeneration)
 
 
 class RegenerateurDeDocumentsSansEffet(RegenerateurDeDocuments):
@@ -1892,7 +1883,7 @@ class GroupeurTransactionsARegenerer:
     Groupe toutes les transactions dans un seul groupe, en ordre de transaction_traitee.
     """
 
-    def __init__(self, gestionnaire_domaine: GestionnaireDomaine, transactions_a_ignorer: list = None):
+    def __init__(self, gestionnaire_domaine: GestionnaireDomaine, transactions_a_ignorer: list = None, document_regeneration: dict = None):
         """
 
         :param gestionnaire_domaine:
@@ -1902,6 +1893,9 @@ class GroupeurTransactionsARegenerer:
         self.__transactions_a_ignorer = transactions_a_ignorer
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.__complet = False
+        self.__document_regeneration = document_regeneration
+        self.__nombre_transactions = None
+        self.__index_transaction_courante = 0
 
     def __preparer_curseur_transactions(self):
         nom_collection_transaction = self.__gestionnaire_domaine.get_collection_transaction_nom()
@@ -1910,11 +1904,12 @@ class GroupeurTransactionsARegenerer:
         collection_transactions = self.__gestionnaire_domaine.document_dao.get_collection(nom_collection_transaction)
 
         filtre, index = self.__preparer_requete()
+
+        self.__nombre_transactions = collection_transactions.find(filtre).count()
+
         return collection_transactions.find(filtre).sort(index).hint(index)
 
     def __preparer_requete(self):
-        idmg = self.__gestionnaire_domaine.configuration.idmg
-
         # Parcourir l'index:
         #  - _evenements.transaction_complete
         #  - _evenements.IDMGtransaction_traitee
@@ -1924,7 +1919,6 @@ class GroupeurTransactionsARegenerer:
             ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                            Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
         ]
-        # ordre_tri = index  # L'index est trie dans l'ordre necessaire
 
         # Filtre par transaction completee:
         #  - _evenements.transaction_complete = True
@@ -1943,6 +1937,16 @@ class GroupeurTransactionsARegenerer:
                 }
             ],
         }
+
+        if self.__document_regeneration is not None:
+            # Ajouter la date de la derniere transaction regeneree comme point de depart
+            completee = self.__document_regeneration['complete'] or False
+            if completee:
+                op = '$gt'
+            else:
+                op = '$gte'
+            date_transaction = self.__document_regeneration['date_traitement']
+            filtre[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT + '.' + Constantes.EVENEMENT_TRANSACTION_TRAITEE] = {op: date_transaction}
 
         if self.__transactions_a_ignorer:
             # Ajouter une liste de transactions a ignorer pour la regeneration
@@ -1966,6 +1970,7 @@ class GroupeurTransactionsARegenerer:
         curseur = self.__preparer_curseur_transactions()
         for valeur in curseur:
             # self.__logger.debug("Transaction: %s" % str(valeur))
+            self.__index_transaction_courante = self.__index_transaction_courante + 1
             yield valeur
 
         self.__complet = True
@@ -1979,6 +1984,14 @@ class GroupeurTransactionsARegenerer:
     @property
     def _complet(self):
         return self.__complet
+
+    @property
+    def nombre_transactions(self):
+        return self.__nombre_transactions
+
+    @property
+    def index_transaction_courante(self):
+        return self.__index_transaction_courante
 
 
 class GroupeurTransactionsSansEffet:

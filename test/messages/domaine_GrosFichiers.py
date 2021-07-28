@@ -667,8 +667,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_collection_personnelle()
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()
-        # sample.commande_regenerer_collectionfichiers()
-        sample.commande_indexer_fichiers()
+        sample.commande_regenerer_collectionfichiers()
+        # sample.commande_indexer_fichiers()
         # sample.requete_rechercher_index()
 
         pass

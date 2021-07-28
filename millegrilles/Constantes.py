@@ -86,6 +86,7 @@ CONFIG_NOEUD_ID = 'noeud_id'
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
 CONFIG_DOMAINES_DYNAMIQUES = 'domaines_dynamiques'
 LIBVAL_CONFIGURATION = 'configuration'
+LIBVAL_REGENERATION = 'regeneration'
 
 # Email notifications
 CONFIG_EMAIL_HOST = 'email_host'
