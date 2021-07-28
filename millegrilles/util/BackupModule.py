@@ -1377,6 +1377,7 @@ class HandlerBackupApplication:
                         files=files,
                         verify=self.__configuration.mq_cafile,
                         cert=(certfile, keyfile),
+                        stream=True,
                         timeout=15
                     )
 
