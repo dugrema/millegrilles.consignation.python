@@ -1056,6 +1056,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         collection_cles = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         document_existant_cle = collection_cles.find_one(filtre)
 
+        fp_millegrille = self.__certificat_millegrille.fingerprint
+
         fingerprints_inconnus = message_dict['cles'].keys()
         flag_non_dechiffrable = False
         if document_existant_cle is not None:
@@ -1091,11 +1093,19 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             }
 
             # Creer domaine action (ex. MaitreDesCles.d16034660842cc9ad9ef37735069f3e3b534f728.cle)
-            domaine_action_transaction = '.'.join([
-                ConstantesMaitreDesCles.DOMAINE_NOM,
-                fp,  # Sous-domaine est le fingerprint du certificat
-                ConstantesMaitreDesCles.TRANSACTION_CLE,
-            ])
+            if fp == fp_millegrille:
+                # La transaction est pour la cle de millegrille, on la met dans le domaine global
+                domaine_action_transaction = '.'.join([
+                    ConstantesMaitreDesCles.DOMAINE_NOM,
+                    ConstantesMaitreDesCles.TRANSACTION_CLE,
+                ])
+            else:
+                # La transaction est pour une cle de maitre des cles, on la met dans un sous-domaine
+                domaine_action_transaction = '.'.join([
+                    ConstantesMaitreDesCles.DOMAINE_NOM,
+                    fp,  # Sous-domaine est le fingerprint du certificat
+                    ConstantesMaitreDesCles.TRANSACTION_CLE,
+                ])
 
             reply_to = None
             correlation_id = None
