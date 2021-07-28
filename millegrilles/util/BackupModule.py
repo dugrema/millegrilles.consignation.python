@@ -60,7 +60,7 @@ class InformationSousDomaineHoraire:
     Information cumulee durant le backup d'un groupe sous-domaine/heure
     """
 
-    CLES_SET = frozenset(['certificats_millegrille', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers'])
+    CLES_SET = frozenset(['certificats_millegrille', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers', 'uuid_transactions'])
 
     def __init__(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime.datetime, snapshot=False):
         self.nom_collection_mongo = nom_collection_mongo
@@ -846,6 +846,8 @@ class HandlerBackupDomaine:
             ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS: dict(),
 
             ConstantesBackup.LIBELLE_BACKUP_PRECEDENT: information_sousgroupe.chainage_backup_precedent,
+
+            'uuid_transactions': information_sousgroupe.uuid_transactions,
         }
         information_sousgroupe.catalogue_backup = catalogue_backup
 
