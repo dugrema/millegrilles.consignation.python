@@ -288,7 +288,7 @@ class CipherMsg2Dechiffrer(CipherMsg1Dechiffrer):
 
 class DigestStream(RawIOBase):
 
-    def __init__(self, file_object):
+    def __init__(self, file_object, hachage: str = None):
         super().__init__()
         self.__file_object = file_object
 
@@ -296,11 +296,19 @@ class DigestStream(RawIOBase):
 
         self.__digest_result: Optional[str] = None
 
+        if hachage is not None:
+            self.__verif = VerificateurHachage(hachage)
+        else:
+            self.__verif = None
+
     def read(self, *args, **kwargs):  # real signature unknown
         data = self.__file_object.read()
 
         # Calculer digest
         self.__digest.update(data)
+
+        if self.__verif:
+            self.__verif.update(data)
 
         return data
 
@@ -308,10 +316,10 @@ class DigestStream(RawIOBase):
         digest_result = self.__digest.finalize()
         return 'sha512_b64:' + b64encode(digest_result).decode('utf-8')
 
-    def verify(self, digest_other: str):
-        verif = VerificateurHachage(digest_other)
-        verif.update(self.__digest.finalize())
-        return verif.verify()
+    def verify(self):
+        # verif = VerificateurHachage(digest_other)
+        # self.__verif.update(self.__digest.finalize())
+        return self.__verif.verify()
 
 
 class DecipherStream(DigestStream):

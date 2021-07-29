@@ -3,6 +3,8 @@ Module avec les fonctions de hachage utilisees dans MilleGrilles.
 
 Inclus les conversions avec multihash et multibase
 """
+import base64
+
 import multibase
 import multihash
 
@@ -103,7 +105,9 @@ class VerificateurHachage:
         """
         hachage_calcule = self.digest()
         if hachage_calcule != self.__hachage_recu:
-            raise ErreurHachage("Hachage different")
+            recu = base64.b64encode(self.__hachage_recu).decode('utf-8')
+            calcule = base64.b64encode(hachage_calcule).decode('utf-8')
+            raise ErreurHachage("Hachage different : recu %s != calcule %s" % (recu, calcule))
 
         return True
 

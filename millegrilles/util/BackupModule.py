@@ -1841,7 +1841,11 @@ class ArchivesBackupParser:
 
             else:
                 # Note : pas de dechiffrage, juste le calcul du digest
-                stream = DigestStream(file_object)
+                try:
+                    hachage_bytes = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
+                except KeyError:
+                    hachage_bytes = None
+                stream = DigestStream(file_object, hachage_bytes)
                 internal_file_object = stream
 
             if internal_file_object is not None:
@@ -1877,10 +1881,12 @@ class ArchivesBackupParser:
 
             try:
                 digest_transactions_catalogue = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
-                stream.verify(digest_transactions_catalogue)
+                # stream.verify(digest_transactions_catalogue)
+                stream.verify()
                 self.__logger.debug("Digest calcule du fichier de transaction est OK")
-            except ErreurHachage:
+            except ErreurHachage as eh:
                 self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions_catalogue)
+                self.__logger.debug("ErreurHachage comparaison base64 : %s" % eh)
                 self.__rapport_restauration.incrementer_digest_invalide(domaine)
             except AttributeError:
                 self.__logger.warning("Digest ne peut pas etre calcul pour transactions domaine %s" % domaine)
