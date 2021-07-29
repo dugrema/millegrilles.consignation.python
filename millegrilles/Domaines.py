@@ -2110,6 +2110,8 @@ class RestaurationTransactions(MGProcessus):
         nom_domaine = gestionnaire.get_nom_domaine()
         configuration = self.controleur.configuration
 
+        verifier = self.parametres.get('verifier') or False
+
         hostname_fichiers = self.parametres.get('url_serveur')
         if hostname_fichiers is None or hostname_fichiers == '':
             host = self.controleur.configuration.serveur_consignationfichiers_host
@@ -2136,8 +2138,14 @@ class RestaurationTransactions(MGProcessus):
                 self.transmettre_reponse({'evenement': 'restauration_demarree', 'domaine': nom_domaine})
                 self.emettre_evenement_restauration({'evenement': 'debut_restauration', 'domaine': nom_domaine})
 
+                params = {
+                    'nom_collection_transactions': self.get_collection_transaction_nom(),
+                    'dry_run': verifier,
+                    'ts_verifier': verifier,
+                }
                 parser = ArchivesBackupParser(
-                    self.controleur.contexte
+                    self.controleur.contexte,
+                    params
                     # resultat.iter_content(chunk_size=10 * 1024)
                 )
 

@@ -25,7 +25,7 @@ from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateForma
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu, EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer, DecipherStream, DigestStream
-from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback
 from millegrilles.util.Hachage import hacher, Hacheur, VerificateurHachage, ErreurHachage
 
@@ -1603,7 +1603,7 @@ class ArchivesBackupParser:
     Parse le fichier .tar transmis par consignationfichiers contenant toutes les archives de backup.
     """
 
-    def __init__(self, contexte: ContexteRessourcesMilleGrilles):
+    def __init__(self, contexte: ContexteRessourcesDocumentsMilleGrilles, params: dict = None):
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1628,10 +1628,14 @@ class ArchivesBackupParser:
         self.__rapport_restauration = RapportRestauration()
 
         # Parametres
+        if params is None:
+            params = dict()
         self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs2)
         self.skip_chiffrage = False     # Mettre a true pour ignorer tous les messages chiffres (.mgs2)
         self.fermer_auto = True         # Ferme la connexion automatiquement sur fin de thread
-        self.dry_run = False            # Si True, fait toutes les verifications mais n'emet pas les transaction
+        self.dry_run = params.get('dry_run') or False  # Si True, fait toutes les verifications mais n'emet pas les transaction
+        self.ts_verifier = params.get('ts_verifier') or False  # Ajoute un timestamp d'evenement verifie_backup sur la transaction
+        self.__nom_collection_transactions = params.get('nom_collection_transactions')
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1993,6 +1997,40 @@ class ArchivesBackupParser:
                 'commande.transaction.restaurerTransaction',
                 exchanges=[Constantes.SECURITE_SECURE]
             )
+
+        if self.ts_verifier is True and self.__nom_collection_transactions is not None:
+            # Valider la transaction (signature)
+            uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            erreur = True
+            try:
+                self.__contexte.validateur_message.verifier(transaction, utiliser_date_message=True, utiliser_idmg_message=True)
+                erreur = False
+            except Exception:
+                self.__logger.exception("Erreur verification transaction %s", )
+
+            # Ajoute un timestamp sur la transaction pour indiquer qu'elle a ete verifiee
+            collection = self.__contexte.document_dao.get_collection(self.__nom_collection_transactions)
+            label = Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID
+            filtre = {label: uuid_transaction}
+            if erreur is False:
+                ops = {
+                    '$currentDate': {
+                        '_evenements.backup_verifie_ok': True
+                    },
+                    '$unset': {
+                        '_evenements.backup_verif_erreur': True
+                    }
+                }
+            else:
+                ops = {
+                    '$currentDate': {
+                        '_evenements.backup_verif_erreur': True
+                    },
+                    '$unset': {
+                        '_evenements.backup_verifie_ok': True
+                    }
+                }
+            collection.update_one(filtre, ops)
 
     def callback_catalogue(self, domaine: str, catalogue: dict):
         """
