@@ -1223,6 +1223,8 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
+        elif action == ConstantesBackup.COMMANDE_BACKUP_RESET_DOMAINE:
+            resultat = self.gestionnaire.reset_backup(message_dict)
 
         else:
             raise ValueError("Commande inconnue: " + routing_key)
@@ -2179,8 +2181,9 @@ class RestaurationTransactions(MGProcessus):
 
                     self.set_etape_suivante()  # Termine
                 else:
-                    self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
-                    reponse['regeneration'] = True
+                    self.set_etape_suivante()  # Termine
+                    #self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
+                    #reponse['regeneration'] = True
 
             else:
                 reponse['evenement'] = 'restauration_annulee'

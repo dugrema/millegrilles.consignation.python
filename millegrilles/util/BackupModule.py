@@ -1631,10 +1631,11 @@ class ArchivesBackupParser:
         self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs2)
         self.skip_chiffrage = False     # Mettre a true pour ignorer tous les messages chiffres (.mgs2)
         self.fermer_auto = True         # Ferme la connexion automatiquement sur fin de thread
+        self.dry_run = False            # Si True, fait toutes les verifications mais n'emet pas les transaction
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def start(self, stream = None, path_output: str = None) -> Event:
+    def start(self, stream=None, path_output: str = None) -> Event:
         """
         Demarre execution
         :return: Event qui est set() a la fin de l'execution
@@ -1702,8 +1703,9 @@ class ArchivesBackupParser:
             for tar_info in self.__tar_stream:
                 self._process_tar_info(tar_info)
         finally:
-            self.__rapport_restauration.generer_transaction_restauration(self.__contexte.generateur_transactions)
-            self.__event_execution.wait(1)
+            if self.dry_run is False:
+                self.__rapport_restauration.generer_transaction_restauration(self.__contexte.generateur_transactions)
+                self.__event_execution.wait(1)
 
             if self.fermer_auto:
                 self.stop()
@@ -1772,8 +1774,9 @@ class ArchivesBackupParser:
         # self.__logger.debug("Catalogue horaire")
         catalogue_json = self.extract_catalogue(nom_fichier, file_object)
         self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
-        generateur = self.__contexte.generateur_transactions
-        generateur.emettre_message(catalogue_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
+        if self.dry_run is False:
+            generateur = self.__contexte.generateur_transactions
+            generateur.emettre_message(catalogue_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
         self._catalogue_horaire_courant = catalogue_json
 
     def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
@@ -1977,12 +1980,13 @@ class ArchivesBackupParser:
         :param transaction:
         :return:
         """
-        generateur = self.__contexte.generateur_transactions
-        generateur.emettre_message(
-            transaction,
-            'commande.transaction.restaurerTransaction',
-            exchanges=[Constantes.SECURITE_SECURE]
-        )
+        if self.dry_run is False:
+            generateur = self.__contexte.generateur_transactions
+            generateur.emettre_message(
+                transaction,
+                'commande.transaction.restaurerTransaction',
+                exchanges=[Constantes.SECURITE_SECURE]
+            )
 
     def callback_catalogue(self, domaine: str, catalogue: dict):
         """
