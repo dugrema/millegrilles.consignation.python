@@ -633,7 +633,7 @@ class HandlerBackupDomaine:
             with lzma.open(information_sousgroupe.path_fichier_catalogue, 'wt') as fichier:
                 self.persister_catalogue(information_sousgroupe, fichier)
             information_sousgroupe.sha512_catalogue = self.calculer_fichier_SHA512(
-                information_sousgroupe.path_fichier_backup)
+                information_sousgroupe.path_fichier_catalogue)
 
         else:
             self.__logger.debug("Backup: aucune transaction, backup annule")
