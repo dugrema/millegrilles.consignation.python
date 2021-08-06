@@ -1,3 +1,5 @@
+import multibase
+
 from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 
@@ -24,7 +26,7 @@ class CertificatSubjectTest:
         self.clecert.cert_from_pem_bytes(pem_file)
 
     def afficher_info(self):
-        print(self.enveloppe.fingerprint_ascii)
+        print(self.enveloppe.fingerprint)
         est_valide = self.enveloppe.date_valide()
         print("Certificat %s, date valide: %s" % (self.enveloppe.subject_rfc4514_string(), est_valide))
 
@@ -40,14 +42,18 @@ class CertificatSubjectTest:
         print(subject)
 
     def idmg(self):
-        print("sha1b58\n" + self.clecert.fingerprint_base58)
-        print("sha2 256\n" + self.clecert.fingerprint_sha256_base58)
-        print("sha2 512\n" + self.clecert.fingerprint_sha512_base58)
+        # print("sha1b58\n" + self.clecert.fingerprint_base58)
+        # print("sha2 256\n" + self.clecert.fingerprint_sha256_base58)
+        # print("sha2 512\n" + self.clecert.fingerprint_sha512_base58)
+
+        idmg = self.clecert.idmg
         print("sha2 512/224:\n" + self.clecert.idmg)
+
+        print("IDMG en bytes : %s" % binascii.hexlify(multibase.decode(idmg)))
 
 
 test = CertificatSubjectTest()
-test.charger('/home/mathieu/mgdev/certs/pki.racine.cert')
+test.charger('/home/mathieu/mgdev/certs/pki.millegrille')
 test.afficher_info()
 test.verifier_typenoeud()
 test.subject_mq()

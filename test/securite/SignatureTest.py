@@ -30,17 +30,18 @@ class PreparateurMessage:
             "en-tete": {
                 "domaine": domaine,
                 "estampille": int(datetime.datetime.utcnow().timestamp()),
-                "noeud": self._identificateur_systeme,
+                # "noeud": self._identificateur_systeme,
                 "uuid": str(uuid.uuid4()),
-                "source-systeme": "test@dev2.maple.mdugre.info"
+                # "source-systeme": "test@dev2.maple.mdugre.info"
             }
         }
 
         return message_ref
 
+
 class SignateurTest:
 
-    CERT_FOLDER = '/usr/local/etc/millegrilles'
+    CERT_FOLDER = '/home/mathieu/mgdev/certs'
 
     def __init__(self):
         self.cle = None
@@ -51,7 +52,7 @@ class SignateurTest:
         self._hash_function = hashes.SHA512
 
     def load_cle(self):
-        with open('%s/pki.millegrilles.ssl.key' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/pki.domaines.key' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             cle = serialization.load_pem_private_key(
                 key_file.read(),
                 password=None,
@@ -61,7 +62,7 @@ class SignateurTest:
             self._logger.debug("Cle privee chargee")
 
     def load_certificat(self):
-        with open('%s/pki.millegrilles.ssl.cert' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/pki.domaines.cert' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             certificat = x509.load_pem_x509_certificate(
                 key_file.read(),
                 backend=default_backend()

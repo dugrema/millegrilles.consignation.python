@@ -255,8 +255,12 @@ class EnveloppeCertificat:
         # Note : utilisation de pytz pour transformer la date vers le format datetime python3
         #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
         #        https://en.wikipedia.org/wiki/Year_2038_problem
-        is_valid_from = (now > pytz.utc.localize(self.certificat.not_valid_before))
-        is_valid_to = (now < pytz.utc.localize(self.certificat.not_valid_after))
+        try:
+            is_valid_from = (now > pytz.utc.localize(self.certificat.not_valid_before))
+            is_valid_to = (now < pytz.utc.localize(self.certificat.not_valid_after))
+        except TypeError:
+            is_valid_from = (now > self.certificat.not_valid_before)
+            is_valid_to = (now < self.certificat.not_valid_after)
 
         return is_valid_from and is_valid_to
 
