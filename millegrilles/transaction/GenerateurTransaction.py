@@ -283,7 +283,13 @@ class GenerateurTransaction:
 
         # Emet le certificat sur l'exchange par defaut
         routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
-        self.emettre_message(message, routing, exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE])
+        message = self.emettre_message(
+            message,
+            routing,
+            exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE],
+            ajouter_certificats=True,
+            retourner_enveloppe=True
+        )
 
         return message
 

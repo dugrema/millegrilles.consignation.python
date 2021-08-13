@@ -93,25 +93,8 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
-    def renouveller_certs_docker(self):
-        requete_cert = {
-            'altdomains': {
-                "mq": 'mq.maple.maceroc.com,mg-dev3.maple.maceroc.com'
-            },
-            'roles': ['mq'],
-        }
-        enveloppe_requete = self.generateur.soumettre_transaction(
-            requete_cert,
-            ConstantesPki.TRANSACTION_RENOUVELLER_CERT_DOCKER,
-            'abcd-1234',
-            self.queue_name,
-        )
-
-        print("Envoi requete: %s" % enveloppe_requete)
-        return enveloppe_requete
-
     def requete_certificat(self):
-        fingerprint = 'G2wDuvqGpxSl2KICGmVfaVxYzgd315zvo7znzwZaMr4='
+        fingerprint = 'zQmfHuGwHhywuP8rX77eXkdx1gwgp4jiiWPuujQCd1Hwq9N'
         requete = {
             # 'fingerprint': 'sha256_b64:idpQSrDt2h+CE0XSJZZNPEakd3Wha+EhcD9v4VKUXSk='
         }
@@ -119,11 +102,10 @@ class MessagesSample(BaseCallback):
         self.generateur.transmettre_requete(requete, domaine_action, correlation_id='abcd', reply_to=self.queue_name)
 
     def executer(self):
-        # self.renouveller_certs_docker()
         # self.requete_cert_backup()
         # self.requete_cert_noeuds()
-        # self.requete_certificat()
-        self.requete_cert_pk()
+        self.requete_certificat()
+        # self.requete_cert_pk()
 
 
 # --- MAIN ---

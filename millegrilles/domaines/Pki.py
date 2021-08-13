@@ -102,19 +102,26 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
+        correlation_id = properties.correlation_id
+        reply_to = properties.reply_to
 
         # Verifier si la requete est pour un certificat
+        reponse = None
         if routing_key and routing_key.startswith('requete.certificat.'):
             fingerprint = routing_key.split('.')[-1]
             certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
             try:
-                self.gestionnaire.generateur_transactions.emettre_certificat(
+                reponse = self.gestionnaire.generateur_transactions.emettre_certificat(
                     certificat[ConstantesSecurityPki.LIBELLE_CHAINE_PEM])
             except KeyError:
+                self.__logger.exception("Erreur preparation certificat %s" % fingerprint)
                 pass  # Certificat inconnu
         else:
             super().traiter_message(ch, method, properties, body)
             return
+
+        if reponse is not None:
+            self.gestionnaire.generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
 
     def traiter_requete(self, ch, method, properties, body, message_dict, enveloppe_certificat):
         routing_key = method.routing_key
@@ -449,6 +456,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
             for key, value in certificat.items():
                 if not key.startswith('_'):
                     certificat_filtre[key] = value
+
+            certs = certificat[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM]
+            chaine_fp = certificat[ConstantesSecurityPki.LIBELLE_CHAINE]
+
+            chaine_pem = [certs[c] for c in chaine_fp]
+            certificat_filtre[ConstantesSecurityPki.LIBELLE_CHAINE_PEM] = chaine_pem
         except AttributeError:
             if demander_si_inconnu:
                 self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint)
