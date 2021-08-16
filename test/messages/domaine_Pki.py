@@ -94,7 +94,7 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def requete_certificat(self):
-        fingerprint = 'zQmfHuGwHhywuP8rX77eXkdx1gwgp4jiiWPuujQCd1Hwq9N'
+        fingerprint = 'zQmTSwmX9UVsEpaeGT2JprmGbSW2S9CYyMXKQShoercJbcg'
         requete = {
             # 'fingerprint': 'sha256_b64:idpQSrDt2h+CE0XSJZZNPEakd3Wha+EhcD9v4VKUXSk='
         }
