@@ -809,7 +809,11 @@ class GestionnaireModulesDocker:
         return self.__trouver_config(config_name)
 
     def __trouver_config(self, config_name):
-        return MonitorConstantes.trouver_config(config_name, self.__docker)
+        try:
+            return MonitorConstantes.trouver_config(config_name, self.__docker)
+        except AttributeError as ae:
+            self.__logger.warning("Configuration %s non trouvee" % config_name)
+            raise ae
 
     def trouver_secret(self, secret_name):
         secret_names = secret_name.split(';')

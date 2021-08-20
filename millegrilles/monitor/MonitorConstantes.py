@@ -84,6 +84,11 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
     },
+    ConstantesServiceMonitor.MODULE_CORE: {
+        'nom': ConstantesServiceMonitor.MODULE_CORE_RUST,
+        'nom_image': ConstantesServiceMonitor.MODULE_CORE_RUST,
+        'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+    },
     ConstantesServiceMonitor.MODULE_REDIS: {
         'nom': ConstantesServiceMonitor.MODULE_REDIS,
         'nom_image': ConstantesServiceMonitor.MODULE_REDIS
@@ -138,6 +143,7 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_TRANSACTION,
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
     ConstantesServiceMonitor.MODULE_PRINCIPAL,
+    ConstantesServiceMonitor.MODULE_CORE,
     ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
