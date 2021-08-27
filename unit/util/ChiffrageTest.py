@@ -6,6 +6,7 @@ from unittest import TestCase
 
 from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer
 from millegrilles.util.Hachage import verifier_hachage
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 
 # Setup logging
@@ -38,7 +39,7 @@ MESSAGE_2_CHIFFRE = {
 }
 
 
-class ChiffrageTest(TestCase):
+class ChiffrageSymmetriqueTest(TestCase):
 
     def test_chiffrer_string(self):
         cipher = CipherMsg2Chiffrer()
@@ -139,3 +140,35 @@ class ChiffrageTest(TestCase):
 
         logger.debug("Resultat dechiffrage : %s" % resultat)
         self.assertEqual(MESSAGE_2, resultat)
+
+
+class ChiffrageAsymmetriqueTest(TestCase):
+
+    def setUp(self) -> None:
+        with open("/home/mathieu/mgdev/certs/pki.domaines.cert", "rb") as fichier:
+            cert = fichier.read()
+        with open("/home/mathieu/mgdev/certs/pki.domaines.key", "rb") as fichier:
+            key = fichier.read()
+        self.enveloppe = EnveloppeCleCert()
+        self.enveloppe.from_pem_bytes(key, cert)
+
+    def test_chiffrer_secret(self):
+        password = b"mon mot de passe"
+        logger.debug("Password en bytes : %s" % multibase.encode('base64', password))
+
+        ciphertext = self.enveloppe.chiffrage_asymmetrique(password)
+        ciphertext_b64 = multibase.encode('base64', ciphertext[0])
+        logger.debug("Cle asymetrique chiffree : %s" % ciphertext_b64)
+
+        cle_dechiffree = self.enveloppe.dechiffrage_asymmetrique(ciphertext[0])
+        cle_dechiffree_b64 = multibase.encode('base64', cle_dechiffree)
+        logger.debug("Cle asymetrique dechiffree : %s" % cle_dechiffree_b64)
+
+    def test_dechiffrer(self):
+        ciphertext = 'mATFKDJFjq1PxOsSVvwqwuzT8LIHwwJWCdTDK6KH07v0qIDh3UOGXPfg5RBK/zj6uXauv0gd3huoTG5kkzWsPd1iCIWwy1rwKbbXa5RSPa40gzqgSoEytrPWWz5NGcq9ITTACNLXRIPKj7CIdkB5PTbXCx3QA02zhLy7ZEWDgAl8hsURx6bFA3thv0Vm+9DreK1P/xauadhpSRwy+FULHIQWUGqcxmM+eaBDSe3hRAB7BUYbe+z5aARFBlJyZN3v2JLhp9CdJG3BHMpeTbaFOMSVDW83sX1zV7Flndf8xZoRkJg2R3XH0nLWYKfQgGZcS56DMm1NL9brU9mTUVUTW2w'
+        ciphertext_bytes = multibase.decode(ciphertext)
+        cle_dechiffree = self.enveloppe.dechiffrage_asymmetrique(ciphertext_bytes)
+        cle_dechiffree_b64 = multibase.encode('base64', cle_dechiffree)
+        logger.debug("Cle asymetrique dechiffree : %s" % cle_dechiffree_b64)
+
+        self.assertEqual(b'mNtgxGCdas7+URUXKjCQa7GX//Raw0trSYPFzME368sQ', cle_dechiffree_b64)
