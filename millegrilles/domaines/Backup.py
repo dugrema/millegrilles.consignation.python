@@ -614,8 +614,8 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
                 transaction[champ]
 
         # Placer les fuuid de chaque fichier pour faire un update individuel
-        for fuuid, info_fichier in transaction[ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS].items():
-            set_ops['%s.%s' % (ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS, fuuid)] = info_fichier
+        # for fuuid, info_fichier in transaction[ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS].items():
+        #     set_ops['%s.%s' % (ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS, fuuid)] = info_fichier
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
@@ -648,7 +648,7 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
             if cles is None and transaction.get('cle'):
                 # On a seulement la cle de millegrille
                 enveloppe_millegrille = self._controleur._contexte.signateur_transactions.get_enveloppe_millegrille()
-                fingerprint_b64 = enveloppe_millegrille.fingerprint_b64
+                fingerprint_b64 = enveloppe_millegrille.fingerprint
                 cles = {fingerprint_b64: transaction['cle']}
 
             transactions_nomfichier = transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]

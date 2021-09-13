@@ -721,7 +721,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.event_recu.wait(5)
         # self.event_recu.clear()
 
-        # enveloppe = self.requete_cert_maitredescles()
+        enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
         # for i in range(0, 2):
@@ -758,9 +758,9 @@ BMz4ginADdtNs9ARr3DcwG4=
         #     "sha512_b64:ys1vTtaKjCXnqt6i2G1GbHvN9vvMoiDt2IuV6/WatDVrN6pm670KO9iiL4N/tu6U60Jhsad+W3ZJky5iUGI1Hg==",
         # ])
 
-        self.requete_dechiffrage_cle_permission([
-            'z8VtAgm7BYshU7J9ZJRJKg8ZcZF783aAJuGgyR8dLNrvAEFEWhDi8zw8oicBD7NMqYnhNzRYQ8cJTydgWyFhtsjNyWX',
-        ])
+        # self.requete_dechiffrage_cle_permission([
+        #     'z8VtAgm7BYshU7J9ZJRJKg8ZcZF783aAJuGgyR8dLNrvAEFEWhDi8zw8oicBD7NMqYnhNzRYQ8cJTydgWyFhtsjNyWX',
+        # ])
 
 
 def reset_docs_cles():
