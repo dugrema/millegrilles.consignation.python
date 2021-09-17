@@ -1,5 +1,7 @@
 import logging
 import datetime
+
+import pytz
 import requests
 import json
 
@@ -52,6 +54,8 @@ class TraitementCommandeBackup(TraitementMessageDomaineCommande):
             return self.gestionnaire.lancer_processus_restauration(message_dict)
         elif action == ConstantesBackup.COMMANDE_BACKUP_BACKUP_HORAIRE_TRANSACTIONS:
             pass  # Rien a faire, les catalogues font deja partis des backups
+        elif action == 'declencherBackupQuotidien':
+            return self.gestionnaire.commande_backup_quotidien(message_dict)
         else:
             raise ValueError("Type de commande de backup inconnue : %s" % action)
 
@@ -237,11 +241,13 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
         filtre = {
             ConstantesBackup.LIBELLE_DOMAINE: domaine,
+            "snapshot": False,
         }
         if securite:
             filtre[ConstantesBackup.LIBELLE_SECURITE] = securite
         sort = [
             (ConstantesBackup.LIBELLE_HEURE, -1),
+            ("_evenements.transaction_traitee", -1),
         ]
 
         collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_TRANSACTIONS_NOM)
@@ -579,6 +585,20 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
             exchange=Constantes.SECURITE_PROTEGE
         )
+
+    def commande_backup_quotidien(self, commande: dict):
+        """
+        Prepare le catalogue quotidien et l'emet sous forme de commande pour consignationfichiers
+
+        :return:
+        """
+        domaine = commande['domaine']
+        jour_epoch = commande['jour']
+        uuid_rapport = commande['uuid_rapport']
+
+        jour = datetime.datetime.fromtimestamp(jour_epoch, pytz.UTC)
+
+        self.handler_backup.creer_backup_quoditien(domaine, jour, uuid_rapport)
 
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):

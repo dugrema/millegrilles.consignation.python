@@ -7,9 +7,6 @@
       "module": "millegrilles.domaines.Backup",
       "classe": "GestionnaireBackup"
     },{
-      "module": "millegrilles.domaines.Pki",
-      "classe": "GestionnairePki"
-    },{
       "module": "millegrilles.domaines.Parametres",
       "classe": "GestionnaireParametres"
     },{

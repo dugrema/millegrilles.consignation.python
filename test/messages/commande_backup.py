@@ -139,7 +139,7 @@ class MessagesSample(BaseCallback):
 
     def requete_backup_dernierhoraire(self):
         requete = {
-            'domaine': Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+            'domaine': "CorePki",  # Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
         }
         self._contexte.generateur_transactions.transmettre_requete(
             requete,
@@ -236,6 +236,16 @@ class MessagesSample(BaseCallback):
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,
             ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL,
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_reset'
+        )
+
+    def commande_reset_backups(self, nom_domaine: str):
+        commande_reset = {}
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_reset,
+            'commande.%s.resetBackup' % nom_domaine,
             exchange=Constantes.SECURITE_PROTEGE,
             reply_to=self.queue_name,
             correlation_id='trigger_backup_reset'
@@ -398,9 +408,19 @@ class MessagesSample(BaseCallback):
             correlation_id='test'
         )
 
+    def commande_restaurer_transactions_domaine(self, domaine: str):
+        commande = {}
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.%s.%s' % (domaine, ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS),
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='test'
+        )
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
-        sample.commande_regenerer()
+        # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
 
         # sample.trigger_backup_global()
@@ -435,6 +455,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup('MaitreDesCles')
         # sample.trigger_backup('Topologie')
         # sample.trigger_backup('GrosFichiers')
+        sample.trigger_backup('CorePki')
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2021, month=2, day=1))
         # sample.commande_verifier_domaine('Publication')
         # sample.commande_verifier_domaine('MaitreDesCles.48a07cc993f5116f158fb280e69b7889f7a24b60')
@@ -443,6 +464,8 @@ class MessagesSample(BaseCallback):
 
         # sample.commande_preparer_restauration()
         # sample.commande_restaurer_transactions()
+        # sample.commande_restaurer_transactions_domaine("CorePki")
+        # sample.commande_reset_backups("CorePki")
         # sample.trigger_backup_reset_grosfichiers()
 
 
