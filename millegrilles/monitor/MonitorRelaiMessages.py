@@ -623,6 +623,7 @@ class ConnexionMiddleware:
                 roles_mongo = [
                     ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
                     ConstantesGenerateurCertificat.ROLE_DOMAINES,
+                    ConstantesGenerateurCertificat.ROLE_CORE,
                     ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
                 ]
                 for role in roles_comptes:

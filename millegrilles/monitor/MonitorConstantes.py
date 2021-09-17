@@ -87,7 +87,7 @@ DICT_MODULES_PROTEGES = {
     ConstantesServiceMonitor.MODULE_CORE: {
         'nom': ConstantesServiceMonitor.MODULE_CORE_RUST,
         'nom_image': ConstantesServiceMonitor.MODULE_CORE_RUST,
-        'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        'role': ConstantesGenerateurCertificat.ROLE_CORE,
     },
     ConstantesServiceMonitor.MODULE_REDIS: {
         'nom': ConstantesServiceMonitor.MODULE_REDIS,

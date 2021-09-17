@@ -455,7 +455,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup('MaitreDesCles')
         # sample.trigger_backup('Topologie')
         # sample.trigger_backup('GrosFichiers')
-        sample.trigger_backup('CorePki')
+        # sample.trigger_backup('CorePki')
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2021, month=2, day=1))
         # sample.commande_verifier_domaine('Publication')
         # sample.commande_verifier_domaine('MaitreDesCles.48a07cc993f5116f158fb280e69b7889f7a24b60')
@@ -464,7 +464,7 @@ class MessagesSample(BaseCallback):
 
         # sample.commande_preparer_restauration()
         # sample.commande_restaurer_transactions()
-        # sample.commande_restaurer_transactions_domaine("CorePki")
+        sample.commande_restaurer_transactions_domaine("CorePki")
         # sample.commande_reset_backups("CorePki")
         # sample.trigger_backup_reset_grosfichiers()
 

@@ -821,6 +821,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         roles_permis = [
             ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
             ConstantesGenerateurCertificat.ROLE_DOMAINES,
+            ConstantesGenerateurCertificat.ROLE_CORE,
         ]
         est_protege = enveloppe_cert.est_acces_protege(roles_permis)
 
