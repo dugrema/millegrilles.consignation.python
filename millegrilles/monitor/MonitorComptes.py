@@ -114,6 +114,7 @@ class GestionnaireComptesMQ:
         idmg = issuer['organizationName']
 
         subject = enveloppe.subject_rfc4514_string_mq()
+        self.__logger.info("Creation compte MQ pour %s" % subject)
 
         try:
             self.ajouter_exchanges(idmg)
