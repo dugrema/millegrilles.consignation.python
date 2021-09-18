@@ -18,9 +18,6 @@
     },{
       "module": "millegrilles.domaines.CatalogueApplications",
       "classe": "GestionnaireCatalogueApplications"
-    },{
-      "module": "millegrilles.domaines.Pki",
-      "classe": "GestionnairePki"
     }
   ]
 }
