@@ -807,10 +807,10 @@ class ServiceMonitor:
         webroot = self._args.webroot
         path_catalogues = os.path.join(webroot, 'catalogues')
 
-        with lzma.open(os.path.join(path_catalogues, 'catalogue.domaines.json.xz'), 'rt') as fichier:
-            catalogue_domaines = json.load(fichier)
-        domaine_action = 'transaction.' + catalogue_domaines[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        self._connexion_middleware.generateur_transactions.emettre_message(catalogue_domaines, domaine_action)
+        # with lzma.open(os.path.join(path_catalogues, 'catalogue.domaines.json.xz'), 'rt') as fichier:
+        #     catalogue_domaines = json.load(fichier)
+        # domaine_action = 'transaction.' + catalogue_domaines[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        # self._connexion_middleware.generateur_transactions.emettre_message(catalogue_domaines, domaine_action)
 
         path_applications = os.path.join(webroot, 'catalogues', 'applications')
         liste_fichiers_apps = os.listdir(path_applications)
@@ -818,9 +818,9 @@ class ServiceMonitor:
         for app_path in info_apps:
             with lzma.open(app_path, 'rt') as fichier:
                 app_transaction = json.load(fichier)
-            domaine_action = 'transaction.' + app_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-            self._connexion_middleware.generateur_transactions.emettre_message(app_transaction, domaine_action)
+
+            commande = {"catalogue": app_transaction}
+            self._connexion_middleware.generateur_transactions.transmettre_commande(commande, domaine='CoreCatalogues', action='catalogueApplication')
 
     def emettre_presence(self):
         """

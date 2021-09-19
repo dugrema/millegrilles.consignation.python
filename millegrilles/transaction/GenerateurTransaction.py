@@ -38,9 +38,9 @@ class GenerateurTransaction:
         return securite_liste
 
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                           idmg_destination: str = None, ajouter_certificats=False):
+                           idmg_destination: str = None, ajouter_certificats=False, action: str = None):
 
-        message, uuid_transaction = self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination)
+        message, uuid_transaction = self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination, action=action)
 
         if ajouter_certificats:
             message['_certificat'] = self.__formatteur_message.chaine_certificat
@@ -183,11 +183,11 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def transmettre_commande(self, commande_dict, routing_key, channel=None, encoding=DateFormatEncoder,
+    def transmettre_commande(self, commande_dict, domaine, channel=None, encoding=DateFormatEncoder,
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None,
-                             reply_to=None, correlation_id=None, ajouter_certificats=False):
+                             reply_to=None, correlation_id=None, ajouter_certificats=False, action: str = None):
 
-        enveloppe = self.preparer_enveloppe(commande_dict, domaine=routing_key, idmg_destination=idmg_destination)
+        enveloppe = self.preparer_enveloppe(commande_dict, domaine=domaine, idmg_destination=idmg_destination, action=action)
 
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
@@ -195,6 +195,12 @@ class GenerateurTransaction:
 
         if ajouter_certificats:
             enveloppe['_certificat'] = self.__formatteur_message.chaine_certificat
+
+        routing_key: str = domaine
+        if not routing_key.startswith('commande'):
+            routing_key = 'commande.' + routing_key
+        if action is not None:
+            routing_key = routing_key + '.' + action
 
         self._contexte.message_dao.transmettre_commande(
             enveloppe, routing_key, channel=channel, encoding=encoding, exchange=exchange,
