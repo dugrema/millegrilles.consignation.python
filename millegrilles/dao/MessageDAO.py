@@ -737,7 +737,7 @@ class PikaDAO:
     '''
 
     def transmettre_message_exchange(self, message_dict, routing_key, exchange: str, delivery_mode_v=1,
-                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None, headers: dict = None):
+                                     encoding=DateFormatEncoder, reply_to=None, correlation_id=None, headers: dict = None):
 
         if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")

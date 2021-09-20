@@ -65,10 +65,12 @@ class MessagesSample(BaseCallback):
 
     def requete_liste_applications(self):
         requete = {}
-        domaine_action = ConstantesCatalogueApplications.REQUETE_LISTE_APPLICATIONS
+        domaine_action = ConstantesCatalogueApplications.DOMAINE_NOM  # ConstantesCatalogueApplications.REQUETE_LISTE_APPLICATIONS
         enveloppe_val = self.generateur.transmettre_requete(
             requete, domaine_action,
-            reply_to=self.queue_name, correlation_id='efgh')
+            reply_to=self.queue_name, correlation_id='efgh',
+            action=ConstantesCatalogueApplications.REQUETE_LISTE_APPLICATIONS
+        )
         print("Envoi metadata: %s" % enveloppe_val)
 
     def requete_domaine(self):
@@ -89,9 +91,9 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_liste_domaines()
-        sample.requete_liste_applications()
         # sample.requete_domaine()
-        # sample.requete_application()
+        # sample.requete_liste_applications()
+        sample.requete_application()
 
 
 # --- MAIN ---

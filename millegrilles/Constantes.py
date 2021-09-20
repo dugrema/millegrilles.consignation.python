@@ -2016,7 +2016,7 @@ class ConstantesPublication:
 
 class ConstantesCatalogueApplications:
 
-    DOMAINE_NOM = 'CatalogueApplications'
+    DOMAINE_NOM = 'CoreCatalogues'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
@@ -2033,7 +2033,7 @@ class ConstantesCatalogueApplications:
     TRANSACTION_CATALOGUE_DOMAINES = '%s.catalogueDomaines' % DOMAINE_NOM
 
     REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM
-    REQUETE_LISTE_APPLICATIONS = '%s.listeApplications' % DOMAINE_NOM
+    REQUETE_LISTE_APPLICATIONS = 'listeApplications'
     REQUETE_INFO_DOMAINE = '%s.infoDomaine' % DOMAINE_NOM
     REQUETE_INFO_APPLICATION = '%s.infoApplication' % DOMAINE_NOM
 
