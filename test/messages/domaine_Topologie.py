@@ -66,24 +66,39 @@ class MessagesSample(DomaineTest):
         requete = {}
         domaine_action = ConstantesTopologie.REQUETE_LISTE_DOMAINES
         enveloppe_val = self.generateur.transmettre_requete(
-            requete, domaine_action,
-            reply_to=self.queue_name, correlation_id='efgh')
+            requete,
+            'CoreTopologie',
+            action='listeDomaines',
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
         print("Envoi metadata: %s" % enveloppe_val)
 
     def requete_liste_noeuds(self):
-        requete = {}
-        domaine_action = ConstantesTopologie.REQUETE_LISTE_NOEUDS
+        requete = {}  # {"noeud_id": "36652245-1c1a-4686-8686-21dcebbdf43f"}
         enveloppe_val = self.generateur.transmettre_requete(
-            requete, domaine_action,
-            reply_to=self.queue_name, correlation_id='efgh')
+            requete,
+            'CoreTopologie',
+            action='listeNoeuds',
+            reply_to=self.queue_name,
+            correlation_id='efgh',
+            securite=Constantes.SECURITE_PROTEGE
+        )
         print("Envoi metadata: %s" % enveloppe_val)
 
     def requete_liste_applications(self):
         requete = {}
-        domaine_action = ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES
+        # domaine_action = ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES
+        # enveloppe_val = self.generateur.transmettre_requete(
+        #     requete, domaine_action,
+        #     reply_to=self.queue_name, correlation_id='efgh')
         enveloppe_val = self.generateur.transmettre_requete(
-            requete, domaine_action,
-            reply_to=self.queue_name, correlation_id='efgh')
+            requete,
+            'CoreTopologie',
+            action='listeApplicationsDeployees',
+            reply_to=self.queue_name, correlation_id='efgh',
+            securite=Constantes.SECURITE_PRIVE
+        )
         print("Envoi metadata: %s" % enveloppe_val)
 
     def requete_liste_noeud_detail(self):
@@ -232,9 +247,9 @@ class MessagesSample(DomaineTest):
         print("Contenu dechiffre : %s" % contenu_dechiffre)
 
     def executer(self):
-        # sample.requete_liste_domaines()
+        sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
-        sample.requete_liste_applications()
+        # sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
         # sample.requete_info_noeud()

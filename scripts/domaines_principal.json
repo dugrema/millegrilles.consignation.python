@@ -6,9 +6,6 @@
     },{
       "module": "millegrilles.domaines.MaitreDesComptes",
       "classe": "GestionnaireMaitreDesComptes"
-    },{
-      "module": "millegrilles.domaines.Topologie",
-      "classe": "GestionnaireTopologie"
     }
   ]
 }

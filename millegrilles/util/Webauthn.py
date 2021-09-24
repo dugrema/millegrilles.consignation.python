@@ -56,8 +56,8 @@ class Webauthn:
     def authenticate_complete(self, url_site: str, assertions: dict, auth_response: dict, user_webauthn: list):
         # data = cbor.decode(request.get_data())
 
+        # Convertir creds du compte usager en format AttestedCredentialData
         credentials = []
-
         for cred in user_webauthn:
             cred_bytes = multibase.decode(cred['credId'])
             aaguid = bytes(16)  # Dummy
@@ -84,6 +84,7 @@ class Webauthn:
             cred_ajuste = AttestedCredentialData.create(aaguid, cred_id, pk)
             credentials.append(cred_ajuste)
 
+        # Formuler le challenge pour authentification FIDO
         challenge_data = {
             'challenge': assertions['challenge'][1:],
             'rpId': assertions['rpId'],
@@ -102,6 +103,7 @@ class Webauthn:
         print("clientData", client_data)
         print("AuthenticatorData", auth_data)
 
+        # Verifier la signature
         server.authenticate_complete(
             challenge_data,
             credentials,

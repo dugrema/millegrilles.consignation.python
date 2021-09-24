@@ -48,8 +48,9 @@ class MessagesSample(BaseCallback):
 
     def requete_profil_usager(self):
         requete = {'userId': 'zQmdPavTTxhnjCKbrcPXUcfVcbpNSssGTVUQboGGRFVt4bN'}
-        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER])
-        enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+        # domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER])
+        # enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+        enveloppe = self.generateur.transmettre_requete(requete, 'CoreMaitreDesComptes', 'abcd-1234', self.queue_name, action='chargerUsager')
 
         print("Envoi : %s" % enveloppe)
         return enveloppe
@@ -69,8 +70,9 @@ class MessagesSample(BaseCallback):
             #     'zQmWApXQASWLPGgqgxj7gBYL5VSF6nqzkrwJdDp4QfRjAXX',
             # ]
         }
-        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS])
-        enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+        # domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS])
+        # enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+        enveloppe = self.generateur.transmettre_requete(requete, 'CoreMaitreDesComptes', 'abcd-1234', self.queue_name, action="getListeUsagers")
 
         print("Envoi : %s" % enveloppe)
         return enveloppe
