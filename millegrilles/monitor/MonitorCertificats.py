@@ -771,13 +771,16 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         if contenu.get('activationTierce') is True:
             # Calculer le fingerprint_pk du certificat
             fingerprint_pk = clecert.fingerprint_cle_publique
-            domaine_activation = 'commande.MaitreDesComptes.activationTierce'
+            # domaine_activation = 'commande.MaitreDesComptes.activationTierce'
+            domaine = 'CoreMaitreDesComptes'
+            action = 'activationTierce'
             commande_activation = {
                 'nomUsager': nom_usager,
                 'userId': user_id,
                 'fingerprint_pk': fingerprint_pk,
+                'certificat_pem': clecert.chaine
             }
-            self._service_monitor.generateur_transactions.transmettre_commande(commande_activation, domaine_activation)
+            self._service_monitor.generateur_transactions.transmettre_commande(commande_activation, domaine, action=action)
 
         return {
             'cert': clecert.cert_bytes.decode('utf-8'),
