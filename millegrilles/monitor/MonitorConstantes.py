@@ -60,8 +60,8 @@ DICT_MODULES_PROTEGES = {
         'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
     },
     ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
-        'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
+        'nom': ConstantesServiceMonitor.MODULE_MAITREDESCLES,
+        'nom_image': ConstantesServiceMonitor.MODULE_MAITREDESCLES,
         'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
     },
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
