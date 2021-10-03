@@ -480,12 +480,12 @@ class MessagesSample(BaseCallback):
 
         # sample.trigger_backup_global()
         # sample.trigger_backup_reset_global()
-        # sample.trigger_restaurer_global()
+        sample.trigger_restaurer_global()
 
-        backup_domaine = 'MaitreDesCles.zQmYiaAcKMBTHEf175LyEcVX88YqLBSUc6oZFDU5utFF94V'
+        backup_domaine = 'CorePki'
         # sample.trigger_backup(backup_domaine)
         # sample.commande_reset_backups(backup_domaine)
-        sample.commande_restaurer_transactions_domaine(backup_domaine)
+        # sample.commande_restaurer_transactions_domaine(backup_domaine)
 
 
 # --- MAIN ---

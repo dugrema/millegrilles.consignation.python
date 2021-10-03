@@ -167,18 +167,20 @@ class BackupUtil:
         iv = multibase.encode('base64', cipher.iv).decode('utf-8')
 
         # Conserver iv/tag et cle chiffree avec cle de millegrille (restore dernier recours)
-        enveloppe_millegrille = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
+        enveloppe_millegrille: EnveloppeCertificat = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
+        cert_millegrille = enveloppe_millegrille.chaine_enveloppes()[-1]
         catalogue_backup['cle'] = multibase.encode('base64', cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
         catalogue_backup['iv'] = iv
         catalogue_backup['tag'] = '!!!REMPLACER!!!'
         catalogue_backup['format'] = 'mgs2'
 
         # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
+        cert_maitredescles = info_cles['certificat'][0]
         certs_cles_backup = [
-            info_cles['certificat'][0],  # Certificat de maitredescles
-            info_cles['certificat_millegrille'],  # Certificat de millegrille
+            cert_maitredescles,  # info_cles['certificat'][0],  # Certificat de maitredescles
+            cert_millegrille.certificat_pem,  # info_cles['certificat_millegrille'],  # Certificat de millegrille
         ]
-        certs_cles_backup.extend(info_cles['certificats_backup'].values())
+        # certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
 
         identificateurs_document = {
