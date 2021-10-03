@@ -54,11 +54,11 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_MONGO,
         'role': ConstantesGenerateurCertificat.ROLE_MONGO,
     },
-    ConstantesServiceMonitor.MODULE_TRANSACTION: {
-        'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-        'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-    },
+    # ConstantesServiceMonitor.MODULE_TRANSACTION: {
+    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+    #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
+    #     'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+    # },
     ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
         'nom': ConstantesServiceMonitor.MODULE_MAITREDESCLES,
         'nom_image': ConstantesServiceMonitor.MODULE_MAITREDESCLES,
@@ -79,11 +79,11 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
         'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
     },
-    ConstantesServiceMonitor.MODULE_PRINCIPAL: {
-        'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-        'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    },
+    # ConstantesServiceMonitor.MODULE_PRINCIPAL: {
+    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+    #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
+    #     'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+    # },
     ConstantesServiceMonitor.MODULE_CORE: {
         'nom': ConstantesServiceMonitor.MODULE_CORE_RUST,
         'nom_image': ConstantesServiceMonitor.MODULE_CORE_RUST,
@@ -140,9 +140,9 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_MQ,
     ConstantesServiceMonitor.MODULE_MONGO,
-    ConstantesServiceMonitor.MODULE_TRANSACTION,
+    # ConstantesServiceMonitor.MODULE_TRANSACTION,
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-    ConstantesServiceMonitor.MODULE_PRINCIPAL,
+    # ConstantesServiceMonitor.MODULE_PRINCIPAL,
     ConstantesServiceMonitor.MODULE_CORE,
     ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,

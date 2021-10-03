@@ -1680,7 +1680,7 @@ class ConstantesGenerateurCertificat:
     ROLE_TRANSACTIONS = 'transaction'
     ROLE_CEDULEUR = 'ceduleur'
     ROLE_DOMAINES = 'domaines'
-    ROLE_CORE = 'Core'
+    ROLE_CORE = 'core'
     ROLE_FICHIERS = 'fichiers'
     ROLE_BACKUP = 'Backup'
     ROLE_GROS_FICHIERS = 'GrosFichiers'
