@@ -38,9 +38,9 @@ class GenerateurTransaction:
         return securite_liste
 
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                           idmg_destination: str = None, ajouter_certificats=False, action: str = None):
+                           idmg_destination: str = None, ajouter_certificats=False, action: str = None, partition: str = None):
 
-        message, uuid_transaction = self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination, action=action)
+        message, uuid_transaction = self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination, action=action, partition=partition)
 
         if ajouter_certificats:
             message['_certificat'] = self.__formatteur_message.chaine_certificat

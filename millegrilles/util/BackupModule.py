@@ -169,6 +169,7 @@ class BackupUtil:
         # Conserver iv/tag et cle chiffree avec cle de millegrille (restore dernier recours)
         enveloppe_millegrille: EnveloppeCertificat = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
         cert_millegrille = enveloppe_millegrille.chaine_enveloppes()[-1]
+        fingerprint_millegrille = enveloppe_millegrille.fingerprint
         catalogue_backup['cle'] = multibase.encode('base64', cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
         catalogue_backup['iv'] = iv
         catalogue_backup['tag'] = '!!!REMPLACER!!!'
@@ -182,6 +183,12 @@ class BackupUtil:
         ]
         # certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
+
+        # Recuperer le fingerprint du cert du maitre des cles
+        fingerprint_cert = None
+        for c in cles_chiffrees.keys():
+            if c != fingerprint_millegrille:
+                fingerprint_cert = c
 
         identificateurs_document = {
             'heure': heure_str
@@ -198,6 +205,7 @@ class BackupUtil:
             'format': 'mgs2',
             'cles': cles_chiffrees,
             'domaine': ConstantesBackup.DOMAINE_NOM,
+            '_fingerprint': fingerprint_cert
         }
 
         return cipher, transaction_maitredescles
@@ -1422,7 +1430,9 @@ class HandlerBackupApplication:
         )
         transaction_maitredescles = self.__generateur_transactions.preparer_enveloppe(
             transaction_maitredescles,
-            'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            domaine='MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            action=Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            partition=transaction_maitredescles['_fingerprint'],
             ajouter_certificats=True
         )
 

@@ -30,7 +30,8 @@ class FormatteurMessageMilleGrilles:
                        version: int = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                        idmg_destination: str = None,
                        ajouter_chaine_certs = False,
-                       action: str = None) -> (dict, str):
+                       action: str = None,
+                       partition: str = None) -> (dict, str):
         """
         Formatte un message en ajoutant l'entete et en le signant.
 
@@ -53,6 +54,8 @@ class FormatteurMessageMilleGrilles:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
         if action is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ACTION] = action
+        if partition is not None:
+            meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_PARTITION] = partition
         if idmg_destination is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION] = idmg_destination
 
