@@ -690,7 +690,10 @@ class GestionnaireApplications:
         domaine_action = 'commande.backupApplication.' + Constantes.ConstantesBackupApplications.COMMANDE_BACKUP_DECLENCHER_RESTAURER
         # generateur_transactions = self.__service_monitor.generateur_transactions
         # generateur_transactions.transmettre_commande(commande_backup_agent, domaine_action, ajouter_certificats=True)
-        self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
+        resultat = self.__handler_requetes.commande(domaine_action, commande_backup_agent, timeout=300, ack_initial=5)
+
+        self.__logger.debug("Resultat commande restaurer sur BackupAgent : %s", resultat)
+        return resultat
 
     def effectuer_restauration(self, nom_application: str, configuration_docker, serveur_url: str = None):
         configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
@@ -699,7 +702,10 @@ class GestionnaireApplications:
         configuration_backup = configuration_docker['backup']
 
         # Restaurer les fichiers
-        self.transmettre_commande_restaurer(nom_application, serveur_url=serveur_url)
+        resultat = self.transmettre_commande_restaurer(nom_application, serveur_url=serveur_url)
+        if not resultat['ok']:
+            self.__logger.error("Echec restauration avec BackupAgent de %s : %s" % (nom_application, resultat))
+            raise Exception("Echec restauration avec BackupAget de %s : %s" % (nom_application, resultat.get('err')))
 
         try:
             volumes = configuration_backup['data']['volumes']

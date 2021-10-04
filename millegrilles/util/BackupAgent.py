@@ -387,7 +387,7 @@ class RestaurerApplication:
         resultat_cle = self.__handler_requetes.requete(
             'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE, requete)
         if resultat_cle['acces'] != '1.permis':
-            raise Exception("Acces refuse a la cle pour le backup d'application %s: %s" % (self.__nom_application, resultat_cle))
+            raise Exception("Acces refuse (%s) a la cle pour le backup d'application %s" % (resultat_cle['acces'], self.__nom_application))
         cle = resultat_cle['cles'][archive_hachage]
         cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(cle['cle'])
         decipher = CipherMsg2Dechiffrer(cle['iv'], cle_dechiffree, compute_tag=cle['tag'])
