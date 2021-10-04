@@ -387,6 +387,13 @@ class RestaurerApplication:
         resultat_cle = self.__handler_requetes.requete(
             'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE, requete)
         if resultat_cle['acces'] != '1.permis':
+            if resultat_cle['acces'] == '4.inconnue':
+                self.__logger.info("Emettre la cle du backup vers CA pour rechiffrage")
+                emettre_cle(
+                    self.__contexte, archive_hachage, cle_header, iv_header, tag_header, format_header,
+                    "Backup", {"application": self.__nom_application, "cle_restauree": 'true'}
+                )
+
             raise Exception("Acces refuse (%s) a la cle pour le backup d'application %s" % (resultat_cle['acces'], self.__nom_application))
         cle = resultat_cle['cles'][archive_hachage]
         cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(cle['cle'])
@@ -411,6 +418,23 @@ class RestaurerApplication:
         with lzma.open(decipher_stream, 'r') as xz:
             with tarfile.open(fileobj=xz, mode='r|') as tar:
                 tar.extractall(path_output_app)
+
+
+def emettre_cle(contexte, hachage_bytes, cle, iv, tag, format, domaine, id_doc: dict):
+    fingerprint = contexte.configuration.certificat_millegrille.fingerprint
+    print("Emettre fingerprint_ca: %s = cle %s: iv: %s, tag: %s, format: %s, cle: %s" % (fingerprint, hachage_bytes, iv, tag, format, cle))
+
+    message_cle = {
+        "domaine": domaine,
+        "hachage_bytes": hachage_bytes,
+        "cles": {fingerprint: cle},
+        "iv": iv,
+        "tag": tag,
+        "format": format,
+        "identificateurs_document": id_doc
+    }
+    generateur_transactions = contexte.generateur_transactions
+    generateur_transactions.transmettre_commande(message_cle, domaine="MaitreDesCles", action="sauvegarderCle", ajouter_certificats=True)
 
 
 if __name__ == '__main__':
