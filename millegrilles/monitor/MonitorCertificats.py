@@ -521,7 +521,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         if nomcle is None:
             nomcle = role
 
-        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
         duree_certs = int(duree_certs)
 
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
@@ -691,7 +691,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         if Constantes.SECURITE_SECURE not in securite_commande:
             return {'err': 'Permission refusee', 'code': 5}
 
-        duree_certs = environ.get('CERT_DUREE') or '31'  # Defaut 31 jours
+        duree_certs = environ.get('CERT_DUREE') or '3'  # Defaut 3 jours
         duree_certs = int(duree_certs)
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
         duree_certs_heures = int(duree_certs_heures)
@@ -795,7 +795,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         """
         self.__logger.debug("Commande signature certificat : %s" % str(commande))
 
-        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
         duree_certs = int(duree_certs)
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
         duree_certs_heures = int(duree_certs_heures)
@@ -878,7 +878,7 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
     def signer_csr(self, csr: bytes):
         generateur = RenouvelleurCertificat(self.idmg, dict(), self._clecert_intermediaire, ca_autorite=self._clecert_millegrille)
 
-        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
         duree_certs = int(duree_certs)
 
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus

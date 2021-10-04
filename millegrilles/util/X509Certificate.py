@@ -731,7 +731,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
     def signer(self, csr: x509.CertificateSigningRequest, role: str = None, **kwargs) -> x509.Certificate:
         cert_autorite = self._autorite.cert
-        duree = kwargs.get('duree') or datetime.timedelta(days=31)
+        duree = kwargs.get('duree') or datetime.timedelta(days=3)
         builder = self._preparer_builder_from_csr(
             csr, cert_autorite, duree, role=role, **kwargs)
 
@@ -991,7 +991,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 class GenerateurNoeud(GenerateurCertificateParRequest):
 
     def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
-                 domaines_publics: list = None, generer_password=False, duree=31, duree_heures=0):
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
         super().__init__(idmg, dict_ca, autorite, domaines_publics)
         self._organization_name = organization_nom
         self._common_name = common_name
@@ -1915,7 +1915,7 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def renouveller_par_role(self, role, common_name, liste_dns: list = None, duree=31, duree_heures=0):
+    def renouveller_par_role(self, role, common_name, liste_dns: list = None, duree=0, duree_heures=3):
         generateur = self.__generateurs_par_role[role]
         if issubclass(generateur, GenerateurNoeud):
             generateur_instance = generateur(
