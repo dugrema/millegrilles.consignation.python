@@ -1707,6 +1707,7 @@ class ConstantesGenerateurCertificat:
     ROLE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
     ROLE_HEBERGEMENT_FICHIERS = 'heb_fichiers'
     ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
+    ROLE_SENSEURSPASSIFS = 'senseurspassifs'
 
 
 class ConstantesServiceMonitor:

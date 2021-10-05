@@ -1,8 +1,8 @@
 {
   "MG_MQ_PORT": 5673,
   "MG_MQ_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.cert",
-  "MG_MQ_KEYFILE": "/home/mathieu/mgdev/certs/pki.domaines.key",
-  "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.domaines.cert",
+  "MG_MQ_KEYFILE": "/home/mathieu/mgdev/certs/pki.core.key",
+  "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.core.cert",
   "MG_MQ_SSL": "on",
   "MG_MQ_AUTH_CERT": "on",
   "MG_MONGO_SSL": "x509",
