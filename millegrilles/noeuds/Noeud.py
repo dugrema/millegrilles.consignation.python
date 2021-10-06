@@ -737,6 +737,10 @@ class GestionnaireMessages(BaseCallback):
         self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
         self.__routing_cert = routing_key
 
+        routing_key_cedule = 'evenement.global.cedule'
+        self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_cedule, callback=None)
+        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+
         routing_key_commandes = 'commande.senseurpassif.%s.*' % self.__noeud.noeud_id
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_commandes, callback=None)
         self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
@@ -750,15 +754,19 @@ class GestionnaireMessages(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         # Implementer la lecture de messages, specialement pour transmettre un certificat manquant
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        validateur = self.contexte.validateur_message
+        validateur.verifier(message_dict)
+
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
         correlation_id = properties.correlation_id
         if routing_key == self.__routing_cert:
             # Transmettre notre certificat
             self.contexte.signateur_transactions.emettre_certificat()
-        elif routing_key.startswith('ceduleur'):
-            indicateurs = message_dict['indicateurs']
-            if 'heure' in indicateurs:
+        elif action == 'cedule':
+            flag_heure = message_dict.get('flag_heure')
+            if flag_heure:
                 self.__noeud.produire_transactions()
         elif correlation_id == 'informationNoeudSenseurs':
             self.__noeud.conserver_informations_noeud_senseurs(message_dict)
