@@ -1346,7 +1346,7 @@ class SenseursPassifsConstantes:
     COMMANDE_RAPPORT_ANNUEL = '%s.rapportAnnuel' % DOMAINE_NOM
     COMMANDE_DECLENCHER_RAPPORTS = '%s.declencherRapports' % DOMAINE_NOM
 
-    EVENEMENT_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
+    EVENEMENT_DOMAINE_LECTURE = 'lecture'
     EVENEMENT_DOMAINE_LECTURE_CONFIRMEE = '%s.lectureConfirmee' % DOMAINE_NOM
 
     EVENEMENT_MAJ_SENSEUR_CONFIRMEE = '%s.majSenseurConfirmee' % DOMAINE_NOM

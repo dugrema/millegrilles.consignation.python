@@ -845,8 +845,20 @@ class PikaDAO:
         self._in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction, reply_to, correlation_id, channel=None):
-        action = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        routing_key = 'transaction.' + action
+        entete = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        rk = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        try:
+            partition = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_PARTITION]
+            rk = rk + '.' + partition
+        except KeyError:
+            pass
+        try:
+            action = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ACTION]
+            rk = rk + '.' + action
+        except KeyError:
+            pass
+
+        routing_key = 'transaction.' + rk
         # Utiliser delivery mode 2 (persistent) pour les transactions
         self.transmettre_message(
             document_transaction, routing_key,

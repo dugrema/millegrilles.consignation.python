@@ -51,7 +51,7 @@ class GenerateurTransaction:
                               reply_to=None, correlation_id=None,
                               version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                               idmg_destination: str = None, retourner_enveloppe=False,
-                              ajouter_certificats=False):
+                              ajouter_certificats=False, action: str = None, partition: str = None):
         """
         Transmet un message. La connexion doit etre ouverte.
 
@@ -63,6 +63,8 @@ class GenerateurTransaction:
         :param idmg_destination: MilleGrille destination
         :param retourner_enveloppe:
         :param ajouter_certificats:
+        :param action:
+        :param partition:
         :returns: UUID de la transaction. Permet de retracer la transaction dans MilleGrilles une fois persistee.
         """
 
@@ -70,7 +72,8 @@ class GenerateurTransaction:
         enveloppe = self.preparer_enveloppe(
             message_dict, domaine_action,
             version=version, idmg_destination=idmg_destination,
-            ajouter_certificats=ajouter_certificats
+            ajouter_certificats=ajouter_certificats,
+            action=action, partition=partition
         )
         # self.__logger.debug("Enveloppe message complet:\n%s" % str(enveloppe))
 
