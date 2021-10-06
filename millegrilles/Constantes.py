@@ -1329,6 +1329,7 @@ class SenseursPassifsConstantes:
     TRANSACTION_DATE_LECTURE = 'timestamp'
     TRANSACTION_LOCATION = 'location'
     TRANSACTION_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
+    TRANSACTION_LECTURE = 'lecture'
     TRANSACTION_MAJ_SENSEUR = '%s.majSenseur' % DOMAINE_NOM
     TRANSACTION_MAJ_NOEUD = '%s.majNoeud' % DOMAINE_NOM
     TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR = '%s.changementAttributSenseur' % DOMAINE_NOM

@@ -20,7 +20,7 @@ from typing import Optional
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ExceptionConnectionFermee, BaseCallback
 from millegrilles import Constantes
-from millegrilles.Constantes import SenseursPassifsConstantes
+from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesSecurityPki
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
@@ -67,11 +67,12 @@ class DemarreurNoeud(Daemon):
         self._stop_event = Event()
         self._stop_event.set()  # Set initiale, faire clear pour activer le processus
 
-        self._message_handler: Optional[MessageCallback] = None
+        self._message_handler: Optional[GestionnaireMessages] = None
 
         self._thread_transactions: Optional[Thread] = None  # Thread de traitement du buffer, tranmission de transactions
 
         self._noeud_id = os.environ['MG_NOEUD_ID']
+        self.__info_noeud: Optional[dict] = None
 
     def print_help(self):
         self._parser.print_help()
@@ -158,19 +159,40 @@ class DemarreurNoeud(Daemon):
         self.__channel = channel
         self.__certificat_event_handler.initialiser()
 
-        self._message_handler = MessageCallback(self.contexte, self)
+        self._message_handler = GestionnaireMessages(self._contexte, self)
+        self._message_handler.initialiser()
+
         # self.contexte.message_dao.enregistrer_callback(queue='', callback=self._message_handler.callbackAvecAck)
-        self.contexte.message_dao.inscrire_topic(
-            self.contexte.configuration.exchange_defaut,
-            ['ceduleur.#'],
-            self._message_handler.callbackAvecAck
-        )
+        # self.contexte.message_dao.inscrire_topic(
+        #     self.contexte.configuration.exchange_defaut,
+        #     ['ceduleur.#'],
+        #     self._message_handler.callbackAvecAck
+        # )
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
         self._logger.info("MQ Channel ferme")
         if not self._stop_event:
             self._contexte.message_dao.enter_error_state()
+
+    def demander_informations_noeud(self):
+        queue_reponse = self._message_handler.queue_reponse
+
+        if queue_reponse is not None:
+            self.contexte.generateur_transactions.transmettre_requete(
+                {'noeud_id': self.noeud_id},
+                'SenseursPassifs',
+                action='getNoeud',
+                correlation_id='informationNoeudSenseurs',
+                reply_to=self._message_handler.queue_reponse,
+                ajouter_certificats=True
+            )
+        else:
+            self._logger.info("Attente demande information noeud, Q reponse pas prete")
+
+    def conserver_informations_noeud_senseurs(self, info_noeud: dict):
+        self._logger.info("Information noeud recues : %s" % info_noeud)
+        self.__info_noeud = info_noeud
 
     def run(self):
         self._logger.info("Demarrage Daemon")
@@ -185,6 +207,14 @@ class DemarreurNoeud(Daemon):
 
         while not self._stop_event.is_set():
             # Faire verifications de fonctionnement, watchdog, etc...
+
+            try:
+                if self.info_noeud is None and self._message_handler.queue_reponse is not None:
+                    self.demander_informations_noeud()
+            except AttributeError:
+                self._logger.debug("Connexion MQ pas prete pour requete info noeud")
+                pass
+
             try:
                 self.traiter_backlog_messages()
             except Exception:
@@ -205,12 +235,12 @@ class DemarreurNoeud(Daemon):
         self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
         self._contexte.initialiser(init_message=doit_connecter)
-        
+
         if doit_connecter:
             self._contexte.message_dao.register_channel_listener(self)
 
             self._producteur_transaction = ProducteurTransactionSenseursPassifs(
-                self._contexte, noeud_id=self._noeud_id, data_path=self._args.data)
+                self._contexte, noeud=self, data_path=self._args.data)
         else:
             self._logger.info("Mode noconnect, les messages sont affiches dans le log uniquement")
             self._producteur_transaction = ProducteurTransactionNoconnect(data_path=self._args.data)
@@ -261,7 +291,7 @@ class DemarreurNoeud(Daemon):
 
     def inclure_dummysenseurs(self):
         self._logger.info("Activer dummysenseurs")
-        self._dummysenseurs = DummySenseurs(no_senseur="7a2764fa-c457-4f25-af0d-0fc915439b21", noeud_id=self._noeud_id)
+        self._dummysenseurs = DummySenseurs(no_senseur="7a2764fa-c457-4f25-af0d-0fc915439b21", noeud=self)
         self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
@@ -277,6 +307,9 @@ class DemarreurNoeud(Daemon):
 
     def traiter_backlog_messages(self):
         pass
+
+    def resoumettre_transactions(self):
+        self._producteur_transaction.resoumettre_transactions()
 
     def __finalisation(self):
         time.sleep(0.2)
@@ -297,13 +330,21 @@ class DemarreurNoeud(Daemon):
     def contexte(self):
         return self._contexte
 
+    @property
+    def info_noeud(self):
+        return self.__info_noeud
+
+    @property
+    def noeud_id(self):
+        return self._noeud_id
+
 
 # Simulation de l'output d'un AM2302
 class DummySenseurs:
 
-    def __init__(self, no_senseur, noeud_id, intervalle_lectures=5):
+    def __init__(self, no_senseur, noeud, intervalle_lectures=5):
         self._no_senseur = no_senseur
-        self._noeud_id = noeud_id
+        self._noeud = noeud
         self._intervalle_lectures = intervalle_lectures
         self._callback_soumettre = None
         self._stop_event = Event()
@@ -359,9 +400,9 @@ class DummySenseurs:
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
     """ Producteur de transactions pour les SenseursPassifs. """
 
-    def __init__(self, contexte, noeud_id, data_path='/var/opt/millegrilles/data'):
+    def __init__(self, contexte, noeud, data_path='/var/opt/millegrilles/data'):
         super().__init__(contexte)
-        self.noeud_id = noeud_id
+        self.noeud = noeud
         self._data_path = data_path
         self._path_buffer: Optional[str] = None
         self._fp_buffer: Optional[int] = None
@@ -502,10 +543,17 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
             # Remplacer instance timestamp pour int (pour sauvegarder en json)
             app['timestamp'] = int(timestamp.timestamp())
 
+            try:
+                partition = self.noeud.info_noeud['partition']
+            except (TypeError, KeyError):
+                partition = None
+
             # Transmettre les transactions
             transaction = self.soumettre_transaction(
                 app,
-                SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
+                domaine_action=SenseursPassifsConstantes.DOMAINE_NOM,
+                action=SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
+                partition=partition,
                 retourner_enveloppe=True
             )
 
@@ -536,6 +584,34 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
         self._logger.debug("Fin creation transactions")
 
+    def resoumettre_transactions(self):
+        self._logger.info("Resoumettre les transactions du repertoire data")
+
+        try:
+            partition = self.noeud.info_noeud['partition']
+        except:
+            self._logger.error("Erreur resoumission transactions, partitions pas chargee")
+            raise Exception("Erreur resoumission transactions, partitions pas chargee")
+
+        mois_archives = os.listdir(self._data_path)
+        for mois in mois_archives:
+            fullpath_mois = os.path.join(self._data_path, mois)
+            if os.path.isdir(fullpath_mois):
+                self._logger.info("Soumettre transactions sous : %s" % fullpath_mois)
+                fichiers_mois = os.listdir(fullpath_mois)
+                for nom_archive in fichiers_mois:
+                    if nom_archive.endswith('.json.xz'):
+                        fullpath_archive = os.path.join(fullpath_mois, nom_archive)
+                        self.soumettre_archive(fullpath_archive, partition)
+
+    def soumettre_archive(self, path_archive: str, partition: str):
+        print("Resoumettre archive transactions %s" % path_archive)
+        with lzma.open(path_archive, 'r') as fichier:
+            for line in fichier:
+                transaction = json.loads(line)
+                routing = 'transaction.SenseursPassifs.%s.lecture' % partition
+                self.emettre_message(transaction, routing)
+
     def transmettre_lecture_senseur(self, dict_lecture, version=6):
         # Preparer le dictionnaire a transmettre pour la lecture
         if not self._path_buffer:
@@ -550,13 +626,23 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
         # Ajouter le noeud s'il n'a pas ete fourni
         if message.get('noeud_id') is None:
-            message['noeud_id'] = self.noeud_id
+            message['noeud_id'] = self.noeud.noeud_id
 
         self._logger.debug("Message a transmettre: %s" % str(message))
 
+        info_noeud = self.noeud.info_noeud
+        try:
+            partition = info_noeud['partition']
+            routing_key = 'evenement.SenseursPassifs.%s.%s' % (partition, SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE)
+        except (TypeError, KeyError):
+            partition = None
+            routing_key = 'evenement.SenseursPassifs.%s' % SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE
+
         enveloppe = self.emettre_message(
-            message,
-            'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
+            message, routing_key,
+            domaine=SenseursPassifsConstantes.DOMAINE_NOM,
+            action=SenseursPassifsConstantes.TRANSACTION_LECTURE,
+            partition=partition,
             retourner_enveloppe=True
         )
 
@@ -612,28 +698,78 @@ class LineReader:
             raise StopIteration()
 
 
-class MessageCallback(BaseCallback):
+class GestionnaireMessages(BaseCallback):
 
     def __init__(self, contexte, noeud: DemarreurNoeud):
         super().__init__(contexte)
-        self._noeud = noeud
+        self.__noeud = noeud
         self.__channel = None
-
+        self.__queue_reponse = None
+        self.__routing_cert = None
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    # Methode pour recevoir le callback pour les nouvelles transactions.
+    def initialiser(self):
+        self.__logger.debug("Initialisation GestionnaireMessages")
+
+        if self.contexte.message_dao is not None:
+            self.contexte.message_dao.register_channel_listener(self)
+
+    def on_channel_open(self, channel):
+        channel.add_on_close_callback(self.__on_channel_close)
+        self.__channel = channel
+        self.__channel.queue_declare(queue='', exclusive=True, callback=self.register_mq_handler)
+
+    def register_mq_handler(self, queue):
+        nom_queue = queue.method.queue
+        self.__queue_reponse = nom_queue
+        self.__logger.info("Q reponse : %s", self.__queue_reponse)
+
+        self.__logger.debug("Transmission certificat PKI a l'initialisation")
+        signateur_transactions = self.contexte.signateur_transactions
+        signateur_transactions.emettre_certificat()
+
+        enveloppe = signateur_transactions.enveloppe_certificat_courant
+        fingerprint = enveloppe.fingerprint
+        routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
+
+        exchange_defaut = self.configuration.exchange_defaut
+        self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key, callback=None)
+        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+        self.__routing_cert = routing_key
+
+        routing_key_commandes = 'commande.senseurpassif.%s.*' % self.__noeud.noeud_id
+        self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_commandes, callback=None)
+        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+
+        # Premiere demande d'information
+        self.__noeud.demander_informations_noeud()
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
     def traiter_message(self, ch, method, properties, body):
+        # Implementer la lecture de messages, specialement pour transmettre un certificat manquant
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
-        # routing_key_split = routing_key.split('.')
-        # exchange = method.exchange
-
-        if routing_key.startswith('ceduleur'):
+        action = routing_key.split('.')[-1]
+        correlation_id = properties.correlation_id
+        if routing_key == self.__routing_cert:
+            # Transmettre notre certificat
+            self.contexte.signateur_transactions.emettre_certificat()
+        elif routing_key.startswith('ceduleur'):
             indicateurs = message_dict['indicateurs']
             if 'heure' in indicateurs:
-                self._noeud.produire_transactions()
+                self.__noeud.produire_transactions()
+        elif correlation_id == 'informationNoeudSenseurs':
+            self.__noeud.conserver_informations_noeud_senseurs(message_dict)
+        elif action == 'transmettreTransactions':
+            self.__noeud.resoumettre_transactions()
         else:
-            self.__logger.error("Message de type inconnu : %s" % routing_key)
+            raise Exception("Routing non gere: %s" % routing_key)
+
+    @property
+    def queue_reponse(self):
+        return self.__queue_reponse
 
 
 if __name__ == "__main__":

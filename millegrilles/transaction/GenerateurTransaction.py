@@ -238,10 +238,10 @@ class GenerateurTransaction:
             self, message_dict, routing_key, exchanges: list = None, reply_to=None, correlation_id=None,
             headers: dict = None,
             version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6, retourner_enveloppe=False,
-            ajouter_certificats=False, domaine_action: str = None):
+            ajouter_certificats=False, domaine: str = None, action: str = None, partition: str = None):
 
         if not message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION):
-            enveloppe = self.preparer_enveloppe(message_dict, domaine=domaine_action, version=version)
+            enveloppe = self.preparer_enveloppe(message_dict, domaine=domaine, action=action, partition=partition, version=version)
         else:
             # Transmettre le message brut (c'est deja une enveloppe)
             enveloppe = message_dict

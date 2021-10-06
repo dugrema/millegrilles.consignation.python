@@ -9,7 +9,7 @@ class MGPProcessusTest(unittest.TestCase):
         self._document_dao = DocumentDaoStub()
         self._message_dao = MessageDaoStub()
         self._controleur = MGPProcessusControleur()
-        self._controleur._message_dao = self._message_dao
+        self._controleur.__message_dao = self._message_dao
         self._controleur._document_dao = self._message_dao
         self._evenement = {
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: 'millegrilles_processus_ProcessusTest:TestOrienteur',
@@ -70,7 +70,7 @@ class MGPProcessusTest(unittest.TestCase):
         processus._etape_suivante = 'finale'
         processus.transmettre_message_etape_suivante()
 
-        params_transmis = self._controleur._message_dao.tranmettre_evenement_mgpprocessus_params
+        params_transmis = self._controleur.__message_dao.tranmettre_evenement_mgpprocessus_params
         self.assertIsNotNone(params_transmis)
         print('test_transmettre_message_etape_suivante, param transmis sur message: %s' % str(params_transmis))
 
