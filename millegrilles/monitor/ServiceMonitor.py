@@ -2154,7 +2154,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         self._gestionnaire_docker = GestionnaireModulesDocker(
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(), self,
-            configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
+            configuration_services=MonitorConstantes.DICT_MODULES_PROTEGES,
             insecure=self._args.dev,
             secrets=self._args.secrets
         )

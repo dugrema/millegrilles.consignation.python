@@ -266,13 +266,14 @@ class GestionnaireModulesDocker:
             dict_services[service_name] = service
 
         entretien_compte_complete = True
+        dict_configurations_services = self.get_configuration_services()
         for service_name in self.__modules_requis:
             if nom_service is not None and service_name != nom_service:
                 # On skip ce service
                 continue
 
             try:
-                params = self.get_configuration_services()[service_name]
+                params = dict_configurations_services[service_name]
                 service = dict_services.get(service_name)
                 if not service:
                     try:
