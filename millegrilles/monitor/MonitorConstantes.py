@@ -133,6 +133,11 @@ MODULES_REQUIS_INSTALLATION = [
     ConstantesServiceMonitor.MODULE_NGINX,
 ]
 
+MODULES_REQUIS_PRIVE_PUBLIC = [
+    ConstantesServiceMonitor.MODULE_ACME,
+    ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+]
+
 MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX,

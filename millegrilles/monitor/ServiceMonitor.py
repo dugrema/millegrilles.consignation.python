@@ -1733,7 +1733,7 @@ class ServiceMonitorPrive(ServiceMonitor):
 
     def configurer_millegrille(self):
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIVE_PUBLIC.copy(),
             self,
             configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
             insecure=self._args.dev,
@@ -2005,7 +2005,7 @@ class ServiceMonitorPublic(ServiceMonitor):
 
     def configurer_millegrille(self):
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIVE_PUBLIC.copy(),
             self,
             configuration_services=MonitorConstantes.DICT_MODULES_PUBLICS,
             insecure=self._args.dev,
