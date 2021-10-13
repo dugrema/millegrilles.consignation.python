@@ -307,6 +307,11 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
                 self.certificats[
                     GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
 
+                # S'assurer que la cle de MilleGrille correspond au certificat (erreur de configuration...)
+                if not self.clecert_monitor.cle_correspondent():
+                    self.__logger.fatal("charger_certificats : La cle et certificat X.509 ne correspondent pas, on va tenter de reparer")
+                    self._service_monitor.gestionnaire_docker.configurer_monitor()
+
             # Charger le certificat de millegrille
             self._charger_certificat_docker('pki.millegrille.cert')
 
