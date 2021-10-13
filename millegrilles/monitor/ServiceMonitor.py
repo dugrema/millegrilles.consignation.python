@@ -1200,7 +1200,10 @@ class ServiceMonitor:
                 self.__logger.warning(
                     "Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
                 Event().wait(15)
-                gestionnaire_docker.maj_service('nginx')
+                try:
+                    gestionnaire_docker.maj_service('nginx')
+                except docker.errors.APIError as apie:
+                    self.__logger.exception("Probleme de mise a jour du certificat de nginx")
             else:
                 raise apie
 
