@@ -200,6 +200,7 @@ class GestionnaireModulesDocker:
             filtre_secrets = {'name': secret_name_val}
             secrets = self.__docker.secrets.list(filters=filtre_secrets)
             secret_retenue = secrets[0]
+            self.__logger.info("Configuration cle %s pour monitor" % secret_retenue.name)
             secret_reference = {
                 'secret_id': secret_retenue.attrs['ID'],
                 'secret_name': secret_retenue.name,
@@ -234,6 +235,7 @@ class GestionnaireModulesDocker:
                     os.symlink(path_original, path_symlink)
 
             service_monitor = services_list[0]
+            self.__logger.info("configurer_monitor Mise a jour monitor avec secrets")
             service_monitor.update(secrets=liste_secrets)
 
         except IndexError:
