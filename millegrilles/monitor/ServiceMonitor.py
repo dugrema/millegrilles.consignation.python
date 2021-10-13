@@ -674,9 +674,9 @@ class ServiceMonitor:
 
     def verifier_load(self):
         cpu_load, cpu_load5, cpu_load10 = psutil.getloadavg()
-        if cpu_load > 3.0 or cpu_load5 > 4.0:
+        if cpu_load > 6.0 or cpu_load5 > 4.0:
             self.limiter_entretien = True
-            self.__logger.warning("Charge de travail elevee %s / %s, entretien limite" % (cpu_load, cpu_load5))
+            self.__logger.warning("Charge de travail elevee %s / %s (limite 6.0/4.0), entretien limite" % (cpu_load, cpu_load5))
         else:
             self.limiter_entretien = False
 
@@ -2553,14 +2553,20 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self._gestionnaire_web.regenerer_configuration(mode_installe=True)
 
         # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
+        if securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
+            nom_service_nginx = 'nginx_public'
+        else:
+            nom_service_nginx = 'nginx'
         try:
-            gestionnaire_docker.maj_service('nginx')
+            self._gestionnaire_web.redeployer_nginx(nom_service=nom_service_nginx)
+            #gestionnaire_docker.maj_service(nom_service)
         except docker.errors.APIError as apie:
             if apie.status_code == 500:
                 self.__logger.warning(
                     "Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
                 Event().wait(15)
-                gestionnaire_docker.maj_service('nginx')
+                # gestionnaire_docker.maj_service('nginx')
+                self._gestionnaire_web.redeployer_nginx(nom_service=nom_service_nginx)
             else:
                 raise apie
 
