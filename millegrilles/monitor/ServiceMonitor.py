@@ -455,6 +455,7 @@ class ServiceMonitor:
 
                 # Reconfigurer tous les services qui utilisent le nouveau certificat
                 self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
             elif nom_role == 'nginx':
                 clecert = info_role['clecert']
                 subject_dict = clecert.formatter_subject()
@@ -1205,9 +1206,13 @@ class ServiceMonitor:
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
-        gestionnaire_docker.configurer_monitor()
-
-        raise ForcerRedemarrage("Redemarrage")
+        try:
+            gestionnaire_docker.configurer_monitor()
+        except ForcerRedemarrage as fe:
+            raise fe
+        except Exception as e:
+            self.__logger.exception("Erreur reconfiguration certificats monitor, on force le redemarrage")
+            raise ForcerRedemarrage("Redemarrage apres erreur")
 
 
 class ServiceMonitorPrincipal(ServiceMonitor):
