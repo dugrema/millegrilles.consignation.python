@@ -20,7 +20,7 @@ from docker.types import SecretReference, NetworkAttachmentConfig, Resources, Re
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
-from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
+from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee, ForcerRedemarrage
 from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
 from millegrilles.SecuritePKI import GenerateurEd25519, GenerateurRsa
 from millegrilles.util import IpUtils
@@ -237,6 +237,7 @@ class GestionnaireModulesDocker:
             service_monitor = services_list[0]
             self.__logger.info("configurer_monitor Mise a jour monitor avec secrets")
             service_monitor.update(secrets=liste_secrets)
+            raise ForcerRedemarrage("Redemarrage apres rotation secrets")
 
         except IndexError:
             self.__logger.error("Erreur configuration service monitor avec nouvelles valeurs (OK si dev)")
@@ -505,7 +506,12 @@ class GestionnaireModulesDocker:
                 self.__add_node_labels(constraints)
 
             # Utiliser service existant pour integrer la nouvelle configuration
-            docker_service.update(**configuration)
+            try:
+                docker_service.update(**configuration)
+            except APIError as ae:
+                self.__logger.error("Erreur maj service, on essaie de recharger : %s" % ae)
+                docker_service = self.get_service(service_name)
+                docker_service.update(**configuration)
 
             # self.__docker.services.create(image_tag, command=command, **configuration)
             return docker_service
@@ -874,30 +880,25 @@ class GestionnaireModulesDocker:
             secret_name_split.append('cert')
             config_name = '.'.join(secret_name_split)
             date_secret = None
+            config_secret = None
             for key, value in date_secrets.items():
                 if config_name in key.split(';'):
-                    date_secret = value
+                    if date_secret is None or int(date_secret) < int(value):
+                        nom_filtre = secret_name + '.' + value
+                        filtre = {'name': nom_filtre}
+                        secrets = self.__docker.secrets.list(filters=filtre)
+                        try:
+                            config_secret = secrets[0]
+                            date_secret = value
+                        except IndexError:
+                            pass
 
-            if date_secret is not None:
-                nom_filtre = secret_name + '.' + date_secret
-                filtre = {'name': nom_filtre}
-                secrets = self.__docker.secrets.list(filters=filtre)
-
-                if len(secrets) != 1:
-                    continue  # Tenter prochain secret
-                    #raise ValueError("Le secret_name ne correspond pas a un secret : %s" % nom_filtre)
-
-                try:
-                    secret = secrets[0]
-
-                    return {
-                        'secret_id': secret.attrs['ID'],
-                        'secret_name': secret.name,
-                        'date': date_secret,
-                    }
-
-                except KeyError:
-                    continue
+            if config_secret is not None:
+                return {
+                    'secret_id': config_secret.attrs['ID'],
+                    'secret_name': config_secret.name,
+                    'date': date_secret,
+                }
 
         raise ValueError("Aucun secrets %s ne correspond a une config" % str(secret_names))
 
