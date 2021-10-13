@@ -193,6 +193,26 @@ class GestionnaireModulesDocker:
             except PkiCleNonTrouvee:
                 self.__logger.warning("Erreur chargement secret %s" % nom_secret)
 
+        # Trouver nom du certificat le plus recent et charger la cle correspondante
+        try:
+            config_cert = self.__trouver_config("pki.monitor.cert")
+            secret_name_val = config_cert['config_reference']['config_name'].replace('cert', 'key')
+            filtre_secrets = {'name': secret_name_val}
+            secrets = self.__docker.secrets.list(filters=filtre_secrets)
+            secret_retenue = secrets[0]
+            secret_reference = {
+                'secret_id': secret_retenue.attrs['ID'],
+                'secret_name': secret_retenue.name,
+                'filename': ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
+                'uid': 0,
+                'gid': 0,
+                'mode': 0o444,
+            }
+
+            liste_secrets.append(SecretReference(**secret_reference))
+        except AttributeError:
+            self.__logger.info("configurer_monitor: Certificat de monitor n'existe pas")
+
         # network = NetworkAttachmentConfig(target='mg_net' % self.__idmg)
 
         # Ajouter secrets au service monitor
