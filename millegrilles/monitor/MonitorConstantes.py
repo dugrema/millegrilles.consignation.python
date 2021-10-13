@@ -14,7 +14,7 @@ DICT_MODULES_PUBLICS = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME
     },
-    ConstantesServiceMonitor.MODULE_NGINX: {
+    ConstantesServiceMonitor.MODULE_NGINX_PUBLIC: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
     },
 }
@@ -23,7 +23,7 @@ DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME
     },
-    ConstantesServiceMonitor.MODULE_NGINX: {
+    ConstantesServiceMonitor.MODULE_NGINX_PUBLIC: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
     },
     # ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
