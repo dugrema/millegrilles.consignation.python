@@ -1098,7 +1098,7 @@ class ServiceMonitor:
 
         erreur_recue = params.get('err')
         if erreur_recue:
-            raise ValueError("Erreur renouvellement certificat\n%s" % erreur_recue)
+            raise ValueError("Erreur renouvellement certificat\n%s" % params)
 
         gestionnaire_docker = self.gestionnaire_docker
 
@@ -1205,7 +1205,9 @@ class ServiceMonitor:
                 except docker.errors.APIError as apie:
                     self.__logger.exception("Probleme de mise a jour du certificat de nginx")
             else:
-                raise apie
+                self.__logger.exception("Erreur maj nginx (1) pour rotation certificats")
+        except Exception:
+            self.__logger.exception("Erreur maj nginx (2) pour rotation certificats")
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
