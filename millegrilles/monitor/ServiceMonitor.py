@@ -674,9 +674,9 @@ class ServiceMonitor:
 
     def verifier_load(self):
         cpu_load, cpu_load5, cpu_load10 = psutil.getloadavg()
-        if cpu_load > 6.0 or cpu_load5 > 4.0:
+        if cpu_load > 10.0 or cpu_load5 > 5.0:
             self.limiter_entretien = True
-            self.__logger.warning("Charge de travail elevee %s / %s (limite 6.0/4.0), entretien limite" % (cpu_load, cpu_load5))
+            self.__logger.warning("Charge de travail elevee %s / %s (limite 10.0/5.0), entretien limite" % (cpu_load, cpu_load5))
         else:
             self.limiter_entretien = False
 
