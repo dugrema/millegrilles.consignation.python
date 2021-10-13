@@ -16,6 +16,7 @@ DICT_MODULES_PUBLICS = {
     },
     ConstantesServiceMonitor.MODULE_NGINX_PUBLIC: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+        'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
     },
 }
 
@@ -25,6 +26,7 @@ DICT_MODULES_PRIVES = {
     },
     ConstantesServiceMonitor.MODULE_NGINX_PUBLIC: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+        'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
     },
     # ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
     #     'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
