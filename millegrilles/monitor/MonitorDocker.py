@@ -692,7 +692,10 @@ class GestionnaireModulesDocker:
     def force_update_service(self, service_name):
         filter = {'name': service_name}
         service_list = self.__docker.services.list(filters=filter)
-        service_list[0].force_update()
+        try:
+            service_list[0].force_update()
+        except IndexError:
+            self.__logger.error("Erreur force update service %s, non trouve" % service_name)
 
     def creer_comptes_service(self, service):
         # S'assurer que le compte MQ est cree
