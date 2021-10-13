@@ -938,6 +938,10 @@ class ServiceMonitor:
         else:
             return self._idmg is not None and self._idmg != ''
 
+    @property
+    def nom_service_nginx(self):
+        return 'nginx'
+
     def initialiser_domaine(self, commande):
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
@@ -1890,6 +1894,10 @@ class ServiceMonitorPrive(ServiceMonitor):
     def role(self):
         return ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE
 
+    @property
+    def nom_service_nginx(self):
+        return 'nginx_public'
+
 
 class ServiceMonitorPublic(ServiceMonitor):
     """
@@ -2111,6 +2119,9 @@ class ServiceMonitorPublic(ServiceMonitor):
     def role(self):
         return ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC
 
+    @property
+    def nom_service_nginx(self):
+        return 'nginx_public'
 
 class ServiceMonitorInstalleur(ServiceMonitor):
 

@@ -426,7 +426,8 @@ include /etc/nginx/conf.d/server.include;
 
         try:
             # Supprimer nginx - docker va recreer les certs/cles pki.nginx et redeployer nginx automatiquement
-            self.redeployer_nginx()
+            nom_service = self.__service_monitor.nom_service_nginx
+            self.redeployer_nginx(nom_service=nom_service)
         except IndexError:
             pass  # OK, nginx n'est juste pas configure (pas de service, probablement en cours d'initialisation)
 
@@ -440,15 +441,16 @@ include /etc/nginx/conf.d/server.include;
         except AttributeError:
             self.__logger.warning("Redemarrage nginx - Aucuns services configures")
 
-    def redeployer_nginx(self, force_update=False):
+    def redeployer_nginx(self, force_update=False, nom_service='nginx'):
         """
         Met a jour la configuration de nginx (e.g. nouveau certificat web)
         Le service va etre redemarre si la configuration a change ou si le param force_update est True
         :param force_update: Si True, force le redemarrage du service - permet de recharger fichiers .conf des modules
+        :param nom_service: Nom du service si autre que 'nginx'
         :return:
         """
         try:
-            docker_nginx = self.__service_monitor.gestionnaire_docker.reconfigurer_service('nginx')
+            docker_nginx = self.__service_monitor.gestionnaire_docker.reconfigurer_service(nom_service)
 
             if force_update:
                 docker_nginx.force_update()
