@@ -1094,6 +1094,7 @@ class ServiceMonitor:
         :return:
         """
 
+        self.__logger.info('_renouveller_certificat_monitor avec commande %s' % commande)
         params = commande.contenu
 
         erreur_recue = params.get('err')
@@ -1184,12 +1185,14 @@ class ServiceMonitor:
 
         # Supprimer le CSR
         try:
+            self.__logger.debug("Supprimer csr pki.monitor.csr.%s" % date_csr)
             gestionnaire_docker.supprimer_config('pki.monitor.csr.%s' % date_csr)
         except docker.errors.NotFound:
             pass
 
         # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
         # Redemarrage est implicite (fait a la fin de la prep)
+        self.__logger.debug("Regenerer configuration monitor")
         self._gestionnaire_web.regenerer_configuration(mode_installe=True)
 
         # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
@@ -1219,7 +1222,7 @@ class ServiceMonitor:
             ]
             self.__logger.info("MAJ connexion MQ avec %s" + str(env_params))
         except KeyError:
-            pass
+            self.__logger.info("Aucune information MQ pour configurer noeud (%s)" % params)
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
