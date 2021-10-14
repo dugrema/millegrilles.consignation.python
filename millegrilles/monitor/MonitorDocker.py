@@ -163,7 +163,7 @@ class GestionnaireModulesDocker:
         
         self.initialiser_millegrille()
 
-    def configurer_monitor(self):
+    def configurer_monitor(self, env_params: list = None):
         """
         Ajoute les element de configuration generes (e.g. secrets).
         :return:
@@ -236,7 +236,7 @@ class GestionnaireModulesDocker:
 
             service_monitor = services_list[0]
             self.__logger.info("configurer_monitor Mise a jour monitor avec secrets")
-            service_monitor.update(secrets=liste_secrets)
+            service_monitor.update(secrets=liste_secrets, env=env_params)
             raise ForcerRedemarrage("Redemarrage apres rotation secrets")
 
         except IndexError:

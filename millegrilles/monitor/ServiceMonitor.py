@@ -1209,10 +1209,22 @@ class ServiceMonitor:
         except Exception:
             self.__logger.exception("Erreur maj nginx (2) pour rotation certificats")
 
+        env_params = None
+        try:
+            host = params['host']
+            port = params['port']
+            env_params = [
+                'MG_MQ_HOST=%s' % host,
+                'MG_MQ_PORT=%s' % port,
+            ]
+            self.__logger.info("MAJ connexion MQ avec %s" + str(env_params))
+        except KeyError:
+            pass
+
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
         try:
-            gestionnaire_docker.configurer_monitor()
+            gestionnaire_docker.configurer_monitor(env_params=env_params)
         except ForcerRedemarrage as fe:
             raise fe
         except Exception as e:
