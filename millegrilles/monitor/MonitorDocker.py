@@ -177,12 +177,21 @@ class GestionnaireModulesDocker:
             #ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
         }
 
-        info_clecert_intermediaire = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.intermediaire.cert', True)
-        info_clecert_monitor = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.monitor.cert')
-
         liste_secrets = list()
-        liste_secrets.extend(info_clecert_intermediaire['secrets'])
-        liste_secrets.extend(info_clecert_monitor['secrets'])
+        try:
+            info_clecert_intermediaire = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.intermediaire.cert', True)
+            liste_secrets.extend(info_clecert_intermediaire['secrets'])
+        except AttributeError:
+            self.__logger.info("On n'a pas de certificat intermediaire - utiliser nom du secret")
+            noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD] = ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt'
+            noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY] = ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'
+
+        try:
+            info_clecert_monitor = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.monitor.cert')
+            liste_secrets.extend(info_clecert_monitor['secrets'])
+        except AttributeError:
+            self.__logger.warning("Certificat monitor n'est pas encore configure")
+            noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY] = ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'
 
         for nom_secret, nom_fichier in noms_secrets.items():
             try:
