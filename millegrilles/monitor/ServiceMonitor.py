@@ -1109,8 +1109,8 @@ class ServiceMonitor:
         :return:
         """
 
-        self.__logger.info('_renouveller_certificat_monitor avec commande %s' % commande)
         params = commande.contenu
+        self.__logger.info('_renouveller_certificat_monitor avec commande %s' % params)
 
         erreur_recue = params.get('err')
         if erreur_recue:
