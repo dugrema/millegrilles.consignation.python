@@ -616,7 +616,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         # Valider existence des certificats/chaines de base
         self._charger_certificat_docker('pki.millegrille.cert')
-        self._charger_certificat_docker('pki.intermediaire.chain')
+        self._charger_certificat_docker('pki.intermediaire.cert')
 
         self.__charger_renouvelleur()
 
@@ -915,6 +915,43 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
                 'cert': clecert.cert_bytes.decode('utf-8'),
                 'fullchain': clecert.chaine,
             }
+
+    def renouveller_intermediaire(self, commande):
+        # Valider certificat intermediaire
+        contenu = commande.contenu
+        pem_intermediaire = contenu['pem']
+
+        # Concatener cert millegrille local et nouveau cert intermediaire
+        chaine = self.clecert_monitor.chaine
+        pems = '\n'.join([pem_intermediaire, chaine[-1]]).encode('utf-8')
+
+        # Valider le certificat
+        clecert = EnveloppeCleCert()
+        clecert.cert_from_pem_bytes(pems)
+        validateur_pki = self._service_monitor.validateur_pki
+        try:
+            validateur_pki.valider(pems, usages=set())
+        except Exception as e:
+            self.__logger.exception("Erreur validation nouveau certificat intermediaire")
+            raise e
+
+        # Trouver cle correspondante (date)
+        label_role_cert = 'pki.intermediaire.cert'
+        label_role_key = 'pki.intermediaire.key'
+        info_role_key = self._service_monitor.gestionnaire_docker.trouver_secret(label_role_key)
+        date_key = str(info_role_key['date'])
+
+        # Inserer la chaine de certificat
+        self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, pems, date_key)
+
+        # Supprimer le csr precedent
+        try:
+            self._service_monitor.gestionnaire_docker.supprimer_config('pki.intermediaire.csr.%s' % date_key)
+        except Exception:
+            self.__logger.exception("Erreur suppression CSR du certificat intermediaire")
+
+        # Reconfigurer monitor avec le nouveau certificat intermediaire
+        self._service_monitor.gestionnaire_docker.configurer_monitor()
 
 
 class GestionnaireCertificatsInstallation(GestionnaireCertificats):

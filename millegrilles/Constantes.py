@@ -1788,6 +1788,7 @@ class ConstantesServiceMonitor:
     COMMANDE_CONFIGURER_IDMG = 'configurerIdmg'
     COMMANDE_INSTALLER_NOEUD = 'installerNoeud'
     COMMANDE_CONFIGURER_MQ = 'configurerMq'
+    COMMANDE_RENOUVELLER_INTERMEDIAIRE = 'renouvellerIntermediaire'
 
     COMMANDE_ACTIVER_HEBERGEMENT = 'activerHebergement'
     COMMANDE_DESACTIVER_HEBERGEMENT = 'desactiverHebergement'

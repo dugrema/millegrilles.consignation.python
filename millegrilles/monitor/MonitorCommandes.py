@@ -189,6 +189,9 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD:
                 reponse = self._service_monitor.gestionnaire_certificats.commande_signer_noeud(commande)
 
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE:
+                reponse = self._service_monitor.gestionnaire_certificats.renouveller_intermediaire(commande)
+
             else:
                 self.__logger.error("Commande inconnue : %s", nom_commande)
                 return

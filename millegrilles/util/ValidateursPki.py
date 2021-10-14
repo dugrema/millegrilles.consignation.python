@@ -86,7 +86,7 @@ class ValidateurCertificat:
 
         return validation_context
 
-    def __run_validation_context(self, enveloppe: EnveloppeCertificat, validation_context: ValidationContext):
+    def __run_validation_context(self, enveloppe: EnveloppeCertificat, validation_context: ValidationContext, usages: set):
         cert_pem = enveloppe.certificat_pem.encode('utf-8')
         inter_list = [c.encode('utf-8') for c in enveloppe.reste_chaine_pem[:-1]]
         validator = CertificateValidator(
@@ -94,13 +94,15 @@ class ValidateurCertificat:
             intermediate_certs=inter_list,
             validation_context=validation_context
         )
-        validator.validate_usage({'digital_signature'})
+        # validator.validate_usage({'digital_signature'})
+        validator.validate_usage(usages)
 
     def valider(
             self,
             certificat: Union[bytes, str, list],
             date_reference: datetime.datetime = None,
-            idmg: str = None
+            idmg: str = None,
+            usages: set = {'digital_signature'}
     ) -> EnveloppeCertificat:
         """
         Valide un certificat.
@@ -108,6 +110,7 @@ class ValidateurCertificat:
         :param certificat: Un certificat ou une liste de certificats a valider.
         :param date_reference: Date de reference pour valider le certificat si autre que date courante.
         :param idmg: IDMG de la millegrille a valider (si autre que la millegrille locale).
+        :param usages: Usages du certificat
 
         :return: Enveloppe avec le certificat valide.
         :raise PathValidationError: Si la chaine de certificat est invalide.
@@ -124,7 +127,7 @@ class ValidateurCertificat:
 
         validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
         try:
-            self.__run_validation_context(enveloppe, validation_context)
+            self.__run_validation_context(enveloppe, validation_context, usages)
         except PathBuildingError as pbe:
             # Verifier si l'echec est du a un certificat d'un IDMG different
             if idmg is None:

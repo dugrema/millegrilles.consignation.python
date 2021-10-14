@@ -111,6 +111,9 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         if path_split[3] == 'installer':
             self.post_installer(request_data)
             return
+        if path_split[3] == 'renouvellerIntermediaire':
+            self.post_renouveller_intermediaire(request_data)
+            return
 
         try:
             service_monitor = self.service_monitor
@@ -160,6 +163,16 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         logger.debug("post_installer : recu\n%s", json.dumps(request_data, indent=2))
 
         request_data['commande'] = ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD
+        commande = CommandeMonitor(request_data)
+        self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+
+        self.repondre_json(dict(), status_code=200)
+
+    def post_renouveller_intermediaire(self, request_data):
+        logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        logger.debug("post_renouveller_intermediaire : recu\n%s", json.dumps(request_data, indent=2))
+
+        request_data['commande'] = ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE
         commande = CommandeMonitor(request_data)
         self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
