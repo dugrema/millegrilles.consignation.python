@@ -41,6 +41,7 @@ from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
+
 class InitialiserServiceMonitor:
 
     def __init__(self):
@@ -231,6 +232,7 @@ class ServiceMonitor:
         self._certificats_entretien_frequence = datetime.timedelta(seconds=30)
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
+        self.csr_intermediaire = None
 
         # Initialiser dernier backup d'application comme s'il etait du dans quelques minutes
         date_now = pytz.utc.localize(datetime.datetime.utcnow())
@@ -339,6 +341,14 @@ class ServiceMonitor:
     def preparer_web_api(self):
         self._web_api = ServerWebAPI(self, webroot=self._args.webroot)
         self._web_api.start()
+
+        # Verifier si le CSR intermediaire a deja ete genere
+        try:
+            csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+            data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
+            self.csr_intermediaire = data_csr
+        except AttributeError:
+            pass
 
     def get_info_monitor(self, inclure_services=False):
         dict_infomillegrille = dict()
@@ -863,6 +873,11 @@ class ServiceMonitor:
             self.__validateur_message = ValidateurMessage(idmg=self.idmg)
 
         return self.__validateur_message
+
+    def generer_csr_intermediaire(self):
+        csr_info = self.gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
+        self.csr_intermediaire = csr_info['request']
+        return self.csr_intermediaire
 
     @property
     def gestionnaire_mq(self):
@@ -2148,6 +2163,7 @@ class ServiceMonitorPublic(ServiceMonitor):
     def nom_service_nginx(self):
         return 'nginx_public'
 
+
 class ServiceMonitorInstalleur(ServiceMonitor):
 
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
@@ -2158,7 +2174,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
 
-        self.csr_intermediaire = None
+        # self.csr_intermediaire = None
         self._securite: Optional[str] = None
 
     def fermer(self, signum=None, frame=None):

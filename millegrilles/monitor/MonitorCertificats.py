@@ -11,6 +11,7 @@ from os import path, environ
 from typing import cast
 
 import docker
+from docker.types import SecretReference
 from cryptography import x509
 from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
@@ -21,7 +22,7 @@ from cryptography.x509.extensions import ExtensionNotFound
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.dao.MessageDAO import CertificatInconnu
-from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
+from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException, ForcerRedemarrage
 # from millegrilles.monitor.ServiceMonitor import DOCKER_LABEL_TIME, GestionnaireModulesDocker
 from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat, \
     GenerateurInitial, GenerateurCertificat, GenerateurCertificatNginxSelfsigned
@@ -551,6 +552,35 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         return clecert
 
+    def reconfigurer_clecert(self, nom_cert, password=False):
+        gestionnaire_docker = self._service_monitor.gestionnaire_docker
+        config_reference = gestionnaire_docker.charger_config_recente(nom_cert)
+        nom_cert = config_reference['config_reference']['config_name']
+        nom_key = nom_cert.replace('cert', 'key')
+        config_key = gestionnaire_docker.trouver_secret(nom_key)
+        secrets_a_configurer = [
+            {'ref': config_key, 'filename': '%s.pem' % nom_key},
+        ]
+
+        if password:
+            nom_passwd = nom_cert.replace('cert', 'passwd')
+            config_passwd = gestionnaire_docker.trouver_secret(nom_passwd)
+            secrets_a_configurer.append({'ref': config_passwd, 'filename': '%s.txt' % nom_passwd})
+
+        liste_secrets = list()
+        for secret in secrets_a_configurer:
+            # secret_reference = self.trouver_secret(secret_name)
+            secret_reference = secret['ref']
+            secret_reference['filename'] = secret['filename']
+            secret_reference['uid'] = 0
+            secret_reference['gid'] = 0
+            secret_reference['mode'] = 0o444
+
+            del secret_reference['date']  # Cause probleme lors du chargement du secret
+            liste_secrets.append(SecretReference(**secret_reference))
+
+        return {'secrets': liste_secrets}
+
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
         os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
@@ -565,6 +595,12 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         clecert_intermediaire = EnveloppeCleCert()
         clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
         clecert_intermediaire.password = None  # Effacer mot de passe
+
+        if not clecert_intermediaire.cle_correspondent():
+            self.__logger.fatal("Certificat et cle intermediaire ne correspondent pas")
+            self._service_monitor.gestionnaire_docker.configurer_monitor()  #  reconfigurer_clecert('pki.intermediaire.cert', True)
+            raise ForcerRedemarrage("Certificat et cle intermediaire mismatch")
+
         self._clecert_intermediaire = clecert_intermediaire
 
         # Valider existence des certificats/chaines de base

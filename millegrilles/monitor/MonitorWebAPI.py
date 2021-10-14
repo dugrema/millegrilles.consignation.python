@@ -91,6 +91,8 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                 self.return_info_monitor()
             elif path_split[3] == 'csr':
                 self.return_csr()
+            elif path_split[3] == 'csrIntermediaire':
+                self.return_csr_intermediaire()
             elif path_split[3] == 'services':
                 self.return_services_installes()
             elif path_split[3] == 'etatCertificatWeb':
@@ -223,6 +225,24 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.__logger.exception("post_configurer_mq: Erreur traitement")
             reponse = {'err': str(e)}
             self.repondre_json(reponse, status_code=500)
+
+    def return_csr_intermediaire(self):
+        csr_intermediaire = self.service_monitor.csr_intermediaire
+        if csr_intermediaire is None:
+            self.__logger.exception("CSR intermediaire n'est pas en memoire, le charger de docker")
+            try:
+                csr_intermediaire = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+            except AttributeError:
+                self.__logger.info("Generer un nouveau CSR intermediaire")
+                csr_intermediaire = self.service_monitor.generer_csr_intermediaire()
+
+        # csr_intermediaire = csr_info['request']
+
+        self.send_response(200)
+        self.send_header("Content-type", "text/ascii")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(csr_intermediaire)
 
     def return_csr(self):
         try:

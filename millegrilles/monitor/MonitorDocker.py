@@ -173,46 +173,52 @@ class GestionnaireModulesDocker:
             'passwd.mq': ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE,
             'passwd.mongoxpweb': ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE,
             # ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
-            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt',
-            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
+            #ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt',
+            #ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
         }
 
+        info_clecert_intermediaire = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.intermediaire.cert', True)
+        info_clecert_monitor = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.monitor.cert')
+
         liste_secrets = list()
-        for nom_secret, nom_fichier in noms_secrets.items():
-            try:
-                self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
-                secret_reference = self.trouver_secret(nom_secret)
-                secret_reference['filename'] = nom_fichier
-                secret_reference['uid'] = 0
-                secret_reference['gid'] = 0
-                secret_reference['mode'] = 0o444
+        liste_secrets.extend(info_clecert_intermediaire['secrets'])
+        liste_secrets.extend(info_clecert_monitor['secrets'])
 
-                del secret_reference['date']
-
-                liste_secrets.append(SecretReference(**secret_reference))
-            except PkiCleNonTrouvee:
-                self.__logger.warning("Erreur chargement secret %s" % nom_secret)
+        # for nom_secret, nom_fichier in noms_secrets.items():
+        #     try:
+        #         self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
+        #         secret_reference = self.trouver_secret(nom_secret)
+        #         secret_reference['filename'] = nom_fichier
+        #         secret_reference['uid'] = 0
+        #         secret_reference['gid'] = 0
+        #         secret_reference['mode'] = 0o444
+        #
+        #         del secret_reference['date']
+        #
+        #         liste_secrets.append(SecretReference(**secret_reference))
+        #     except PkiCleNonTrouvee:
+        #         self.__logger.warning("Erreur chargement secret %s" % nom_secret)
 
         # Trouver nom du certificat le plus recent et charger la cle correspondante
-        try:
-            config_cert = self.__trouver_config("pki.monitor.cert")
-            secret_name_val = config_cert['config_reference']['config_name'].replace('cert', 'key')
-            filtre_secrets = {'name': secret_name_val}
-            secrets = self.__docker.secrets.list(filters=filtre_secrets)
-            secret_retenue = secrets[0]
-            self.__logger.info("Configuration cle %s pour monitor" % secret_retenue.name)
-            secret_reference = {
-                'secret_id': secret_retenue.attrs['ID'],
-                'secret_name': secret_retenue.name,
-                'filename': ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
-                'uid': 0,
-                'gid': 0,
-                'mode': 0o444,
-            }
-
-            liste_secrets.append(SecretReference(**secret_reference))
-        except AttributeError:
-            self.__logger.info("configurer_monitor: Certificat de monitor n'existe pas")
+        # try:
+        #     config_cert = self.__trouver_config("pki.monitor.cert")
+        #     secret_name_val = config_cert['config_reference']['config_name'].replace('cert', 'key')
+        #     filtre_secrets = {'name': secret_name_val}
+        #     secrets = self.__docker.secrets.list(filters=filtre_secrets)
+        #     secret_retenue = secrets[0]
+        #     self.__logger.info("Configuration cle %s pour monitor" % secret_retenue.name)
+        #     secret_reference = {
+        #         'secret_id': secret_retenue.attrs['ID'],
+        #         'secret_name': secret_retenue.name,
+        #         'filename': ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
+        #         'uid': 0,
+        #         'gid': 0,
+        #         'mode': 0o444,
+        #     }
+        #
+        #     liste_secrets.append(SecretReference(**secret_reference))
+        # except AttributeError:
+        #     self.__logger.info("configurer_monitor: Certificat de monitor n'existe pas")
 
         # network = NetworkAttachmentConfig(target='mg_net' % self.__idmg)
 
