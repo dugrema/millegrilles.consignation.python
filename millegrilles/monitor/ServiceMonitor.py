@@ -1899,7 +1899,8 @@ class ServiceMonitorPrive(ServiceMonitor):
                     'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
                     exchange=self.securite,
                     correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
-                    reply_to=self.connexion_middleware.reply_q
+                    reply_to=self.connexion_middleware.reply_q,
+                    ajouter_certificats=True
                 )
             except AttributeError:
                 self.__logger.warning("Connexion MQ pas prete, on ne peut pas renouveller le certificat de monitor")
