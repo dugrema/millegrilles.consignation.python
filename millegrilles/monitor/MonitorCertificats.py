@@ -942,7 +942,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         date_key = str(info_role_key['date'])
 
         # Inserer la chaine de certificat
-        self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, pems, date_key)
+        self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, pem_intermediaire.encode('utf-8'), date_key)
 
         # Supprimer le csr precedent
         try:
