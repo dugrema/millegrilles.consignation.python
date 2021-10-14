@@ -2358,16 +2358,23 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_certs.generer_motsdepasse()
 
         # Faire correspondre et sauvegarder certificat de noeud
-        secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+        intermediaire_key = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
 
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
+        if self._args.dev:
+            path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.%s' % intermediaire_key['date'])
+            path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.%s' % intermediaire_key['date'])
+        else:
+            path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.pem')
+            path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt')
+
+        with open(path_key, 'rb') as fichier:
             intermediaire_key_pem = fichier.read()
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt'), 'rb') as fichier:
-            intermediaire_passwd_pem = fichier.read()
+        with open(path_passwd, 'rb') as fichier:
+            intermediaire_passwd_txt = fichier.read()
 
         certificat_pem = params['certificatPem']
         certificat_millegrille = params['chainePem'][-1]
-        chaine = params['chainePem']
+        # chaine = params['chainePem']
 
         # Extraire IDMG
         self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
@@ -2376,7 +2383,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         idmg = clecert_millegrille.idmg
 
         clecert_recu = EnveloppeCleCert()
-        clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
+        clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_txt)
         if not clecert_recu.cle_correspondent():
             raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
@@ -2405,12 +2412,12 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         securite = Constantes.SECURITE_PROTEGE
         gestionnaire_docker.sauvegarder_config(
-            'pki.intermediaire.cert.' + str(secret_intermediaire['date']),
+            'pki.intermediaire.cert.' + str(intermediaire_key['date']),
             certificat_pem
         )
         chaine_intermediaire = '\n'.join([certificat_pem, certificat_millegrille])
         gestionnaire_docker.sauvegarder_config(
-            'pki.intermediaire.chain.' + str(secret_intermediaire['date']), chaine_intermediaire)
+            'pki.intermediaire.chain.' + str(intermediaire_key['date']), chaine_intermediaire)
 
         # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
         self._gestionnaire_certificats.idmg = idmg
@@ -2435,7 +2442,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
 
         # Supprimer le CSR
-        gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
+        gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(intermediaire_key['date']))
 
         # Terminer configuration swarm docker
         gestionnaire_docker.initialiser_noeud(idmg=idmg)

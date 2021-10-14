@@ -184,20 +184,20 @@ class GestionnaireModulesDocker:
         liste_secrets.extend(info_clecert_intermediaire['secrets'])
         liste_secrets.extend(info_clecert_monitor['secrets'])
 
-        # for nom_secret, nom_fichier in noms_secrets.items():
-        #     try:
-        #         self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
-        #         secret_reference = self.trouver_secret(nom_secret)
-        #         secret_reference['filename'] = nom_fichier
-        #         secret_reference['uid'] = 0
-        #         secret_reference['gid'] = 0
-        #         secret_reference['mode'] = 0o444
-        #
-        #         del secret_reference['date']
-        #
-        #         liste_secrets.append(SecretReference(**secret_reference))
-        #     except PkiCleNonTrouvee:
-        #         self.__logger.warning("Erreur chargement secret %s" % nom_secret)
+        for nom_secret, nom_fichier in noms_secrets.items():
+            try:
+                self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
+                secret_reference = self.trouver_secret(nom_secret)
+                secret_reference['filename'] = nom_fichier
+                secret_reference['uid'] = 0
+                secret_reference['gid'] = 0
+                secret_reference['mode'] = 0o444
+
+                del secret_reference['date']
+
+                liste_secrets.append(SecretReference(**secret_reference))
+            except PkiCleNonTrouvee:
+                self.__logger.warning("Erreur chargement secret %s" % nom_secret)
 
         # Trouver nom du certificat le plus recent et charger la cle correspondante
         # try:
@@ -846,6 +846,9 @@ class GestionnaireModulesDocker:
             secret_existant[0].remove()
 
     def charger_config_recente(self, config_name):
+        return self.__trouver_config(config_name)
+
+    def trouver_config(self, config_name):
         return self.__trouver_config(config_name)
 
     def __trouver_config(self, config_name):

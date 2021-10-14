@@ -233,6 +233,37 @@ class GestionnaireCertificats:
         chaine = '\n'.join(pems)
         self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, chaine, date_key)
 
+    def reconfigurer_clecert(self, nom_cert, password=False):
+        gestionnaire_docker = self._service_monitor.gestionnaire_docker
+        config_reference = gestionnaire_docker.charger_config_recente(nom_cert)
+        nom_cert = config_reference['config_reference']['config_name']
+        nom_key = nom_cert.replace('cert', 'key')
+        config_key = gestionnaire_docker.trouver_secret(nom_key)
+        fichier_cert = '.'.join(nom_key.split('.')[0:3])
+        secrets_a_configurer = [
+            {'ref': config_key, 'filename': '%s.pem' % fichier_cert},
+        ]
+
+        if password:
+            nom_passwd = nom_cert.replace('cert', 'passwd')
+            fichier_passwd = '.'.join(nom_passwd.split('.')[0:3])
+            config_passwd = gestionnaire_docker.trouver_secret(nom_passwd)
+            secrets_a_configurer.append({'ref': config_passwd, 'filename': '%s.txt' % fichier_passwd})
+
+        liste_secrets = list()
+        for secret in secrets_a_configurer:
+            # secret_reference = self.trouver_secret(secret_name)
+            secret_reference = secret['ref']
+            secret_reference['filename'] = secret['filename']
+            secret_reference['uid'] = 0
+            secret_reference['gid'] = 0
+            secret_reference['mode'] = 0o444
+
+            del secret_reference['date']  # Cause probleme lors du chargement du secret
+            liste_secrets.append(SecretReference(**secret_reference))
+
+        return {'secrets': liste_secrets}
+
     @property
     def idmg_tronque(self):
         return self.idmg[0:12]
@@ -552,45 +583,25 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         return clecert
 
-    def reconfigurer_clecert(self, nom_cert, password=False):
-        gestionnaire_docker = self._service_monitor.gestionnaire_docker
-        config_reference = gestionnaire_docker.charger_config_recente(nom_cert)
-        nom_cert = config_reference['config_reference']['config_name']
-        nom_key = nom_cert.replace('cert', 'key')
-        config_key = gestionnaire_docker.trouver_secret(nom_key)
-        secrets_a_configurer = [
-            {'ref': config_key, 'filename': '%s.pem' % nom_key},
-        ]
-
-        if password:
-            nom_passwd = nom_cert.replace('cert', 'passwd')
-            config_passwd = gestionnaire_docker.trouver_secret(nom_passwd)
-            secrets_a_configurer.append({'ref': config_passwd, 'filename': '%s.txt' % nom_passwd})
-
-        liste_secrets = list()
-        for secret in secrets_a_configurer:
-            # secret_reference = self.trouver_secret(secret_name)
-            secret_reference = secret['ref']
-            secret_reference['filename'] = secret['filename']
-            secret_reference['uid'] = 0
-            secret_reference['gid'] = 0
-            secret_reference['mode'] = 0o444
-
-            del secret_reference['date']  # Cause probleme lors du chargement du secret
-            liste_secrets.append(SecretReference(**secret_reference))
-
-        return {'secrets': liste_secrets}
-
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
         os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
 
         # Charger information certificat intermediaire
+        config_cert = self._service_monitor.gestionnaire_docker.trouver_config('pki.intermediaire.cert')
         cert_pem = self._charger_certificat_docker('pki.intermediaire.cert')
-        with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'rb') as fichiers:
-            key_pem = fichiers.read()
-        with open(path.join(secret_path, 'pki.intermediaire.passwd.txt'), 'rb') as fichiers:
-            passwd_bytes = fichiers.read()
+
+        if self._service_monitor.is_dev_mode:
+            path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.%s' % config_cert['date'])
+            path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.%s' % config_cert['date'])
+        else:
+            path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.pem')
+            path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.txt')
+
+        with open(path_key, 'rb') as fichier:
+            key_pem = fichier.read()
+        with open(path_passwd, 'rb') as fichier:
+            passwd_bytes = fichier.read()
 
         clecert_intermediaire = EnveloppeCleCert()
         clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
@@ -611,8 +622,14 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         try:
             # Charger information certificat monitor
+            config_cert_monitor = self._service_monitor.gestionnaire_docker.trouver_config('pki.monitor.cert')
             cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-            with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
+            if self._service_monitor.is_dev_mode:
+                path_key = os.path.join(self._service_monitor.path_secrets,
+                                        'pki.monitor.key.%s' % config_cert_monitor['date'])
+            else:
+                path_key = os.path.join(self._service_monitor.path_secrets, 'pki.monitor.key.pem')
+            with open(path_key, 'rb') as fichiers:
                 key_pem = fichiers.read()
             clecert_monitor = EnveloppeCleCert()
             clecert_monitor.from_pem_bytes(key_pem, cert_pem)
