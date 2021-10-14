@@ -2595,9 +2595,21 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             else:
                 raise apie
 
+        env_params = None
+        try:
+            host = params['host']
+            port = params['port']
+            env_params = [
+                'MG_MQ_HOST=%s' % host,
+                'MG_MQ_PORT=%s' % port,
+            ]
+            self.__logger.info("MAJ connexion MQ avec %s" + str(env_params))
+        except KeyError:
+            self.__logger.info("Aucune information MQ pour configurer noeud (%s)" % params)
+
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
-        gestionnaire_docker.configurer_monitor()
+        gestionnaire_docker.configurer_monitor(env_params=env_params)
 
         raise ForcerRedemarrage("Redemarrage")
 
