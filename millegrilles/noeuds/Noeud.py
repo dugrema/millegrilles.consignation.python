@@ -179,6 +179,7 @@ class DemarreurNoeud(Daemon):
         queue_reponse = self._message_handler.queue_reponse
 
         if queue_reponse is not None:
+            self._logger.info("Demander information noeud %s" % self.noeud_id)
             self.contexte.generateur_transactions.transmettre_requete(
                 {'noeud_id': self.noeud_id},
                 'SenseursPassifs',
@@ -291,7 +292,7 @@ class DemarreurNoeud(Daemon):
 
     def inclure_dummysenseurs(self):
         self._logger.info("Activer dummysenseurs")
-        self._dummysenseurs = DummySenseurs(no_senseur="7a2764fa-c457-4f25-af0d-0fc915439b21", noeud=self)
+        self._dummysenseurs = DummySenseurs(no_senseur="8a2764fa-c457-4f25-af0d-0fc915439b21", noeud=self)
         self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
