@@ -179,7 +179,7 @@ class DemarreurNoeud(Daemon):
         queue_reponse = self._message_handler.queue_reponse
 
         if queue_reponse is not None:
-            self._logger.info("Demander information noeud %s" % self.noeud_id)
+            self._logger.warning("Demander information noeud %s" % self.noeud_id)
             self.contexte.generateur_transactions.transmettre_requete(
                 {'noeud_id': self.noeud_id},
                 'SenseursPassifs',
