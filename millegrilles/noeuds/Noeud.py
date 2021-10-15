@@ -23,9 +23,9 @@ from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesSecurityPki
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-
-
 from millegrilles.util.Daemon import Daemon
+
+from mgdomaines.appareils.AffichagesPassifs import AffichageAvecConfiguration
 
 
 FORMAT_TIMESTAMP_FICHIER = '%Y%m%d%H%M'
@@ -117,6 +117,10 @@ class DemarreurNoeud(Daemon):
         self._parser.add_argument(
             '--dummysenseurs', action="store_true", required=False,
             help="Initalise un emetteur de lecture dummy, pour tester la connexion"
+        )
+        self._parser.add_argument(
+            '--dummylcd', action="store_true", required=False,
+            help="Initalise un affichage dummy vers logs, pour tester AffichagesPassifs"
         )
         self._parser.add_argument(
             '--debug', action="store_true", required=False,
@@ -264,6 +268,9 @@ class DemarreurNoeud(Daemon):
         if self._args.dummysenseurs:
             self.inclure_dummysenseurs()
 
+        if self._args.dummylcd:
+            self.inclure_dummylcd()
+
     def fermer(self):
         self._stop_event.set()
 
@@ -299,6 +306,11 @@ class DemarreurNoeud(Daemon):
         self._dummysenseurs = DummySenseurs(no_senseur="8a2764fa-c457-4f25-af0d-0fc915439b21", noeud=self)
         self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
+
+    def inclure_dummylcd(self):
+        self._logger.info("Activer Dummy LCD")
+        self._dummylcd = DummyLcd(self.contexte, self.noeud_id)
+        self._dummylcd.start()
 
     def transmettre_lecture_callback(self, dict_lecture):
         self._producteur_transaction.transmettre_lecture_senseur(dict_lecture, version=5)
@@ -400,6 +412,16 @@ class DummySenseurs:
                 self._logger.exception("DummySenseurs: Erreur lecture")
             finally:
                 self._stop_event.wait(self._intervalle_lectures)
+
+
+class DummyLcd(AffichageAvecConfiguration):
+
+    def __init__(self, contexte, noeud_id: str = None, timezone_horloge: str = None, intervalle_secs=30):
+        super().__init__(contexte, noeud_id, timezone_horloge, intervalle_secs)
+
+    def maj_affichage(self, lignes_affichage):
+        super().maj_affichage(lignes_affichage)
+        print(self._lignes_ecran)
 
 
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):

@@ -75,7 +75,7 @@ class AfficheurDocumentMAJDirecte:
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
 
         self._configuration_affichage_lcd: Optional[dict] = None
-        self._cles_senseurs_supportes = None
+        self._cles_senseurs_supportes = list()
 
         # self._collection = None
         # self._curseur_changements = None  # Si None, on fonctionne par timer
@@ -166,9 +166,10 @@ class AfficheurDocumentMAJDirecte:
         try:
             self._contexte.generateur_transactions.transmettre_requete(
                 requete,
-                'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD,
-                'affichage_lcd',
-                self._queue_reponse,
+                domaine="SenseursPassifs",
+                action='getNoeud',
+                correlation_id='affichage_lcd',
+                reply_to=self._queue_reponse,
                 ajouter_certificats=True
             )
         except Exception as e:
