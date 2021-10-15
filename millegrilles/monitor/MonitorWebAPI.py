@@ -261,7 +261,10 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         try:
             csr_intermediaire = self.service_monitor.csr_intermediaire
         except AttributeError:
-            # On est probablement dans un monitor instancie, charger avec docker
+            csr_intermediaire = None
+
+        # On est probablement dans un monitor instancie, charger avec docker
+        if csr_intermediaire is None:
             try:
                 csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
                     'pki.monitor.csr')
