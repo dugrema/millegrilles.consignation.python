@@ -234,6 +234,9 @@ class DemarreurNoeud(Daemon):
 
     def setup_modules(self):
         # Charger la configuration et les DAOs
+        if self._args.debug:
+            self._logger.setLevel(logging.DEBUG)
+
         self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
         self._contexte.initialiser(init_message=doit_connecter)
