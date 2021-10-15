@@ -210,11 +210,12 @@ class DemarreurNoeud(Daemon):
             # Faire verifications de fonctionnement, watchdog, etc...
 
             try:
-                if self.info_noeud is None and self._message_handler.queue_reponse is not None:
+                if self.info_noeud is None:
                     self.demander_informations_noeud()
+                else:
+                    self._logger.debug("Configuration noeud : %s", self.info_noeud)
             except AttributeError:
                 self._logger.debug("Connexion MQ pas prete pour requete info noeud")
-                pass
 
             try:
                 self.traiter_backlog_messages()
