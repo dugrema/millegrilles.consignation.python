@@ -1337,6 +1337,10 @@ class GestionnaireModulesDocker:
         services = self.__docker.services.list(filters={'name': nom_service})
         return services[0]
 
+    def get_application_certificats(self):
+        services = self.__docker.services.list(filters={'label': "certificat=true"})
+        return services
+
     def get_liste_services(self):
         services = self.__docker.services.list()
 

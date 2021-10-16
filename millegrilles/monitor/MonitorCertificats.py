@@ -288,7 +288,7 @@ class GestionnaireCertificats:
     def generer_nouveau_idmg(self):
         raise NotImplementedError()
 
-    def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None, liste_dns: list = None) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None, liste_dns: list = None, combiner_keycert=False) -> EnveloppeCleCert:
         raise GenerationCertificatNonSupporteeException()
 
     def verifier_eligibilite_renouvellement(self, clecert: EnveloppeCleCert):
@@ -554,7 +554,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
         self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
-    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None, combiner_keycert=False) -> EnveloppeCleCert:
         if nomcle is None:
             nomcle = role
 
@@ -571,7 +571,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         secret = clecert.private_key_bytes
 
         # Verifier si on doit combiner le cert et la cle (requis pour Mongo)
-        if role in [ConstantesGenerateurCertificat.ROLE_MONGO, ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS]:
+        if combiner_keycert or role in [ConstantesGenerateurCertificat.ROLE_MONGO, ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS]:
             secret_str = [str(secret, 'utf-8')]
             secret_str.extend(clecert.chaine)
             secret = '\n'.join(secret_str).encode('utf-8')

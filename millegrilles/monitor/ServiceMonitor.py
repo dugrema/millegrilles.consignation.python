@@ -452,7 +452,7 @@ class ServiceMonitor:
         except KeyError:
             domaine_noeud = fqdn_noeud
 
-        # Entretien des certificats services
+        # S'assurer que tous les certificats sont generes (initialement ou sur suppression forcee)
         roles = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
         resultat_entretien_certificats = self._supprimer_certificats_expires(roles)
 
@@ -476,28 +476,28 @@ class ServiceMonitor:
                         nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
                     self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
 
-        # Generer certificats expires et manquants pour applications protegees
-        # self._gestionnaire_docker.get_service()
+        # Entretien des certificats services
+        self._entretien_certificats_pki()
 
         # Entretien certificat nginx - s'assurer que le certificat d'installation est remplace
 
         # Nettoyer certificats monitor
         self._supprimer_certificats_expires(['monitor'])
 
-        # Entretien certificats applications
-        self._entretien_certificats_applications()
+        # # Entretien certificats applications
+        # self._entretien_certificats_applications()
 
-    def _entretien_certificats_applications(self):
+    def _entretien_certificats_pki(self):
         prefixe_certificats = 'pki.'
         filtre = {
             'name': prefixe_certificats,
-            'label': ['mg_type=pki', 'role=application']
+            'label': ['mg_type=pki']
         }
         nom_applications = dict()
         for config in self._docker.configs.list(filters=filtre):
             labels = config.attrs['Spec']['Labels']
-            app_name = labels['common_name']
-            nom_applications[app_name] = labels
+            app_role = labels['role']
+            nom_applications[app_role] = labels
 
         # Supprimer les certificats expires, renouveller si possible (ok si echec)
         liste_apps = list(nom_applications.keys())
@@ -514,17 +514,19 @@ class ServiceMonitor:
         # Generer certificats expires et manquants
         for nom_role, info_role in resultat_suppression.items():
             if not info_role.get('expiration') or info_role.get('est_expire'):
-            # if True:
                 self.__logger.debug("Generer nouveau certificat role %s", nom_role)
-                self._gestionnaire_certificats.generer_clecert_module(
-                    ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE,
-                    nom_role,
-                    nom_role,
-                    liste_dns=[fqdn_noeud, domaine_noeud, nom_role + '.' + domaine_noeud]
-                )
+                try:
+                    self._gestionnaire_certificats.generer_clecert_module(
+                        nom_role,
+                        domaine_noeud,
+                        nom_role,
+                        liste_dns=[fqdn_noeud, domaine_noeud, nom_role, nom_role + '.' + domaine_noeud]
+                    )
 
-                # Reconfigurer tous les services qui utilisent le nouveau certificat
-                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+                    # Reconfigurer tous les services qui utilisent le nouveau certificat
+                    self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+                except Exception:
+                    self.__logger.exception("Erreur creation nouveau certificat %s" % nom_role)
 
     def _supprimer_certificats_expires(self, roles_entretien: list):
         prefixe_certificats = 'pki.'
