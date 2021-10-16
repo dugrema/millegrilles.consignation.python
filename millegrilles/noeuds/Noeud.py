@@ -303,7 +303,8 @@ class DemarreurNoeud(Daemon):
 
     def inclure_dummysenseurs(self):
         self._logger.info("Activer dummysenseurs")
-        self._dummysenseurs = DummySenseurs(no_senseur="8a2764fa-c457-4f25-af0d-0fc915439b21", noeud=self)
+        no_senseur = self.noeud_id + '/dummy1'
+        self._dummysenseurs = DummySenseurs(no_senseur=no_senseur, noeud=self)
         self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
