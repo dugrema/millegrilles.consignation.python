@@ -1711,6 +1711,7 @@ class ServiceMonitorPrive(ServiceMonitor):
                 self.preparer_secrets()
 
                 if self.__containers_redemarres_rotation is False:
+                    self.__logger.info("Redemarrer containers en mode application suite au redemarrage du monitor (1 fois)")
                     self.__containers_redemarres_rotation = True
                     self.gestionnaire_docker.stop_applications_modecontainer()
 
