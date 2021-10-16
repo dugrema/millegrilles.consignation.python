@@ -1767,6 +1767,12 @@ class ServiceMonitorPrive(ServiceMonitor):
             self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
             self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
 
+            # Tenter de fermer tous les containers qui requierent un certificat (il a probablement ete mis a jour)
+            try:
+                self.gestionnaire_docker.stop_applications_modecontainer()
+            except Exception:
+                self.__logger.exception("Erreur stop applications mode container")
+
         except Exception:
             self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
 

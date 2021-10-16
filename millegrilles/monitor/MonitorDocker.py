@@ -670,6 +670,15 @@ class GestionnaireModulesDocker:
             # Ok, container s'est auto-supprime
             pass
 
+    def stop_applications_modecontainer(self):
+        filter = {'label': 'mode_container=true'}
+        container_list = self.__docker.containers.list(filters=filter)
+        for container in container_list:
+            try:
+                container.stop()
+            except Exception:
+                self.__logger.exception("Erreur stop container %s (mode application, restart requis)", container.id)
+
     # def activer_hebergement(self):
     #     """
     #     Active les modules d'hebergement (si pas deja fait).
