@@ -1685,6 +1685,9 @@ class ServiceMonitorPrive(ServiceMonitor):
         self._configuration = TransactionConfiguration()
         self._configuration.loadEnvironment()
 
+        # Flag pour redemarrer les app mode containers apres rotation de certificats
+        self.__containers_redemarres_rotation = False
+
     def _entretien_modules(self):
         if not self.limiter_entretien:
             # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
@@ -1706,6 +1709,10 @@ class ServiceMonitorPrive(ServiceMonitor):
 
                 # Mettre a jour les certificats utilises par les modules prives
                 self.preparer_secrets()
+
+                if self.__containers_redemarres_rotation is False:
+                    self.__containers_redemarres_rotation = True
+                    self.gestionnaire_docker.stop_applications_modecontainer()
 
     def connecter_middleware(self):
         """
