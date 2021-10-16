@@ -456,7 +456,7 @@ class ServiceMonitor:
         roles = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
         resultat_entretien_certificats = self._supprimer_certificats_expires(roles)
 
-        # Generer certificats expires et manquants
+        # Generer certificats expires et manquants pour modules proteges
         for nom_role, info_role in resultat_entretien_certificats.items():
             if not info_role.get('expiration') or info_role.get('est_expire'):
                 self.__logger.debug("Generer nouveau certificat role %s", nom_role)
@@ -475,6 +475,9 @@ class ServiceMonitor:
                     self._gestionnaire_certificats.generer_clecert_module(
                         nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
                     self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
+        # Generer certificats expires et manquants pour applications protegees
+        # self._gestionnaire_docker.get_service()
 
         # Entretien certificat nginx - s'assurer que le certificat d'installation est remplace
 

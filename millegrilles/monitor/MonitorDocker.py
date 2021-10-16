@@ -1086,7 +1086,11 @@ class GestionnaireModulesDocker:
 
             if kwargs.get('application'):
                 updated_labels['application'] = kwargs.get('application')
+                if config_service.get('certificat_compte'):
+                    updated_labels['certificat'] = 'true'
+                    updated_labels['certificat_nom'] = config_service['certificat_compte']
                 dict_config_docker['labels'] = updated_labels
+
 
             # Container labels
             config_container_labels = config_service.get('container_labels')
