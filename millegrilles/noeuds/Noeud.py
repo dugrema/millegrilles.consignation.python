@@ -788,9 +788,18 @@ class GestionnaireMessages(BaseCallback):
         routing_key = method.routing_key
         action = routing_key.split('.')[-1]
         correlation_id = properties.correlation_id
+
         if routing_key == self.__routing_cert:
-            # Transmettre notre certificat
-            self.contexte.signateur_transactions.emettre_certificat()
+            # Emettre notre certificat pour s'assurer qu'il soit sauvegarde
+            chaine_certs = self.contexte.signateur_transactions.chaine_certs
+            enveloppe = self.contexte.signateur_transactions.enveloppe_certificat_courant
+            fingerprint = enveloppe.fingerprint
+            message_cert = {'chaine_pem': chaine_certs, 'fingerprint': fingerprint}
+            self.contexte.generateur_transactions.emettre_certificat(chaine_certs)
+            # Repondre au demandeur
+            reply_to = properties.reply_to
+            self.contexte.generateur_transactions.transmettre_reponse(
+                message_cert, reply_to, correlation_id, ajouter_certificats=True)
         elif action == 'cedule':
             flag_heure = message_dict.get('flag_heure')
             if flag_heure:
