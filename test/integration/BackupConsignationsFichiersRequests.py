@@ -134,7 +134,7 @@ class GetCommands(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.url_consignationfichiers = 'https://fichiers:3021'
+        self.url_consignationfichiers = 'https://mg-dev4:3021'
         self.certfile = self.configuration.pki_certfile
         self.keyfile = self.configuration.pki_keyfile
 
@@ -144,7 +144,7 @@ class GetCommands(DomaineTest):
             data=data,
             verify=self._contexte.configuration.mq_cafile,
             cert=(self.certfile, self.keyfile),
-            timeout=1,
+            timeout=3,
             stream=True,
         )
 
@@ -187,10 +187,12 @@ class GetCommands(DomaineTest):
         self.__logger.debug("Resultat get_liste_fichiers : %d\nHeaders: %s" % (r.status_code, r.headers))
         self.__logger.debug(r.text)
 
-    def get_fichier(self, domaine='domaine.test', fichier='horaire/domaine.sousdomaine.202001010000.json.xz'):
+    def get_fichier(self, domaine='GrosFichiers', fichier='GrosFichiers_20211021.tar'):
         r = self.get('fichier/' + domaine + '/' + fichier)
         self.__logger.debug("Resultat get_fichier : %d\nHeaders: %s" % (r.status_code, r.headers))
         content = r.content
+        with open('/tmp/download.tar', 'wb') as fichier:
+            fichier.write(r.content)
         self.__logger.debug("Taille contenu fichier : %d" % len(content))
 
     def get_listeapplications(self):
@@ -219,11 +221,11 @@ class GetCommands(DomaineTest):
             # self.get_catalogues("GrosFichiers")
             # self.get_liste_fichiers("sample5")
             # self.get_liste_fichiers("MaitreDesComptes")
-            # self.get_fichier()
+            self.get_fichier()
             # self.get_fichier('sample4', 'domaine.test_2020.tar')
             # self.get_fichier('mathieu.main', 'snapshot/test.txt')
             # self.get_listeapplications()
-            self.head_application()
+            # self.head_application()
         except:
             self.__logger.exception("Erreur")
         finally:
