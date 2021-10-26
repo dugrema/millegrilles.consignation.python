@@ -1709,6 +1709,7 @@ class ConstantesGenerateurCertificat:
     ROLE_HEBERGEMENT_FICHIERS = 'heb_fichiers'
     ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
     ROLE_SENSEURSPASSIFS = 'senseurspassifs'
+    ROLE_MEDIA = 'media'
 
 
 class ConstantesServiceMonitor:
@@ -1750,6 +1751,7 @@ class ConstantesServiceMonitor:
     MODULE_REDIS = 'redis'
     MODULE_AGENT_BACKUP = 'agent_backup'
     MODULE_ELASTICSEARCH = 'elasticsearch'
+    MODULE_MEDIA = 'media'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     # MODULE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     # MODULE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'

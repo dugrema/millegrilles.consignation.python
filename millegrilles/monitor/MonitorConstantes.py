@@ -102,6 +102,11 @@ DICT_MODULES_PROTEGES = {
         'nom': ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
         'nom_image': ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
     },
+    ConstantesServiceMonitor.MODULE_MEDIA: {
+        'nom': ConstantesServiceMonitor.MODULE_MEDIA,
+        'nom_image': ConstantesServiceMonitor.MODULE_MEDIA,
+        'role': ConstantesGenerateurCertificat.ROLE_MEDIA,
+    },
     # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
     #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
     #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,

@@ -1536,6 +1536,39 @@ class GenererGrosFichiers(GenerateurNoeud):
         return builder
 
 
+class GenererMedia(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ','.join([Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_MEDIA.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'media'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'localhost'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        # Ajouter noms DNS valides
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
 class GenererMongoexpress(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
@@ -1892,6 +1925,7 @@ class RenouvelleurCertificat:
 
             ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: GenererSenseursPassifs,
             ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS: GenererGrosFichiers,
+            ConstantesGenerateurCertificat.ROLE_MEDIA: GenererMedia,
         }
 
         # S'assurer que le dict contient reference aux CAs

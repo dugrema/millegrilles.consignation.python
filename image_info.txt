@@ -1,7 +1,7 @@
 # Fichier d'information pour le build Docker
 
 REPO=docker.maceroc.com
-DOCKERHUB_REPO=dugremat
+# DOCKERHUB_REPO=dugremat
 NAME=millegrilles_consignation_python_main
 #BRANCH=`git name-rev --name-only HEAD`
 #_TAG=`git name-rev --name-only HEAD`
