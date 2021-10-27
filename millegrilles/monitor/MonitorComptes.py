@@ -137,6 +137,15 @@ class GestionnaireComptesMQ:
 
         return configure_permissions, read_permissions, write_permissions
 
+    def get_topic_permissions(self):
+        raise NotImplementedError()
+        # Exemple pour media
+        # TOPICS (1.public, 2.prive, 3.protege)
+        # write, exchanges 2.prive, 3.protege:
+        # requete\..*|evenement\.fichiers.*|evenement\.media.*|\..*|commande\..*|transaction\.GrosFichiers\..*|amq\..*
+        # read
+        # requete\.certificat\..*|evenement\.certificat\..*|requete\.media\..*|evenement\.media\..*|commande\.media\..*|commande\.fichiers\..*|amq.*
+
     def ajouter_compte(self, enveloppe: EnveloppeCleCert):
         issuer = enveloppe.formatter_issuer()
         idmg = issuer['organizationName']

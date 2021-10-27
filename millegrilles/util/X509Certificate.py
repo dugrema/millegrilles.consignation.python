@@ -1550,7 +1550,7 @@ class GenererMedia(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ConstantesGenerateurCertificat.ROLE_MEDIA.encode('utf-8')
+        roles = ','.join([ConstantesGenerateurCertificat.ROLE_MEDIA, ConstantesGenerateurCertificat.ROLE_FICHIERS]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
