@@ -54,11 +54,6 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_MONGO,
         'role': ConstantesGenerateurCertificat.ROLE_MONGO,
     },
-    # ConstantesServiceMonitor.MODULE_TRANSACTION: {
-    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-    # },
     ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
         'nom': ConstantesServiceMonitor.MODULE_MAITREDESCLES,
         'nom_image': ConstantesServiceMonitor.MODULE_MAITREDESCLES,
@@ -79,11 +74,6 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
         'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
     },
-    # ConstantesServiceMonitor.MODULE_PRINCIPAL: {
-    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    # },
     ConstantesServiceMonitor.MODULE_CORE: {
         'nom': ConstantesServiceMonitor.MODULE_CORE_RUST,
         'nom_image': ConstantesServiceMonitor.MODULE_CORE_RUST,
@@ -107,31 +97,6 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_MEDIA,
         'role': ConstantesGenerateurCertificat.ROLE_MEDIA,
     },
-    # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
-    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    # },
-    # ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
-    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
-    # },
-    # ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
-    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
-    # },
-    # ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
-    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-    #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
-    # },
-    # ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
-    #     'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
-    #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
-    # },
-    # ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
-    #     'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-    #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
-    # },
 }
 
 # Liste de modules requis. L'ordre est important
@@ -150,17 +115,15 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_MQ,
     ConstantesServiceMonitor.MODULE_MONGO,
-    # ConstantesServiceMonitor.MODULE_TRANSACTION,
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-    # ConstantesServiceMonitor.MODULE_PRINCIPAL,
     ConstantesServiceMonitor.MODULE_CORE,
     ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
+    ConstantesServiceMonitor.MODULE_MEDIA,
     ConstantesServiceMonitor.MODULE_AGENT_BACKUP,
     ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
-    # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
 ]
 
 MODULES_REQUIS_DEPENDANT = [
