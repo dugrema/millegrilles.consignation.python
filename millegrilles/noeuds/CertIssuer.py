@@ -37,6 +37,7 @@ class Config:
         self.idmg: Optional[str] = None
         self.path_data = '/var/opt/millegrilles/issuer'
         self.noeud_id: Optional[str] = None
+        self.clecert: Optional[EnveloppeCleCert] = None
 
 
 # Creer objet config global, permet de le passer plus facilement au serveur
@@ -130,6 +131,13 @@ def parse(config_in: Config):
     config_in.idmg = environ.get("IDMG")
     config_in.path_data = environ.get("PATH_DATA") or config_in.path_data
     config_in.noeud_id = environ.get("MG_NOEUD_ID") or 'certissuer'
+
+    # Charger cle courante
+    try:
+        clecert = charger_clecert(config_in)
+        config_in.clecert = clecert
+    except FileNotFoundError:
+        logger.info("Certificat intermediare n'est pas encore charge")
 
     # Ligne de commande
     parser = argparse.ArgumentParser(description="""
@@ -243,7 +251,7 @@ def set_intermediaire(http_instance: ServeurHttp, request_data: dict):
     # Charger le certificat recu, verifier correspondence avec csr
     path_data = config.path_data
     try:
-        clecert = charger_clecert(prive_seulement=True)
+        clecert = charger_clecert(csr=True)
     except FileNotFoundError:
         http_instance.send_error(404)
         return
@@ -255,6 +263,7 @@ def set_intermediaire(http_instance: ServeurHttp, request_data: dict):
     if clecert.cle_correspondent():
         # Ok, sauvegarder le nouveau certificat, mettre nouvelle cle/password effectifs
         sauvegarder_certificat(config, chaine_pem)
+        config.clecert = clecert  # Activer cle immediatement
         http_instance.send_response(200)
     else:
         logger.error("Mismatch cle et cert (csr)")
@@ -310,25 +319,31 @@ def rotation_courant(config: Config):
             pass
 
 
-def charger_clecert(prive_seulement=False):
+def charger_clecert(csr=False):
     clecert = EnveloppeCleCert()
 
     path_data = config.path_data
     path_cert = path.join(path_data, 'config/cert.pem')
-    path_key = path.join(path_data, 'secrets/csr.key.pem')
-    path_pwd = path.join(path_data, 'secrets/csr.passwd.pem')
+    if csr is True:
+        path_key = path.join(path_data, 'secrets/csr.key.pem')
+        path_pwd = path.join(path_data, 'secrets/csr.passwd.pem')
+    else:
+        path_key = path.join(path_data, 'secrets/current.key.pem')
+        path_pwd = path.join(path_data, 'secrets/current.passwd.pem')
 
     with open(path_key, 'rb') as fichier:
         cle_pem = fichier.read()
     with open(path_pwd, 'rb') as fichier:
         passwd = fichier.read()
 
-    if prive_seulement:
+    if csr:
         clecert.key_from_pem_bytes(cle_pem, passwd)
     else:
         with open(path_cert, 'rb') as fichier:
             cert_pem = fichier.read()
         clecert.from_pem_bytes(cle_pem, cert_pem, passwd)
+        if not clecert.cle_correspondent():
+            raise Exception("Mismatch cle/cert")
 
     return clecert
 
