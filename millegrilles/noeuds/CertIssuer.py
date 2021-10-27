@@ -57,14 +57,15 @@ def main():
 
 
 def executer():
+    global stop_event
     logger.info("Demarrage certissuer sur port http %d" % server_port)
 
-    thread_server = Thread(name="web_server", target=executer_serveur)
+    thread_server = Thread(name="web_server", target=executer_serveur, daemon=True)
     thread_server.start()
 
     # Conserver la thread main active (sert a recevoir les 'signal')
     while not stop_event.is_set():
-        stop_event.wait(300)
+        stop_event.wait(1)
 
     logger.info("Fermeture certissuer")
 
@@ -88,7 +89,7 @@ def setup(config_in: Config):
 
 
 def executer_serveur():
-    global web_server, config
+    global web_server, config, stop_event
     web_server = HTTPServer((host_name, server_port), ServeurHttp)
     web_server.config = config
     web_server.serve_forever()
@@ -101,10 +102,12 @@ def executer_serveur():
 
 
 def exit_gracefully(signum=None, frame=None):
+    global web_server
     logger.info("Fermer sur signal: %d" % signum)
     stop_event.set()
-    global web_server
-    web_server.shutdown()
+    logger.info("Stop event set - fermeture en cours")
+    # web_server.shutdown()
+    logger.info("Shutdown web serveur complete")
 
 
 def entretien():
@@ -112,6 +115,8 @@ def entretien():
     while not stop_event.is_set():
         logger.debug("Cycle entretien")
         stop_event.wait(30)
+
+    logger.info("Fin thread entretien")
 
 
 def parse(config_in: Config):
