@@ -1,6 +1,7 @@
 # Programme de signature de certificats
 # Expose une interface web sur https://certissuer:8443/certificats
 import argparse
+import json
 import logging
 import signal
 import time
@@ -10,8 +11,9 @@ from cryptography import x509
 from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
+from json.decoder import JSONDecodeError
 from http.server import SimpleHTTPRequestHandler, HTTPServer
-from os import environ, makedirs, path, chmod
+from os import environ, makedirs, path, chmod, rename, remove
 from threading import Event, Thread
 from typing import Optional
 
@@ -127,6 +129,7 @@ def parse(config_in: Config):
     server_port = int(port)
     config_in.idmg = environ.get("IDMG")
     config_in.path_data = environ.get("PATH_DATA") or config_in.path_data
+    config_in.noeud_id = environ.get("MG_NOEUD_ID") or 'certissuer'
 
     # Ligne de commande
     parser = argparse.ArgumentParser(description="""
@@ -150,7 +153,7 @@ class ServeurHttp(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         super().__init__(*args, **kwargs)
-        self.config: Optional[dict] = None
+        self.config: Optional[Config] = None
 
     def do_GET(self):
         path_request = self.path.split('/')
@@ -160,6 +163,23 @@ class ServeurHttp(SimpleHTTPRequestHandler):
             elif path_request[1] == 'certissuerInterne':
                 # Path uniquement accessible de l'interne (network docker)
                 self.traiter_get_communs(path_request, interne=True)
+            else:
+                self.send_error(404)
+
+        except IndexError:
+            self.send_error(404)
+        except:
+            logger.exception("Erreur traitement")
+            self.send_error(500)
+
+    def do_POST(self):
+        path_request = self.path.split('/')
+        try:
+            if path_request[1] == 'certissuer':
+                self.traiter_post_communs(path_request)
+            elif path_request[1] == 'certissuerInterne':
+                # Path uniquement accessible de l'interne (network docker)
+                self.traiter_post_communs(path_request, interne=True)
             else:
                 self.send_error(404)
 
@@ -178,9 +198,27 @@ class ServeurHttp(SimpleHTTPRequestHandler):
         except:
             self.send_error(500)
 
+    def traiter_post_communs(self, path_request: list, interne=False):
+        commande = path_request[2]
+
+        content_len = int(self.headers.get('content-length', 0))
+        post_body = self.rfile.read(content_len)
+        try:
+            request_data = json.loads(post_body)
+        except JSONDecodeError:
+            request_data = None
+
+        try:
+            if commande == 'issuer':
+                set_intermediaire(self, request_data)
+            else:
+                self.send_error(404)
+        except:
+            self.__logger.exception("Erreur traitement http")
+            self.send_error(500)
+
 
 def send_csr(http_instance: ServeurHttp):
-
 
     try:
         server = http_instance.server
@@ -197,6 +235,102 @@ def send_csr(http_instance: ServeurHttp):
         http_instance.send_header("Access-Control-Allow-Origin", "*")
         http_instance.end_headers()
         http_instance.finish()
+
+
+def set_intermediaire(http_instance: ServeurHttp, request_data: dict):
+    config = http_instance.server.config
+
+    # Charger le certificat recu, verifier correspondence avec csr
+    path_data = config.path_data
+    try:
+        clecert = charger_clecert(prive_seulement=True)
+    except FileNotFoundError:
+        http_instance.send_error(404)
+        return
+
+    chaine_pem: list = request_data['chainePem']
+    clecert.cert_from_pem_bytes(''.join(chaine_pem).encode('utf-8'))
+
+    # Verifier si la cle correspond au certificat
+    if clecert.cle_correspondent():
+        # Ok, sauvegarder le nouveau certificat, mettre nouvelle cle/password effectifs
+        sauvegarder_certificat(config, chaine_pem)
+        http_instance.send_response(200)
+    else:
+        logger.error("Mismatch cle et cert (csr)")
+        http_instance.send_error(400)
+
+
+def sauvegarder_certificat(config: Config, chaine: list):
+    # Marquer fichiers courantes comme .old
+    rotation_courant(config)
+    path_data = config.path_data
+
+    path_csr = path.join(path_data, 'config/csr.pem')
+    path_csr_key = path.join(path_data, 'secrets/csr.key.pem')
+    path_csr_pwd = path.join(path_data, 'secrets/csr.passwd.pem')
+
+    path_current_cert = path.join(path_data, 'config/current.cert.pem')
+    path_current_key = path.join(path_data, 'secrets/current.key.pem')
+    path_current_pwd = path.join(path_data, 'secrets/current.passwd.pem')
+
+    # Sauvegarder cert, deplacer cle/password csr comme courant
+    with open(path_current_cert, 'w') as fichier:
+        fichier.write(''.join(chaine))
+
+    rename(path_csr_key, path_current_key)
+    rename(path_csr_pwd, path_current_pwd)
+    remove(path_csr)
+
+
+def rotation_courant(config: Config):
+    """
+    Effectue une rotation des cles, passwd et cert courants (marquer .old)
+    :return:
+    """
+    path_data = config.path_data
+    path_current_cert = path.join(path_data, 'config/current.cert.pem')
+    path_current_key = path.join(path_data, 'secrets/current.key.pem')
+    path_current_pwd = path.join(path_data, 'secrets/current.passwd.pem')
+
+    path_old_cert = path.join(path_data, 'config/old.cert.pem')
+    path_old_key = path.join(path_data, 'secrets/old.key.pem')
+    path_old_pwd = path.join(path_data, 'secrets/old.passwd.pem')
+
+    for old in [path_old_cert, path_old_key, path_old_pwd]:
+        try:
+            remove(old)
+        except FileNotFoundError:
+            pass
+
+    for (current, old) in [(path_current_cert, path_old_cert), (path_current_key, path_old_key), (path_current_pwd, path_old_pwd)]:
+        try:
+            rename(current, old)
+        except FileNotFoundError:
+            pass
+
+
+def charger_clecert(prive_seulement=False):
+    clecert = EnveloppeCleCert()
+
+    path_data = config.path_data
+    path_cert = path.join(path_data, 'config/cert.pem')
+    path_key = path.join(path_data, 'secrets/csr.key.pem')
+    path_pwd = path.join(path_data, 'secrets/csr.passwd.pem')
+
+    with open(path_key, 'rb') as fichier:
+        cle_pem = fichier.read()
+    with open(path_pwd, 'rb') as fichier:
+        passwd = fichier.read()
+
+    if prive_seulement:
+        clecert.key_from_pem_bytes(cle_pem, passwd)
+    else:
+        with open(path_cert, 'rb') as fichier:
+            cert_pem = fichier.read()
+        clecert.from_pem_bytes(cle_pem, cert_pem, passwd)
+
+    return clecert
 
 
 def charger_csr(config: Config):
@@ -231,6 +365,7 @@ def generer_csr(config: Config):
     builder = x509.CertificateSigningRequestBuilder()
     name_list = list()
     name_list.append(x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, u'intermediaire'))
+    name_list.append(x509.NameAttribute(x509.name.NameOID.COMMON_NAME, config.noeud_id))
 
     if config.idmg:
         name_list.append(x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, config.idmg))
