@@ -1443,14 +1443,14 @@ class GenererFichiers(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS).encode('utf-8')
+        exchanges = ','.join([('%s' % e) for e in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s,%s' % (ConstantesGenerateurCertificat.ROLE_FICHIERS, ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS)).encode('utf-8')
+        roles = ('%s,%s' % (ConstantesGenerateurCertificat.ROLE_FICHIERS, ConstantesGenerateurCertificat.ROLE_BACKUP)).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1458,6 +1458,7 @@ class GenererFichiers(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'fichiers'),
+            x509.DNSName(u'backup'),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'localhost'),
             x509.IPAddress(IPv4Address('127.0.0.1')),
@@ -1542,7 +1543,7 @@ class GenererMedia(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]).encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False

@@ -144,9 +144,9 @@ class RabbitMQAPI:
         :type read: str
         """
         data = {
-            'configure': configure or '.*',
-            'write': write or '.*',
-            'read': read or '.*',
+            'configure': configure or 'amq\\..*',
+            'write': write or 'amq\\..*',
+            'read': read or 'amq\\..*',
         }
         return self._api_put(
             '/api/permissions/{0}/{1}'.format(

@@ -109,6 +109,34 @@ class GestionnaireComptesMQ:
 
         return mq_pret
 
+    def get_user_permissions(self, enveloppe: EnveloppeCleCert):
+
+        read_permissions = ''
+        write_permissions = ''
+        configure_permissions = ''
+
+        if Constantes.SECURITE_SECURE in enveloppe.get_exchanges:
+            # Permission secure, on donne tous les acces
+            read_permissions = '.*'
+            write_permissions = '.*'
+            configure_permissions = '.*'
+        else:
+            exchanges = '|'.join([e.replace('.', '\\.') for e in enveloppe.get_exchanges])
+
+            roles = enveloppe.get_roles
+            if 'media' in roles or 'fichiers' in roles:
+                role_configs = '|'.join([r + '/.*' for r in roles])
+                configure_permissions = '|'.join([role_configs, 'amq.*'])
+                read_permissions = '|'.join([role_configs, exchanges, 'amq.*'])
+                write_permissions = '|'.join([role_configs, exchanges, 'amq.*'])
+            else:
+                # TODO Corriger, permissions pour tous les roles
+                read_permissions = '.*'
+                write_permissions = '.*'
+                configure_permissions = '.*'
+
+        return configure_permissions, read_permissions, write_permissions
+
     def ajouter_compte(self, enveloppe: EnveloppeCleCert):
         issuer = enveloppe.formatter_issuer()
         idmg = issuer['organizationName']
@@ -124,7 +152,11 @@ class GestionnaireComptesMQ:
 
             responses = list()
             responses.append(self._admin_api.create_user(subject))
-            responses.append(self._admin_api.create_user_permission(subject, idmg))
+
+            configure_permissions, read_permissions, write_permissions = self.get_user_permissions(enveloppe)
+            responses.append(self._admin_api.create_user_permission(
+                subject, idmg, configure=configure_permissions, write=write_permissions, read=read_permissions
+            ))
 
             liste_inclure = {Constantes.SECURITE_PUBLIC}  # PUblic toujours inclus
             if Constantes.SECURITE_PROTEGE in exchanges:
