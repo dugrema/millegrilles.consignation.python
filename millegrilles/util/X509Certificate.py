@@ -97,6 +97,9 @@ class EnveloppeCleCert:
         self.__fingerprint = None
         self.__idmg = None
 
+        self._sign_hash_function = hashes.SHA512
+        self._contenu_hash_function = hashes.SHA256
+
     def set_cert(self, cert):
         self.cert = cert
 
@@ -214,6 +217,19 @@ class EnveloppeCleCert:
         )
 
         return contenu_dechiffre
+
+    def signer(self, message_bytes: bytes):
+        signature = self.private_key.sign(
+            message_bytes,
+            asymmetric.padding.PSS(
+                mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
+                # salt_length=asymmetric.padding.PSS.MAX_LENGTH
+                salt_length=64   # Maximum supporte sur iPhone
+            ),
+            self._sign_hash_function()
+        )
+
+        return signature
 
     @property
     def get_roles(self):
@@ -1260,6 +1276,12 @@ class GenererMonitorDependant(GenerateurNoeud):
 
 class GenererMQ(GenerateurNoeud):
 
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
@@ -1286,12 +1308,21 @@ class GenererMQ(GenerateurNoeud):
             liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
 
         # Ajouter noms DNS valides pour MQ
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
 
         return builder
 
 
 class GenererMongo(GenerateurNoeud):
+
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
@@ -1320,12 +1351,21 @@ class GenererMongo(GenerateurNoeud):
                 liste_dns.append(x509.DNSName(u'mq.%s' % domaine))
 
         # Ajouter noms DNS valides pour MQ
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
 
         return builder
 
 
 class GenererWebProtege(GenerateurNoeud):
+
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
@@ -1362,8 +1402,11 @@ class GenererWebProtege(GenerateurNoeud):
             for domaine in self._domaines_publics:
                 liste_dns.append(x509.DNSName(u'%s' % domaine))
 
-        # Ajouter noms DNS valides pour CoupDoeil
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        # Ajouter noms DNS valides pour MQ
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
 
         return builder
 
@@ -1439,6 +1482,12 @@ class GenererWebPublic(GenerateurNoeud):
 
 class GenererFichiers(GenerateurNoeud):
 
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
@@ -1466,7 +1515,10 @@ class GenererFichiers(GenerateurNoeud):
         ]
 
         # Ajouter noms DNS valides pour MQ
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
 
         return builder
 
@@ -1539,6 +1591,12 @@ class GenererGrosFichiers(GenerateurNoeud):
 
 class GenererMedia(GenerateurNoeud):
 
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
@@ -1564,8 +1622,11 @@ class GenererMedia(GenerateurNoeud):
             x509.IPAddress(IPv6Address('::1')),
         ]
 
-        # Ajouter noms DNS valides
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        # Ajouter noms DNS valides pour MQ
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
 
         return builder
 
@@ -1600,6 +1661,12 @@ class GenererMongoexpress(GenerateurNoeud):
 
 class GenererNginx(GenerateurNoeud):
 
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
@@ -1627,7 +1694,10 @@ class GenererNginx(GenerateurNoeud):
                 liste_dns.append(x509.DNSName(u'www.%s' % domaine))
 
         # Ajouter noms DNS valides pour MQ
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
 
         return builder
 
@@ -1894,7 +1964,7 @@ class GenererAgentBackup(GenerateurNoeud):
 
 class RenouvelleurCertificat:
 
-    def __init__(self, idmg, dict_ca: dict, clecert_intermediaire: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None, generer_password=False):
+    def __init__(self, idmg, dict_ca: dict, clecert_intermediaire: EnveloppeCleCert = None, ca_autorite: EnveloppeCleCert = None, generer_password=False):
         self.__idmg = idmg
         self.__dict_ca = dict_ca
         self.__clecert_intermediaire = clecert_intermediaire
@@ -1930,9 +2000,10 @@ class RenouvelleurCertificat:
         }
 
         # S'assurer que le dict contient reference aux CAs
-        self.__dict_ca[clecert_intermediaire.skid] = clecert_intermediaire.cert
-        if ca_autorite:
-            self.__dict_ca[ca_autorite.skid] = ca_autorite.cert
+        if clecert_intermediaire is not None:
+            self.__dict_ca[clecert_intermediaire.skid] = clecert_intermediaire.cert
+            if ca_autorite:
+                self.__dict_ca[ca_autorite.skid] = ca_autorite.cert
 
         self.__generateur_par_csr = GenerateurCertificateParRequest
 
@@ -2033,6 +2104,21 @@ class RenouvelleurCertificat:
 
         cert_dict = generateur_instance.generer()
         return cert_dict
+
+    def preparer_csr_par_role(self, role, common_name, liste_dns: list = None) -> EnveloppeCleCert:
+        generateur = self.__generateurs_par_role[role]
+        if issubclass(generateur, GenerateurNoeud):
+            generateur_instance = generateur(
+                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire,
+                domaines_publics=liste_dns, generer_password=self.__generer_password,
+                duree=3, duree_heures=0)
+        else:
+            generateur_instance = generateur(
+                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire,
+                domaines_publics=liste_dns)
+
+        clecert_csr = generateur_instance.preparer_request(common_name, None, liste_dns)
+        return clecert_csr
 
     def signer_navigateur(self, csr_pem: bytes, securite: str, nom_usager: str, user_id: str, **kwargs):
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)

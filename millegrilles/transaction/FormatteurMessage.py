@@ -1,11 +1,65 @@
 import datetime
 import json
 import logging
+import multibase
 import uuid
 
+from typing import Union
+
 from millegrilles import Constantes
-from millegrilles.SecuritePKI import SignateurTransaction
+from millegrilles.SecuritePKI import SignateurTransaction, UtilCertificats
 from millegrilles.util.Hachage import hacher
+from millegrilles.util.X509Certificate import EnveloppeCleCert
+
+
+class SignateurTransactionSimple:
+    """ Signe une transaction avec clecert. """
+
+    def __init__(self, clecert: EnveloppeCleCert):
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.__clecert = clecert
+
+    def signer(self, dict_message):
+        """
+        Signe le message et retourne une nouvelle version. Ajout l'information pour le certificat.
+
+        :param dict_message: Message a signer.
+        :return: Nouvelle version du message, signee.
+        """
+
+        # Copier la base du message et l'en_tete puisqu'ils seront modifies
+        dict_message_effectif = dict_message.copy()
+        en_tete = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].copy()
+        dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = en_tete
+
+        # Ajouter information du certification dans l'en_tete
+        fingerprint_cert = self.__clecert.fingerprint
+        # self._logger.debug("Fingerprint: %s" % fingerprint_cert)
+        en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT] = fingerprint_cert
+
+        signature = self._produire_signature(dict_message_effectif)
+        dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = signature
+
+        return dict_message_effectif
+
+    def _produire_signature(self, dict_message):
+        # message_bytes = self.preparer_transaction_bytes(dict_message)
+        message_bytes = UtilCertificats.preparer_message_bytes(dict_message)
+        self._logger.debug("Message en format json: %s" % message_bytes)
+        signature = self.__clecert.signer(message_bytes)
+        # signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')
+
+        VERSION_SIGNATURE = 1
+        signature = bytes([VERSION_SIGNATURE]) + signature
+
+        signature_encodee = multibase.encode('base64', signature).decode('utf-8')
+        self._logger.debug("Signature: %s" % signature_encodee)
+
+        return signature_encodee
+
+    @property
+    def chaine_certs(self) -> list:
+        return self.__clecert.chaine
 
 
 class FormatteurMessageMilleGrilles:
@@ -14,7 +68,7 @@ class FormatteurMessageMilleGrilles:
     Supporte aussi une contre-signature pour emission vers une MilleGrille tierce.
     """
 
-    def __init__(self, idmg: str, signateur_transactions: SignateurTransaction):
+    def __init__(self, idmg: str, signateur_transactions: Union[SignateurTransaction, SignateurTransactionSimple]):
         """
         :param idmg: MilleGrille correspondant au signateur de transactions
         :param signateur_transactions: Signateur de transactions pour la MilleGrille
@@ -67,7 +121,8 @@ class FormatteurMessageMilleGrilles:
             pass  # L'entete n'existait pas
 
         # Nettoyer le message, serialiser pour eliminer tous les objets
-        enveloppe_bytes = self.__signateur_transactions.preparer_transaction_bytes(enveloppe)
+        enveloppe_bytes = UtilCertificats.preparer_message_bytes(enveloppe)
+        # enveloppe_bytes = self.__signateur_transactions.preparer_transaction_bytes(enveloppe)
 
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
         # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
@@ -91,3 +146,4 @@ class FormatteurMessageMilleGrilles:
     @property
     def chaine_certificat(self):
         return self.__signateur_transactions.chaine_certs
+

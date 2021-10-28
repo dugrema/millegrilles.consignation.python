@@ -17,11 +17,13 @@ from json.decoder import JSONDecodeError
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from os import environ, makedirs, path, chmod, rename, remove
 from threading import Event, Thread
-from typing import Optional
+from typing import Optional, Union
 
 from millegrilles import Constantes
-from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat
+from millegrilles.SecuritePKI import EnveloppeCertificat
+from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat
 from millegrilles.util.ValidateursPki import ValidateurCertificat
+from millegrilles.util.ValidateursMessages import ValidateurMessage
 
 
 # Variables globales
@@ -54,6 +56,8 @@ class HandlerCertificats:
         self.__clecert: Optional[EnveloppeCleCert] = None
         self.__renouvelleur: Optional[RenouvelleurCertificat] = None
         self.__validateur: Optional[ValidateurCertificat] = None
+        self.__chaine_certs: Optional[list] = None
+        self.__validateur_messages: Optional[ValidateurMessage] = None
 
     def set_intermediaire(self, clecert: EnveloppeCleCert):
         """
@@ -70,9 +74,13 @@ class HandlerCertificats:
         clecert_millegrille.cert_from_pem_bytes(cert_ca.encode('utf-8'))
         idmg = clecert_millegrille.idmg
 
+        self.__chaine_certs = [clecert.cert_bytes.decode('utf-8'), self.cert_ca]
+
         # Creer instance de validateur de certificats, valider chaine intermediaire
         self.__validateur = ValidateurCertificat(idmg, cert_ca)
         self.__validateur.valider(clecert.chaine, usages={'key_cert_sign'})
+
+        self.__validateur_messages = ValidateurMessage(idmg=idmg)
 
         # Creer instance de renouvelleur de certificats
         dict_ca = {
@@ -82,24 +90,30 @@ class HandlerCertificats:
 
         self.__renouvelleur = RenouvelleurCertificat(idmg, dict_ca, clecert, clecert_millegrille)
 
+    def generer_clecert_module(self, role: str, csr: str) -> EnveloppeCleCert:
+        duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
+        duree_certs = int(duree_certs)
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+
+        duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+
+        noeud_id = self.config.noeud_id
+        clecert = self.__renouvelleur.renouveller_avec_csr(role, noeud_id, csr.encode('utf-8'), duree)
+
+        return clecert
+
+    @property
+    def chaine_certs(self):
+        return self.__chaine_certs
+
+    def verifier_message(self, message: Union[bytes, str, dict]) -> EnveloppeCertificat:
+        return self.__validateur_messages.verifier(message)
+
 
 # Creer objet config global, permet de le passer plus facilement au serveur
 config = Config()
 handler = HandlerCertificats(config)
-
-
-def main():
-    # Parse args en premier, si -h/--help va sortir immediatement
-    global config, handler
-    parse(config, handler)
-    setup(config, handler)
-
-    # Demarrer thread d'entretien
-    global thread_entretien
-    thread_entretien = Thread(name="entretien", target=entretien, daemon=True)
-    thread_entretien.start()
-
-    executer()
 
 
 def executer():
@@ -279,6 +293,8 @@ class ServeurHttp(SimpleHTTPRequestHandler):
         try:
             if commande == 'issuer':
                 set_intermediaire(self, request_data, interne)
+            elif commande == 'signerModule':
+                signer_module(self, request_data, interne)
             else:
                 self.send_error(404)
         except:
@@ -336,21 +352,66 @@ def set_intermediaire(http_instance: ServeurHttp, request_data: dict, interne=Fa
         handler = http_instance.server.handler
         handler.set_intermediaire(clecert)  # Activer cle immediatement
 
+        reponse = {'ok': True}
         if interne:
             try:
                 csr_monitor = request_data['csr_monitor']
-                signer_monitor(handler, csr_monitor)
+                clecert_monitor = handler.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, csr_monitor)
+                certificat = [clecert_monitor.cert_bytes.decode('utf-8')]
+                certificat.extend(handler.chaine_certs)
+                reponse['certificat_monitor'] = certificat
             except KeyError:
                 pass  # Aucun certificat monitor a generer
 
+        reponse_bytes = json.dumps(reponse).encode('utf-8')
+
         http_instance.send_response(200)
+        http_instance.send_header("Content-type", "application/json")
+        http_instance.end_headers()
+        http_instance.wfile.write(reponse_bytes)
+
+        # http_instance.send_response(200, json.dumps(reponse))
     else:
         logger.error("Mismatch cle et cert (csr)")
         http_instance.send_error(400)
 
 
-def signer_monitor(handler: HandlerCertificats, csr_monitor: str):
-    pass
+def signer_module(http_instance: ServeurHttp, request_data: dict, interne=False):
+
+    if interne is False:
+        logger.warning("Erreur - signer_module demande externe - REFUSE")
+        http_instance.send_error(403)
+        return
+
+    handler = http_instance.server.handler
+
+    # Verifier signature de la requete
+    enveloppe_certificat: EnveloppeCertificat = handler.verifier_message(request_data)
+
+    # Aucune exception, la signature est valide
+    if 'monitor' not in enveloppe_certificat.get_roles:
+        logger.warning("Erreur - signer_module demande avec certificat autre que monitor - REFUSE")
+        http_instance.send_error(403)
+        return
+
+    csr = request_data['csr']
+    role = request_data['role']
+
+    logger.info("Signer nouveau certificat %s" % role)
+
+    clecert_module = handler.generer_clecert_module(role, csr)
+    certificat = [clecert_module.cert_bytes.decode('utf-8')]
+    certificat.extend(handler.chaine_certs)
+    reponse = {
+        'ok': True,
+        'certificat': certificat,
+    }
+    reponse_bytes = json.dumps(reponse).encode('utf-8')
+
+    http_instance.send_response(200)
+    http_instance.send_header("Content-type", "application/json")
+    http_instance.end_headers()
+    http_instance.wfile.write(reponse_bytes)
 
 
 def sauvegarder_certificat(config: Config, chaine: list):
@@ -905,7 +966,31 @@ def verifier_eligibilite_renouvellement(clecert: EnveloppeCleCert):
 #         self._service_monitor.gestionnaire_docker.configurer_monitor()
 
 
-if __name__ == '__main__':
+PROFIL_PAR_ROLE = {
+    ConstantesGenerateurCertificat.ROLE_MQ: {},
+    ConstantesGenerateurCertificat.ROLE_MONGO: {},
+    ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: {},
+    ConstantesGenerateurCertificat.ROLE_CORE: {},
+    ConstantesGenerateurCertificat.ROLE_FICHIERS: {},
+    ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS: {},
+    ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: {},
+    ConstantesGenerateurCertificat.ROLE_NAVIGATEUR: {},
+    ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE: {},
+    ConstantesGenerateurCertificat.ROLE_AGENT_BACKUP: {},
+    ConstantesGenerateurCertificat.ROLE_NGINX: {},
+    ConstantesGenerateurCertificat.ROLE_VITRINE: {},
+    ConstantesGenerateurCertificat.ROLE_MONITOR: {},
+    ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE: {},
+    ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC: {},
+    ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: {},
+    ConstantesGenerateurCertificat.ROLE_MEDIA: {},
+}
+
+
+def main():
+    # Parse args en premier, si -h/--help va sortir immediatement
+    global config, handler
+
     signal.signal(signal.SIGINT, exit_gracefully)
     signal.signal(signal.SIGTERM, exit_gracefully)
 
@@ -915,4 +1000,16 @@ if __name__ == '__main__':
     logging.getLogger('certissuer').setLevel(logging.INFO)
     logging.getLogger('millegrilles.noeuds').setLevel(logging.INFO)
 
+    parse(config, handler)
+    setup(config, handler)
+
+    # Demarrer thread d'entretien
+    global thread_entretien
+    thread_entretien = Thread(name="entretien", target=entretien, daemon=True)
+    thread_entretien.start()
+
+    executer()
+
+
+if __name__ == '__main__':
     main()

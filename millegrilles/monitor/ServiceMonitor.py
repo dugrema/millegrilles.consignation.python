@@ -31,7 +31,7 @@ from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, Connex
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat
-from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
@@ -40,6 +40,7 @@ from millegrilles.util.IpUtils import get_ip
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles, SignateurTransactionSimple
 
 
 class InitialiserServiceMonitor:
@@ -247,6 +248,8 @@ class ServiceMonitor:
         signal.signal(signal.SIGTERM, self.fermer)
 
         self.exit_code = 0
+
+        self.__generateur_temporaire: Optional[GenerateurTransaction] = None
 
     def fermer(self, signum=None, frame=None):
         if signum:
@@ -904,6 +907,10 @@ class ServiceMonitor:
     @property
     def generateur_transactions(self) -> GenerateurTransaction:
         return self._connexion_middleware.generateur_transactions
+
+    def get_formatteur_message(self, clecert: EnveloppeCleCert) -> FormatteurMessageMilleGrilles:
+        signateur = SignateurTransactionSimple(clecert)
+        return FormatteurMessageMilleGrilles(self.idmg, signateur)
 
     @property
     def verificateur_transactions(self):
@@ -2378,38 +2385,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         gestionnaire_certs = GestionnaireCertificatsNoeudProtegePrincipal(
             self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
-        gestionnaire_certs.recuperer_monitor_initial(params)
-        #gestionnaire_certs.generer_motsdepasse()
-
-        # # Faire correspondre et sauvegarder certificat de noeud
-        # intermediaire_key = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
-        #
-        # if self._args.dev:
-        #     path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.%s' % intermediaire_key['date'])
-        #     path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.%s' % intermediaire_key['date'])
-        # else:
-        #     path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.pem')
-        #     path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt')
-        #
-        # with open(path_key, 'rb') as fichier:
-        #     intermediaire_key_pem = fichier.read()
-        # with open(path_passwd, 'rb') as fichier:
-        #     intermediaire_passwd_txt = fichier.read()
-
-        certificat_pem = params['certificatPem']
+        clecert_monitor = gestionnaire_certs.recuperer_monitor_initial(params)
         certificat_millegrille = params['chainePem'][-1]
-        # chaine = params['chainePem']
 
         # Extraire IDMG
         self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
         clecert_millegrille = EnveloppeCleCert()
-        clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
+        clecert_millegrille.cert_from_pem_bytes(clecert_monitor.chaine[-1].encode('utf-8'))
         idmg = clecert_millegrille.idmg
-
-        # clecert_recu = EnveloppeCleCert()
-        # clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_txt)
-        # if not clecert_recu.cle_correspondent():
-        #     raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
         # Verifier si on doit generer un certificat web SSL
         domaine_web = params.get('domaine')
@@ -2417,19 +2400,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
             self.initialiser_domaine(commande)
 
-        # cert_subject = clecert_recu.formatter_subject()
-        #
-        # # Verifier le type de certificat - il determine le type de noeud:
-        # # intermediaire = noeud protege, prive = noeud prive, public = noeud public
-        # self.__logger.debug("Certificat recu : %s", str(cert_subject))
-        # subject_clecert_recu = clecert_recu.formatter_subject()
-        # if subject_clecert_recu['organizationName'] != idmg:
-        #     raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
-        #
-        # type_certificat_recu = subject_clecert_recu['organizationalUnitName']
-
-        # Comencer sauvegarde
-        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
+        # # Comencer sauvegarde
+        # gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
 
         # if type_certificat_recu != 'intermediaire':
         #     raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
@@ -2449,7 +2421,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # self._gestionnaire_certificats.set_clecert_intermediaire(clecert_recu)
 
         # Generer nouveau certificat de monitor
-        raise NotImplementedError("TODO")
         # # Charger CSR monitor
         # config_csr_monitor = self._gestionnaire_docker.charger_config_recente('pki.monitor.csr')
         # data_csr_monitor = b64decode(config_csr_monitor['config'].attrs['Spec']['Data'])
@@ -2457,11 +2428,11 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Sauvegarder certificat monitor
         # Faire correspondre et sauvegarder certificat de noeud
-        secret_monitor = gestionnaire_docker.trouver_secret('pki.monitor.key')
-        gestionnaire_docker.sauvegarder_config(
-            'pki.monitor.cert.' + str(secret_monitor['date']),
-            '\n'.join(clecert_monitor.chaine)
-        )
+        # secret_monitor = gestionnaire_docker.trouver_secret('pki.monitor.key')
+        # gestionnaire_docker.sauvegarder_config(
+        #     'pki.monitor.cert.' + str(secret_monitor['date']),
+        #     '\n'.join(clecert_monitor.chaine)
+        # )
 
         # # Supprimer le CSR
         # gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
@@ -2473,6 +2444,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.initialiser_noeud(idmg=idmg)
 
         self.sauvegarder_config_millegrille(idmg, securite)
+
+        # Generer les mots de passe pour middleware (secret partage entre monitor et module comme mq et mongo)
+        gestionnaire_certs.generer_motsdepasse()
 
         # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
         # Redemarrage est implicite (fait a la fin de la prep)

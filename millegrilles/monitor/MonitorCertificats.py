@@ -9,7 +9,7 @@ import pytz
 
 from base64 import b64decode, b64encode
 from os import path, environ
-from typing import cast
+from typing import cast, Optional
 
 import docker
 from docker.types import SecretReference
@@ -552,8 +552,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         super().__init__(docker_client, service_monitor, **kwargs)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        # self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
-        # self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
+        self.__renouvelleur = RenouvelleurCertificat(service_monitor.idmg, dict(), None)
 
     def recuperer_monitor_initial(self, info_installation: dict):
         """
@@ -577,7 +576,28 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         reponse_json = reponse.json()
         cert_monitor = reponse_json['certificat_monitor']
 
-        pass
+        # Charger le certificat, verifier correspondance
+        chaine_cert = ''.join(cert_monitor).encode('utf-8')
+        clecert.cert_from_pem_bytes(chaine_cert)
+        if clecert.cle_correspondent() is False:
+            raise Exception("erreur, cle prive/public ne correspondent pas")
+
+        cert_millegrille = cert_monitor[-1].encode('utf-8')
+        clecert_millegrille = EnveloppeCleCert()
+        clecert_millegrille.cert_from_pem_bytes(cert_millegrille)
+        idmg_recu = clecert_millegrille.idmg
+        if idmg_recu != idmg:
+            raise Exception("Mismatch idmg recu : %s" % idmg_recu)
+
+        # labels_millegrille = {'mg_type': 'pki', 'role': 'millegrille', 'common_name': noeud_id}
+        self._docker.configs.create(name='pki.millegrille.cert', data=cert_millegrille)
+
+        secret = clecert.private_key_bytes
+        labels = {'mg_type': 'pki', 'role': 'monitor', 'common_name': noeud_id}
+        self.ajouter_secret('pki.monitor.key', secret, labels=labels)
+        self.ajouter_config('pki.monitor.cert', chaine_cert, labels=labels)
+
+        return clecert
 
     def generer_csr_monitor(self, idmg: str, noeud_id: str) -> EnveloppeCleCert:
         # Generer une nouveau CSR avec une cle privee pour le monitor
@@ -599,10 +619,23 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         return clecert_monitor
 
     def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None, combiner_keycert=False) -> EnveloppeCleCert:
-        raise NotImplementedError("TODO")
-        # if nomcle is None:
-        #     nomcle = role
-        #
+        clecert = self.__renouvelleur.preparer_csr_par_role(role, common_name, liste_dns)
+
+        # Post vers certissuer pour signer avec l'autorite, obtenir le certificat
+        requete = {'csr': clecert.csr_bytes.decode('utf-8'), 'role': role}
+        # Signer avec certificat de monitor pour autoriser le certissuer
+        formatteur_message = self._service_monitor.get_formatteur_message(self.clecert_monitor)
+        requete_signee, uuid_transaction = formatteur_message.signer_message(requete, 'certissuer', action="signer", ajouter_chaine_certs=True)
+
+        url_certissuer = 'http://mg-dev4.maple.maceroc.com:8380/certissuerInterne/signerModule'
+        reponse = requests.post(url_certissuer, json=requete_signee, timeout=10)
+        reponse.raise_for_status()
+        reponse_json = reponse.json()
+        chaine = reponse_json['certificat']
+
+        if nomcle is None:
+            nomcle = role
+
         # duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
         # duree_certs = int(duree_certs)
         #
@@ -611,85 +644,85 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         #
         # clecert = self.__renouvelleur.renouveller_par_role(role, common_name, liste_dns, duree_certs, duree_certs_heures)
         # chaine = list(clecert.chaine)
-        # chaine_certs = '\n'.join(chaine)
-        #
-        # secret = clecert.private_key_bytes
-        #
-        # # Verifier si on doit combiner le cert et la cle (requis pour Mongo)
-        # if combiner_keycert or role in [ConstantesGenerateurCertificat.ROLE_MONGO, ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS]:
-        #     secret_str = [str(secret, 'utf-8')]
-        #     secret_str.extend(clecert.chaine)
-        #     secret = '\n'.join(secret_str).encode('utf-8')
-        #
-        # labels = {'mg_type': 'pki', 'role': role, 'common_name': common_name}
-        #
-        # self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
-        # self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
-        #
-        # return clecert
 
-    # def charger_certificats(self):
-    #     secret_path = path.abspath(self.secret_path)
-    #     os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
-    #
-    #     # Charger information certificat intermediaire
-    #     config_cert = self._service_monitor.gestionnaire_docker.trouver_config('pki.intermediaire.cert')
-    #     cert_pem = self._charger_certificat_docker('pki.intermediaire.cert')
-    #
-    #     if self._service_monitor.is_dev_mode:
-    #         path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.%s' % config_cert['date'])
-    #         path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.%s' % config_cert['date'])
-    #     else:
-    #         path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.pem')
-    #         path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.txt')
-    #
-    #     with open(path_key, 'rb') as fichier:
-    #         key_pem = fichier.read()
-    #     with open(path_passwd, 'rb') as fichier:
-    #         passwd_bytes = fichier.read()
-    #
-    #     clecert_intermediaire = EnveloppeCleCert()
-    #     clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
-    #     clecert_intermediaire.password = None  # Effacer mot de passe
-    #
-    #     if not clecert_intermediaire.cle_correspondent():
-    #         self.__logger.fatal("Certificat et cle intermediaire ne correspondent pas")
-    #         self._service_monitor.gestionnaire_docker.configurer_monitor()  #  reconfigurer_clecert('pki.intermediaire.cert', True)
-    #         raise ForcerRedemarrage("Certificat et cle intermediaire mismatch")
-    #
-    #     self._clecert_intermediaire = clecert_intermediaire
-    #
-    #     # Valider existence des certificats/chaines de base
-    #     self._charger_certificat_docker('pki.millegrille.cert')
-    #     self._charger_certificat_docker('pki.intermediaire.cert')
-    #
-    #     self.__charger_renouvelleur()
-    #
-    #     try:
-    #         # Charger information certificat monitor
-    #         config_cert_monitor = self._service_monitor.gestionnaire_docker.trouver_config('pki.monitor.cert')
-    #         cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-    #         if self._service_monitor.is_dev_mode:
-    #             path_key = os.path.join(self._service_monitor.path_secrets,
-    #                                     'pki.monitor.key.%s' % config_cert_monitor['date'])
-    #         else:
-    #             path_key = os.path.join(self._service_monitor.path_secrets, 'pki.monitor.key.pem')
-    #         with open(path_key, 'rb') as fichiers:
-    #             key_pem = fichiers.read()
-    #         clecert_monitor = EnveloppeCleCert()
-    #         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
-    #         self.clecert_monitor: EnveloppeCleCert = clecert_monitor
-    #
-    #         # Conserver reference au cert monitor pour middleware
-    #         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-    #         self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
-    #
-    #         # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
-    #         #     self._passwd_mongo = fichiers.read()
-    #         # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
-    #         #     self._passwd_mq = fichiers.read()
-    #     except Exception:
-    #         self.__logger.exception("Erreur chargement certificat monitor, il va etre regenere")
+        chaine_certs = '\n'.join(chaine)
+        secret = clecert.private_key_bytes
+
+        # Verifier si on doit combiner le cert et la cle (requis pour Mongo)
+        if combiner_keycert or role in [ConstantesGenerateurCertificat.ROLE_MONGO, ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS]:
+            secret_str = [str(secret, 'utf-8')]
+            secret_str.extend(chaine)
+            secret = '\n'.join(secret_str).encode('utf-8')
+
+        labels = {'mg_type': 'pki', 'role': role, 'common_name': common_name}
+
+        self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
+        self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
+
+        return clecert
+
+    def charger_certificats(self):
+        secret_path = path.abspath(self.secret_path)
+        os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
+
+        # # Charger information certificat intermediaire
+        # config_cert = self._service_monitor.gestionnaire_docker.trouver_config('pki.intermediaire.cert')
+        # cert_pem = self._charger_certificat_docker('pki.intermediaire.cert')
+        #
+        # if self._service_monitor.is_dev_mode:
+        #     path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.%s' % config_cert['date'])
+        #     path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.%s' % config_cert['date'])
+        # else:
+        #     path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.pem')
+        #     path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.txt')
+        #
+        # with open(path_key, 'rb') as fichier:
+        #     key_pem = fichier.read()
+        # with open(path_passwd, 'rb') as fichier:
+        #     passwd_bytes = fichier.read()
+        #
+        # clecert_intermediaire = EnveloppeCleCert()
+        # clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
+        # clecert_intermediaire.password = None  # Effacer mot de passe
+        #
+        # if not clecert_intermediaire.cle_correspondent():
+        #     self.__logger.fatal("Certificat et cle intermediaire ne correspondent pas")
+        #     self._service_monitor.gestionnaire_docker.configurer_monitor()  #  reconfigurer_clecert('pki.intermediaire.cert', True)
+        #     raise ForcerRedemarrage("Certificat et cle intermediaire mismatch")
+        #
+        # self._clecert_intermediaire = clecert_intermediaire
+
+        # Valider existence des certificats/chaines de base
+        self._charger_certificat_docker('pki.millegrille.cert')
+        # self._charger_certificat_docker('pki.intermediaire.cert')
+
+        # self.__charger_renouvelleur()
+
+        try:
+            # Charger information certificat monitor
+            config_cert_monitor = self._service_monitor.gestionnaire_docker.trouver_config('pki.monitor.cert')
+            cert_pem = self._charger_certificat_docker('pki.monitor.cert')
+            if self._service_monitor.is_dev_mode:
+                path_key = os.path.join(self._service_monitor.path_secrets,
+                                        'pki.monitor.key.%s' % config_cert_monitor['date'])
+            else:
+                path_key = os.path.join(self._service_monitor.path_secrets, 'pki.monitor.key.pem')
+            with open(path_key, 'rb') as fichiers:
+                key_pem = fichiers.read()
+            clecert_monitor = EnveloppeCleCert()
+            clecert_monitor.from_pem_bytes(key_pem, cert_pem)
+            self.clecert_monitor: EnveloppeCleCert = clecert_monitor
+
+            # Conserver reference au cert monitor pour middleware
+            self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
+            self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
+
+            # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
+            #     self._passwd_mongo = fichiers.read()
+            # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
+            #     self._passwd_mq = fichiers.read()
+        except Exception:
+            self.__logger.exception("Erreur chargement certificat monitor, il va etre regenere")
 
     # def __charger_renouvelleur(self):
     #     dict_ca = {
