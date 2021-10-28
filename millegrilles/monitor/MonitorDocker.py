@@ -25,6 +25,7 @@ from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSuppor
 from millegrilles.SecuritePKI import GenerateurEd25519, GenerateurRsa
 from millegrilles.util import IpUtils
 
+
 class GestionnaireModulesDocker:
 
     def __init__(self,
@@ -178,13 +179,13 @@ class GestionnaireModulesDocker:
         }
 
         liste_secrets = list()
-        try:
-            info_clecert_intermediaire = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.intermediaire.cert', True)
-            liste_secrets.extend(info_clecert_intermediaire['secrets'])
-        except AttributeError:
-            self.__logger.info("On n'a pas de certificat intermediaire - utiliser nom du secret")
-            noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD] = ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt'
-            noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY] = ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'
+        # try:
+        #     info_clecert_intermediaire = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.intermediaire.cert', True)
+        #     liste_secrets.extend(info_clecert_intermediaire['secrets'])
+        # except AttributeError:
+        #     self.__logger.info("On n'a pas de certificat intermediaire - utiliser nom du secret")
+        #     noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD] = ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt'
+        #     noms_secrets[ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY] = ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'
 
         try:
             info_clecert_monitor = self.__service_monitor.gestionnaire_certificats.reconfigurer_clecert('pki.monitor.cert')
@@ -251,8 +252,9 @@ class GestionnaireModulesDocker:
 
             service_monitor = services_list[0]
             self.__logger.info("configurer_monitor Mise a jour monitor avec secrets")
-            service_monitor.update(secrets=liste_secrets, env=env_params)
-            raise ForcerRedemarrage("Redemarrage apres rotation secrets")
+            if len(liste_secrets) > 0:
+                service_monitor.update(secrets=liste_secrets, env=env_params)
+                raise ForcerRedemarrage("Redemarrage apres rotation secrets")
 
         except IndexError:
             self.__logger.error("Erreur configuration service monitor avec nouvelles valeurs (OK si dev)")

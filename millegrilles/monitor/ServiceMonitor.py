@@ -232,7 +232,7 @@ class ServiceMonitor:
         self._certificats_entretien_frequence = datetime.timedelta(seconds=30)
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
-        self.csr_intermediaire = None
+        # self.csr_intermediaire = None
 
         # Initialiser dernier backup d'application comme s'il etait du dans quelques minutes
         date_now = pytz.utc.localize(datetime.datetime.utcnow())
@@ -342,13 +342,13 @@ class ServiceMonitor:
         self._web_api = ServerWebAPI(self, webroot=self._args.webroot)
         self._web_api.start()
 
-        # Verifier si le CSR intermediaire a deja ete genere
-        try:
-            csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
-            data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
-            self.csr_intermediaire = data_csr
-        except AttributeError:
-            pass
+        # # Verifier si le CSR intermediaire a deja ete genere
+        # try:
+        #     csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+        #     data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
+        #     self.csr_intermediaire = data_csr
+        # except AttributeError:
+        #     pass
 
     def get_info_monitor(self, inclure_services=False):
         dict_infomillegrille = dict()
@@ -794,17 +794,18 @@ class ServiceMonitor:
             info_mq['MQ_PORT'] = self._connexion_middleware.configuration.mq_port
         except:
             # Connexion middleware pas chargee, on tente d'utiliser mdns
-            if not nowait:
-                self._attente_event.wait(2)
-                # services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
-                services = self._gestionnaire_commandes.requete_mdns_acteur(self.idmg)
-                services_mq = [s for s in services if s.get('type') is not None and s['type'].startswith('_mgamqps._tcp')]
-                try:
-                    service = services_mq[0]
-                    info_mq['MQ_HOST'] = service['addresses'][0]
-                    info_mq['MQ_PORT'] = service['port']
-                except IndexError:
-                    pass  # Aucun service disponible
+            pass
+            # if not nowait:
+            #     self._attente_event.wait(2)
+            #     # services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
+            #     services = self._gestionnaire_commandes.requete_mdns_acteur(self.idmg)
+            #     services_mq = [s for s in services if s.get('type') is not None and s['type'].startswith('_mgamqps._tcp')]
+            #     try:
+            #         service = services_mq[0]
+            #         info_mq['MQ_HOST'] = service['addresses'][0]
+            #         info_mq['MQ_PORT'] = service['port']
+            #     except IndexError:
+            #         pass  # Aucun service disponible
 
         return info_mq
 
@@ -879,10 +880,10 @@ class ServiceMonitor:
 
         return self.__validateur_message
 
-    def generer_csr_intermediaire(self):
-        csr_info = self.gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
-        self.csr_intermediaire = csr_info['request']
-        return self.csr_intermediaire
+    # def generer_csr_intermediaire(self):
+    #     csr_info = self.gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
+    #     self.csr_intermediaire = csr_info['request']
+    #     return self.csr_intermediaire
 
     @property
     def gestionnaire_mq(self):
@@ -969,7 +970,7 @@ class ServiceMonitor:
 
         # Aller chercher le certificat SSL de LetsEncrypt
         domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
-        mode_test = params.get('modeTest') or False # self._args.dev or params.get('modeTest')
+        mode_test = params.get('modeTest') or False  # self._args.dev or params.get('modeTest')
 
         params_environnement = list()
         params_secrets = list()
@@ -1123,49 +1124,50 @@ class ServiceMonitor:
 
         gestionnaire_docker = self.gestionnaire_docker
 
-        # gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
-        #     self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
-        role = self.role
+        raise NotImplementedError('TODO')
+        # Generer CSR, faire requete aupres du certissuer
 
-        certificat_pem = params.get('certificatPem') or params['cert']
-        chaine = params.get('chainePem') or params['fullchain']
-
-        certificat_millegrille_present = False
-        try:
-            certificat_millegrille = self.gestionnaire_docker.charger_config('pki.millegrille.cert').decode('utf-8')
-            certificat_millegrille_present = True
-        except IndexError:
-            certificat_millegrille = chaine[-1]
-
-        try:
-            config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
-            date_csr = config_csr['date']
-
-            if self._args.dev:
-                # Mode DEV, on verifie que la cle et cert correspondent.
-                with open(os.path.join(self._args.secrets, 'pki.monitor.key.' + date_csr), 'rb') as fichier:
-                    monitor_key_pem = fichier.read()
-
-                clecert_recu = EnveloppeCleCert()
-                clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
-                if not clecert_recu.cle_correspondent():
-                    raise ValueError('Cle et Certificat monitor (mode insecure) ne correspondent pas')
-            else:
-                # On n'a pas acces a la nouvelle cle (secret docker non deploye).
-                # On charge uniquement le nouveau certificat
-                clecert_recu = EnveloppeCleCert()
-                clecert_recu.cert_from_pem_bytes(certificat_pem.encode('utf-8'))
-
-        except Exception as e:
-            # self.__logger.exception("Erreur ouverture CSR")
-            self.__logger.error("Commande CSR en ereur : %s" % str(params))
-            raise e
-
-        # Extraire IDMG
-        self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
-        clecert_millegrille = EnveloppeCleCert()
-        clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
-        idmg = clecert_millegrille.idmg
+        # role = self.role
+        #
+        # certificat_pem = params.get('certificatPem') or params['cert']
+        # chaine = params.get('chainePem') or params['fullchain']
+        #
+        # certificat_millegrille_present = False
+        # try:
+        #     certificat_millegrille = self.gestionnaire_docker.charger_config('pki.millegrille.cert').decode('utf-8')
+        #     certificat_millegrille_present = True
+        # except IndexError:
+        #     certificat_millegrille = chaine[-1]
+        #
+        # try:
+        #     config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
+        #     date_csr = config_csr['date']
+        #
+        #     if self._args.dev:
+        #         # Mode DEV, on verifie que la cle et cert correspondent.
+        #         with open(os.path.join(self._args.secrets, 'pki.monitor.key.' + date_csr), 'rb') as fichier:
+        #             monitor_key_pem = fichier.read()
+        #
+        #         clecert_recu = EnveloppeCleCert()
+        #         clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
+        #         if not clecert_recu.cle_correspondent():
+        #             raise ValueError('Cle et Certificat monitor (mode insecure) ne correspondent pas')
+        #     else:
+        #         # On n'a pas acces a la nouvelle cle (secret docker non deploye).
+        #         # On charge uniquement le nouveau certificat
+        #         clecert_recu = EnveloppeCleCert()
+        #         clecert_recu.cert_from_pem_bytes(certificat_pem.encode('utf-8'))
+        #
+        # except Exception as e:
+        #     # self.__logger.exception("Erreur ouverture CSR")
+        #     self.__logger.error("Commande CSR en ereur : %s" % str(params))
+        #     raise e
+        #
+        # # Extraire IDMG
+        # self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
+        # clecert_millegrille = EnveloppeCleCert()
+        # clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
+        # idmg = clecert_millegrille.idmg
 
         if self.idmg != idmg:
             raise ValueError("Le IDMG du certificat (%s) ne correspond pas a celui du noeud (%s)", (idmg, self.idmg))
@@ -1203,12 +1205,12 @@ class ServiceMonitor:
             '\n'.join(chaine)
         )
 
-        # Supprimer le CSR
-        try:
-            self.__logger.debug("Supprimer csr pki.monitor.csr.%s" % date_csr)
-            gestionnaire_docker.supprimer_config('pki.monitor.csr.%s' % date_csr)
-        except docker.errors.NotFound:
-            pass
+        # # Supprimer le CSR
+        # try:
+        #     self.__logger.debug("Supprimer csr pki.monitor.csr.%s" % date_csr)
+        #     gestionnaire_docker.supprimer_config('pki.monitor.csr.%s' % date_csr)
+        # except docker.errors.NotFound:
+        #     pass
 
         # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
         # Redemarrage est implicite (fait a la fin de la prep)
@@ -1434,242 +1436,242 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         return self._fermeture_event
 
 
-class ServiceMonitorDependant(ServiceMonitor):
-    """
-    ServiceMonitor pour noeud protege dependant
-    """
-
-    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
-        super().__init__(args, docker_client, configuration_json)
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
-        self.__event_attente = Event()
-
-        self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
-
-    def fermer(self, signum=None, frame=None):
-        super().fermer(signum, frame)
-        self.__event_attente.set()
-
-    def trigger_event_attente(self):
-        self.__event_attente.set()
-
-    def run(self):
-        self.__logger.debug("Execution noeud dependant")
-        self._charger_configuration()
-        self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_DEPENDANT.copy(),
-            self, insecure=self._args.dev, secrets=self._args.secrets)
-        self._gestionnaire_docker.start_events()
-        self._gestionnaire_docker.add_event_listener(self)
-        self.preparer_gestionnaire_certificats()
-
-        methode_run = self.__determiner_type_run()
-        methode_run()  # Excuter run
-
-    def __determiner_type_run(self):
-        # Verifier si le certificat de millegrille a ete charge
-        try:
-            info_cert_millegrille = MonitorConstantes.trouver_config(
-                'pki.millegrille.cert', self._docker)
-            self.__logger.debug("Cert millegrille deja charge, date %s" % info_cert_millegrille['date'])
-        except AttributeError:
-            self.__logger.info("Run initialisation noeud dependant")
-            return self.run_configuration_initiale
-
-        # Le certificat de millegrille est charge, s'assurer que la cle de monitor est generee
-        # Il est anormal que le cert millegrille soit charge et la cle de monitor absente, mais c'est supporte
-        try:
-            label_key = 'pki.' + ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT + '.key'
-            info_cle_monitor = self.gestionnaire_docker.trouver_secret(label_key)
-            self.__logger.debug("Cle monitor deja chargee, date %s" % info_cle_monitor['date'])
-        except AttributeError:
-            self.__logger.warning("Cle secrete monitor manquante, run initialisation noeud dependant")
-            return self.run_configuration_initiale
-
-        # Verifier si le certificat de monitor correspondant a la cle est charge
-
-        return self.run_monitor
-
-    def run_configuration_initiale(self):
-        """
-        Sert a initialiser le noeud protege dependant.
-        Termine son execution immediatement apres creation du CSR.
-        :return:
-        """
-
-        self.__logger.info("Run configuration initiale, (mode insecure: %s)" % self._args.dev)
-
-        # Creer CSR pour le service monitor
-        self._gestionnaire_certificats.generer_csr(
-            ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT, insecure=self._args.dev)
-
-        # Generer mots de passe
-        self._gestionnaire_certificats.generer_motsdepasse()
-
-        # Sauvegarder information pour CSR, cle
-        cert_millegrille = self._configuration_json['pem'].encode('utf-8')
-        self._gestionnaire_certificats.ajouter_config(
-            name='pki.millegrille.cert', data=cert_millegrille)
-
-        self._gestionnaire_docker.initialiser_millegrille()
-
-        print("Preparation CSR du noeud dependant terminee")
-        print("Redemarrer le service monitor")
-
-    def run_monitor(self):
-        """
-        Execution du monitor.
-        :return:
-        """
-        self.__logger.info("Run monitor noeud protege dependant")
-
-        # Activer ecoute des commandes
-        self.preparer_gestionnaire_commandes()
-
-        # Initialiser cles, certificats disponibles
-        self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
-
-        self._attendre_certificat_monitor()  # S'assurer que le certificat du monitor est correct, l'attendre au besoin
-        self._initialiser_middleware()       # S'assurer que les certificats du middleware sont corrects
-        self._run_entretien()                # Mode d'operation de base, lorsque le noeud est bien configure
-
-    def _attendre_certificat_monitor(self):
-        """
-        Mode d'attente de la commande avec le certificat signe du monitor.
-        :return:
-        """
-        self.__logger.info("Verifier et attendre certificat du service monitor")
-
-        clecert_monitor = self._gestionnaire_certificats.clecert_monitor
-        if not clecert_monitor.cert:
-            while not self.__event_attente.is_set():
-                self.__logger.info("Attente du certificat de monitor dependant")
-                self.__event_attente.wait(120)
-
-        self.__logger.debug("Certificat monitor valide jusqu'a : %s" % clecert_monitor.not_valid_after)
-
-        self.__logger.info("Certificat du service monitor pret")
-
-    def _initialiser_middleware(self):
-        """
-        Mode de creation des certificats du middleware (MQ, Mongo, MongoExpress)
-        :return:
-        """
-        self.__logger.info("Verifier et attendre certificats du middleware")
-
-        # Charger certificats - copie les certs sous /tmp pour connecter a MQ
-        self._gestionnaire_certificats.charger_certificats()
-
-        # Connecter au MQ principal
-        self.__connexion_principal = ConnexionPrincipal(self._docker, self)
-        self.__connexion_principal.connecter()
-
-        # Confirmer que les cles mq, mongo, mongoxp ont ete crees
-        liste_csr = list()
-        for role in MonitorConstantes.CERTIFICATS_REQUIS_DEPENDANT:
-            label_cert = 'pki.%s.cert' % role
-            try:
-                MonitorConstantes.trouver_config(label_cert, self._docker)
-            except AttributeError:
-                label_key = 'pki.%s.key' % role
-                fichier_csr = 'pki.%s.csr.pem' % role
-                try:
-                    self._gestionnaire_docker.trouver_secret(label_key)
-                    path_fichier = os.path.join(MonitorConstantes.PATH_PKI, fichier_csr)
-                    with open(path_fichier, 'r') as fichier:
-                        csr = fichier.read()
-                except AttributeError:
-                    # Creer la cle, CSR correspondant
-                    inserer_cle = role not in ['mongo']
-                    info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev, inserer_cle=inserer_cle)
-                    csr = str(info_csr['request'], 'utf-8')
-                    if role == 'mongo':
-                        self._gestionnaire_certificats.memoriser_cle(role, info_csr['cle_pem'])
-                liste_csr.append(csr)
-
-        if len(liste_csr) > 0:
-            self.__event_attente.clear()
-            commande = {
-                'liste_csr': liste_csr,
-            }
-            # Transmettre commande de signature de certificats, attendre reponse
-            while not self.__event_attente.is_set():
-                self.__connexion_principal.generateur_transactions.transmettre_commande(
-                    commande,
-                    'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
-                    correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
-                    reply_to=self.__connexion_principal.reply_q
-                )
-                self.__logger.info("Attente certificats signes du middleware")
-                self.__event_attente.wait(120)
-
-        self.preparer_gestionnaire_comptesmq()
-        self.__logger.info("Certificats du middleware prets")
-
-    def _run_entretien(self):
-        """
-        Mode d'operation de base du monitor, lorsque toute la configuration est completee.
-        :return:
-        """
-        self.__logger.info("Debut boucle d'entretien du service monitor")
-
-        while not self._fermeture_event.is_set():
-            self._attente_event.clear()
-
-            try:
-                self.__logger.debug("Cycle entretien ServiceMonitor")
-
-                self.verifier_load()
-
-                if not self._connexion_middleware:
-                    try:
-                        self.connecter_middleware()
-                        self._connexion_middleware.set_relai(self.__connexion_principal)
-                        self.__connexion_principal.initialiser_relai_messages(self._connexion_middleware.relayer_message)
-                    except BrokenBarrierError:
-                        self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
-
-                self._entretien_modules()
-
-                self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-            except Exception as e:
-                self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
-            finally:
-                self._attente_event.wait(30)
-
-        self.__logger.info("Fin execution de la boucle d'entretien du service monitor")
-
-    def connecter_middleware(self):
-        super().connecter_middleware()
-
-    def __charger_cle(self):
-        if self._args.dev:
-            path_cle = '/var/opt/millegrilles/pki/servicemonitor.key.pem'
-        else:
-            path_cle = '/run/secrets/pki.monitor.key.pem'
-
-        with open(path_cle, 'rb') as fichier:
-            cle_bytes = fichier.read()
-
-    def preparer_gestionnaire_certificats(self):
-        params = dict()
-        if self._args.dev:
-            params['insecure'] = True
-        if self._args.secrets:
-            params['secrets'] = self._args.secrets
-        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegeDependant(self._docker, self, **params)
-
-    def preparer_gestionnaire_commandes(self):
-        self._gestionnaire_commandes = GestionnaireCommandesNoeudProtegeDependant(self._fermeture_event, self)
-
-        super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
-
-    def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
-        self._connexion_middleware.rediriger_messages_domaine(nom_domaine, exchanges_routing)
-
-    def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
-        self.__connexion_principal.enregistrer_domaine(nom_domaine, exchanges_routing)
+# class ServiceMonitorDependant(ServiceMonitor):
+#     """
+#     ServiceMonitor pour noeud protege dependant
+#     """
+#
+#     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+#         super().__init__(args, docker_client, configuration_json)
+#         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+#         self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
+#         self.__event_attente = Event()
+#
+#         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
+#
+#     def fermer(self, signum=None, frame=None):
+#         super().fermer(signum, frame)
+#         self.__event_attente.set()
+#
+#     def trigger_event_attente(self):
+#         self.__event_attente.set()
+#
+#     def run(self):
+#         self.__logger.debug("Execution noeud dependant")
+#         self._charger_configuration()
+#         self._gestionnaire_docker = GestionnaireModulesDocker(
+#             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_DEPENDANT.copy(),
+#             self, insecure=self._args.dev, secrets=self._args.secrets)
+#         self._gestionnaire_docker.start_events()
+#         self._gestionnaire_docker.add_event_listener(self)
+#         self.preparer_gestionnaire_certificats()
+#
+#         methode_run = self.__determiner_type_run()
+#         methode_run()  # Excuter run
+#
+#     def __determiner_type_run(self):
+#         # Verifier si le certificat de millegrille a ete charge
+#         try:
+#             info_cert_millegrille = MonitorConstantes.trouver_config(
+#                 'pki.millegrille.cert', self._docker)
+#             self.__logger.debug("Cert millegrille deja charge, date %s" % info_cert_millegrille['date'])
+#         except AttributeError:
+#             self.__logger.info("Run initialisation noeud dependant")
+#             return self.run_configuration_initiale
+#
+#         # Le certificat de millegrille est charge, s'assurer que la cle de monitor est generee
+#         # Il est anormal que le cert millegrille soit charge et la cle de monitor absente, mais c'est supporte
+#         try:
+#             label_key = 'pki.' + ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT + '.key'
+#             info_cle_monitor = self.gestionnaire_docker.trouver_secret(label_key)
+#             self.__logger.debug("Cle monitor deja chargee, date %s" % info_cle_monitor['date'])
+#         except AttributeError:
+#             self.__logger.warning("Cle secrete monitor manquante, run initialisation noeud dependant")
+#             return self.run_configuration_initiale
+#
+#         # Verifier si le certificat de monitor correspondant a la cle est charge
+#
+#         return self.run_monitor
+#
+#     def run_configuration_initiale(self):
+#         """
+#         Sert a initialiser le noeud protege dependant.
+#         Termine son execution immediatement apres creation du CSR.
+#         :return:
+#         """
+#
+#         self.__logger.info("Run configuration initiale, (mode insecure: %s)" % self._args.dev)
+#
+#         # Creer CSR pour le service monitor
+#         self._gestionnaire_certificats.generer_csr(
+#             ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT, insecure=self._args.dev)
+#
+#         # Generer mots de passe
+#         self._gestionnaire_certificats.generer_motsdepasse()
+#
+#         # Sauvegarder information pour CSR, cle
+#         cert_millegrille = self._configuration_json['pem'].encode('utf-8')
+#         self._gestionnaire_certificats.ajouter_config(
+#             name='pki.millegrille.cert', data=cert_millegrille)
+#
+#         self._gestionnaire_docker.initialiser_millegrille()
+#
+#         print("Preparation CSR du noeud dependant terminee")
+#         print("Redemarrer le service monitor")
+#
+#     def run_monitor(self):
+#         """
+#         Execution du monitor.
+#         :return:
+#         """
+#         self.__logger.info("Run monitor noeud protege dependant")
+#
+#         # Activer ecoute des commandes
+#         self.preparer_gestionnaire_commandes()
+#
+#         # Initialiser cles, certificats disponibles
+#         self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
+#
+#         self._attendre_certificat_monitor()  # S'assurer que le certificat du monitor est correct, l'attendre au besoin
+#         self._initialiser_middleware()       # S'assurer que les certificats du middleware sont corrects
+#         self._run_entretien()                # Mode d'operation de base, lorsque le noeud est bien configure
+#
+#     def _attendre_certificat_monitor(self):
+#         """
+#         Mode d'attente de la commande avec le certificat signe du monitor.
+#         :return:
+#         """
+#         self.__logger.info("Verifier et attendre certificat du service monitor")
+#
+#         clecert_monitor = self._gestionnaire_certificats.clecert_monitor
+#         if not clecert_monitor.cert:
+#             while not self.__event_attente.is_set():
+#                 self.__logger.info("Attente du certificat de monitor dependant")
+#                 self.__event_attente.wait(120)
+#
+#         self.__logger.debug("Certificat monitor valide jusqu'a : %s" % clecert_monitor.not_valid_after)
+#
+#         self.__logger.info("Certificat du service monitor pret")
+#
+#     def _initialiser_middleware(self):
+#         """
+#         Mode de creation des certificats du middleware (MQ, Mongo, MongoExpress)
+#         :return:
+#         """
+#         self.__logger.info("Verifier et attendre certificats du middleware")
+#
+#         # Charger certificats - copie les certs sous /tmp pour connecter a MQ
+#         self._gestionnaire_certificats.charger_certificats()
+#
+#         # Connecter au MQ principal
+#         self.__connexion_principal = ConnexionPrincipal(self._docker, self)
+#         self.__connexion_principal.connecter()
+#
+#         # Confirmer que les cles mq, mongo, mongoxp ont ete crees
+#         liste_csr = list()
+#         for role in MonitorConstantes.CERTIFICATS_REQUIS_DEPENDANT:
+#             label_cert = 'pki.%s.cert' % role
+#             try:
+#                 MonitorConstantes.trouver_config(label_cert, self._docker)
+#             except AttributeError:
+#                 label_key = 'pki.%s.key' % role
+#                 fichier_csr = 'pki.%s.csr.pem' % role
+#                 try:
+#                     self._gestionnaire_docker.trouver_secret(label_key)
+#                     path_fichier = os.path.join(MonitorConstantes.PATH_PKI, fichier_csr)
+#                     with open(path_fichier, 'r') as fichier:
+#                         csr = fichier.read()
+#                 except AttributeError:
+#                     # Creer la cle, CSR correspondant
+#                     inserer_cle = role not in ['mongo']
+#                     info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev, inserer_cle=inserer_cle)
+#                     csr = str(info_csr['request'], 'utf-8')
+#                     if role == 'mongo':
+#                         self._gestionnaire_certificats.memoriser_cle(role, info_csr['cle_pem'])
+#                 liste_csr.append(csr)
+#
+#         if len(liste_csr) > 0:
+#             self.__event_attente.clear()
+#             commande = {
+#                 'liste_csr': liste_csr,
+#             }
+#             # Transmettre commande de signature de certificats, attendre reponse
+#             while not self.__event_attente.is_set():
+#                 self.__connexion_principal.generateur_transactions.transmettre_commande(
+#                     commande,
+#                     'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
+#                     correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
+#                     reply_to=self.__connexion_principal.reply_q
+#                 )
+#                 self.__logger.info("Attente certificats signes du middleware")
+#                 self.__event_attente.wait(120)
+#
+#         self.preparer_gestionnaire_comptesmq()
+#         self.__logger.info("Certificats du middleware prets")
+#
+#     def _run_entretien(self):
+#         """
+#         Mode d'operation de base du monitor, lorsque toute la configuration est completee.
+#         :return:
+#         """
+#         self.__logger.info("Debut boucle d'entretien du service monitor")
+#
+#         while not self._fermeture_event.is_set():
+#             self._attente_event.clear()
+#
+#             try:
+#                 self.__logger.debug("Cycle entretien ServiceMonitor")
+#
+#                 self.verifier_load()
+#
+#                 if not self._connexion_middleware:
+#                     try:
+#                         self.connecter_middleware()
+#                         self._connexion_middleware.set_relai(self.__connexion_principal)
+#                         self.__connexion_principal.initialiser_relai_messages(self._connexion_middleware.relayer_message)
+#                     except BrokenBarrierError:
+#                         self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+#
+#                 self._entretien_modules()
+#
+#                 self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
+#             except Exception as e:
+#                 self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
+#             finally:
+#                 self._attente_event.wait(30)
+#
+#         self.__logger.info("Fin execution de la boucle d'entretien du service monitor")
+#
+#     def connecter_middleware(self):
+#         super().connecter_middleware()
+#
+#     def __charger_cle(self):
+#         if self._args.dev:
+#             path_cle = '/var/opt/millegrilles/pki/servicemonitor.key.pem'
+#         else:
+#             path_cle = '/run/secrets/pki.monitor.key.pem'
+#
+#         with open(path_cle, 'rb') as fichier:
+#             cle_bytes = fichier.read()
+#
+#     def preparer_gestionnaire_certificats(self):
+#         params = dict()
+#         if self._args.dev:
+#             params['insecure'] = True
+#         if self._args.secrets:
+#             params['secrets'] = self._args.secrets
+#         self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegeDependant(self._docker, self, **params)
+#
+#     def preparer_gestionnaire_commandes(self):
+#         self._gestionnaire_commandes = GestionnaireCommandesNoeudProtegeDependant(self._fermeture_event, self)
+#
+#         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
+#
+#     def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
+#         self._connexion_middleware.rediriger_messages_domaine(nom_domaine, exchanges_routing)
+#
+#     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
+#         self.__connexion_principal.enregistrer_domaine(nom_domaine, exchanges_routing)
 
 
 class ServiceMonitorPrive(ServiceMonitor):
@@ -2299,23 +2301,24 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             # Certificat absent, on genere un certificat et cle nginx
             self._gestionnaire_certificats.generer_certificat_nginx_selfsigned()
 
-        # Verifier si le CSR a deja ete genere, sinon le generer
-        try:
-            csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
-            data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
-            self.csr_intermediaire = data_csr
-        except AttributeError:
-            # Creer CSR pour le service monitor
-            csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
-            self.csr_intermediaire = csr_info['request']
+        # # Verifier si le CSR a deja ete genere, sinon le generer
+        # try:
+        #     csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+        #     data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
+        #     self.csr_intermediaire = data_csr
+        # except AttributeError:
+        #     # Creer CSR pour le service monitor
+        #     csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
+        #     self.csr_intermediaire = csr_info['request']
 
         # Verifier si la cle du monitor existe, sinon la generer
         try:
             self._gestionnaire_docker.trouver_secret('pki.monitor.key')
         except PkiCleNonTrouvee:
             # Creer CSR pour le service monitor
-            self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
-            nouveau_secrets_monitor_ajoutes = True
+            # self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
+            # nouveau_secrets_monitor_ajoutes = True
+            pass
 
         # if nouveau_secrets_monitor_ajoutes:
         if nouveau_secrets_monitor_ajoutes:
@@ -2375,22 +2378,23 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         gestionnaire_certs = GestionnaireCertificatsNoeudProtegePrincipal(
             self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
-        gestionnaire_certs.generer_motsdepasse()
+        gestionnaire_certs.recuperer_monitor_initial(params)
+        #gestionnaire_certs.generer_motsdepasse()
 
-        # Faire correspondre et sauvegarder certificat de noeud
-        intermediaire_key = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
-
-        if self._args.dev:
-            path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.%s' % intermediaire_key['date'])
-            path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.%s' % intermediaire_key['date'])
-        else:
-            path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.pem')
-            path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt')
-
-        with open(path_key, 'rb') as fichier:
-            intermediaire_key_pem = fichier.read()
-        with open(path_passwd, 'rb') as fichier:
-            intermediaire_passwd_txt = fichier.read()
+        # # Faire correspondre et sauvegarder certificat de noeud
+        # intermediaire_key = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+        #
+        # if self._args.dev:
+        #     path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.%s' % intermediaire_key['date'])
+        #     path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.%s' % intermediaire_key['date'])
+        # else:
+        #     path_key = os.path.join(self._args.secrets, 'pki.intermediaire.key.pem')
+        #     path_passwd = os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt')
+        #
+        # with open(path_key, 'rb') as fichier:
+        #     intermediaire_key_pem = fichier.read()
+        # with open(path_passwd, 'rb') as fichier:
+        #     intermediaire_passwd_txt = fichier.read()
 
         certificat_pem = params['certificatPem']
         certificat_millegrille = params['chainePem'][-1]
@@ -2402,10 +2406,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
         idmg = clecert_millegrille.idmg
 
-        clecert_recu = EnveloppeCleCert()
-        clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_txt)
-        if not clecert_recu.cle_correspondent():
-            raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+        # clecert_recu = EnveloppeCleCert()
+        # clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_txt)
+        # if not clecert_recu.cle_correspondent():
+        #     raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
         # Verifier si on doit generer un certificat web SSL
         domaine_web = params.get('domaine')
@@ -2413,42 +2417,43 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
             self.initialiser_domaine(commande)
 
-        cert_subject = clecert_recu.formatter_subject()
-
-        # Verifier le type de certificat - il determine le type de noeud:
-        # intermediaire = noeud protege, prive = noeud prive, public = noeud public
-        self.__logger.debug("Certificat recu : %s", str(cert_subject))
-        subject_clecert_recu = clecert_recu.formatter_subject()
-        if subject_clecert_recu['organizationName'] != idmg:
-            raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
-
-        type_certificat_recu = subject_clecert_recu['organizationalUnitName']
+        # cert_subject = clecert_recu.formatter_subject()
+        #
+        # # Verifier le type de certificat - il determine le type de noeud:
+        # # intermediaire = noeud protege, prive = noeud prive, public = noeud public
+        # self.__logger.debug("Certificat recu : %s", str(cert_subject))
+        # subject_clecert_recu = clecert_recu.formatter_subject()
+        # if subject_clecert_recu['organizationName'] != idmg:
+        #     raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
+        #
+        # type_certificat_recu = subject_clecert_recu['organizationalUnitName']
 
         # Comencer sauvegarde
         gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
 
-        if type_certificat_recu != 'intermediaire':
-            raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
+        # if type_certificat_recu != 'intermediaire':
+        #     raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
 
         securite = Constantes.SECURITE_PROTEGE
-        gestionnaire_docker.sauvegarder_config(
-            'pki.intermediaire.cert.' + str(intermediaire_key['date']),
-            certificat_pem
-        )
-        chaine_intermediaire = '\n'.join([certificat_pem, certificat_millegrille])
-        gestionnaire_docker.sauvegarder_config(
-            'pki.intermediaire.chain.' + str(intermediaire_key['date']), chaine_intermediaire)
+        # gestionnaire_docker.sauvegarder_config(
+        #     'pki.intermediaire.cert.' + str(intermediaire_key['date']),
+        #     certificat_pem
+        # )
+        # chaine_intermediaire = '\n'.join([certificat_pem, certificat_millegrille])
+        # gestionnaire_docker.sauvegarder_config(
+        #     'pki.intermediaire.chain.' + str(intermediaire_key['date']), chaine_intermediaire)
 
         # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
         self._gestionnaire_certificats.idmg = idmg
         self._gestionnaire_certificats.set_clecert_millegrille(clecert_millegrille)
-        self._gestionnaire_certificats.set_clecert_intermediaire(clecert_recu)
+        # self._gestionnaire_certificats.set_clecert_intermediaire(clecert_recu)
 
         # Generer nouveau certificat de monitor
-        # Charger CSR monitor
-        config_csr_monitor = self._gestionnaire_docker.charger_config_recente('pki.monitor.csr')
-        data_csr_monitor = b64decode(config_csr_monitor['config'].attrs['Spec']['Data'])
-        clecert_monitor = self._gestionnaire_certificats.signer_csr(data_csr_monitor)
+        raise NotImplementedError("TODO")
+        # # Charger CSR monitor
+        # config_csr_monitor = self._gestionnaire_docker.charger_config_recente('pki.monitor.csr')
+        # data_csr_monitor = b64decode(config_csr_monitor['config'].attrs['Spec']['Data'])
+        # clecert_monitor = self._gestionnaire_certificats.signer_csr(data_csr_monitor)
 
         # Sauvegarder certificat monitor
         # Faire correspondre et sauvegarder certificat de noeud
@@ -2458,11 +2463,11 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             '\n'.join(clecert_monitor.chaine)
         )
 
-        # Supprimer le CSR
-        gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
-
-        # Supprimer le CSR
-        gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(intermediaire_key['date']))
+        # # Supprimer le CSR
+        # gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
+        #
+        # # Supprimer le CSR
+        # gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(intermediaire_key['date']))
 
         # Terminer configuration swarm docker
         gestionnaire_docker.initialiser_noeud(idmg=idmg)
@@ -2492,7 +2497,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
     def _get_info_noeud(self):
         information_systeme = super()._get_info_noeud()
-        information_systeme['csr'] = self.csr_intermediaire.decode('utf-8')
+        # information_systeme['csr'] = self.csr_intermediaire.decode('utf-8')
         return information_systeme
 
     def __initialiser_noeud_installation(self, commande: CommandeMonitor, securite: str):
@@ -2518,21 +2523,21 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         gestionnaire_certs.generer_motsdepasse()
 
-        # Faire correspondre et sauvegarder certificat de noeud
-        secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
-        secret_date = secret_intermediaire['date']
-
-        if not self._args.dev:
-            nom_fichier_key = 'pki.intermediaire.key.pem'
-            nom_fichier_passwd = 'pki.intermediaire.passwd.txt'
-        else:
-            nom_fichier_key = 'pki.intermediaire.key.%s' % secret_date
-            nom_fichier_passwd = 'pki.intermediaire.passwd.%s' % secret_date
-
-        with open(os.path.join(self._args.secrets, nom_fichier_key), 'rb') as fichier:
-            intermediaire_key_pem = fichier.read()
-        with open(os.path.join(self._args.secrets, nom_fichier_passwd), 'rb') as fichier:
-            intermediaire_passwd_pem = fichier.read()
+        # # Faire correspondre et sauvegarder certificat de noeud
+        # secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+        # secret_date = secret_intermediaire['date']
+        #
+        # if not self._args.dev:
+        #     nom_fichier_key = 'pki.intermediaire.key.pem'
+        #     nom_fichier_passwd = 'pki.intermediaire.passwd.txt'
+        # else:
+        #     nom_fichier_key = 'pki.intermediaire.key.%s' % secret_date
+        #     nom_fichier_passwd = 'pki.intermediaire.passwd.%s' % secret_date
+        #
+        # with open(os.path.join(self._args.secrets, nom_fichier_key), 'rb') as fichier:
+        #     intermediaire_key_pem = fichier.read()
+        # with open(os.path.join(self._args.secrets, nom_fichier_passwd), 'rb') as fichier:
+        #     intermediaire_passwd_pem = fichier.read()
         certificat_pem = params['certificatPem']
 
         certificat_millegrille_existe = False
@@ -2556,10 +2561,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         if certificat_millegrille_existe is False:
             self.gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
 
-        clecert_recu = EnveloppeCleCert()
-        clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
-        if not clecert_recu.cle_correspondent():
-            raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+        # clecert_recu = EnveloppeCleCert()
+        # clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
+        # if not clecert_recu.cle_correspondent():
+        #     raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
         # Verifier si on doit generer un certificat web SSL
         domaine_web = params.get('domaine')
@@ -2567,18 +2572,18 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
             self.initialiser_domaine(commande)
 
-        cert_subject = clecert_recu.formatter_subject()
-
-        # Verifier le type de certificat - il determine le type de noeud:
-        # intermediaire = noeud protege, prive = noeud prive, public = noeud public
-        self.__logger.debug("Certificat recu : %s", str(cert_subject))
-        subject_clecert_recu = clecert_recu.formatter_subject()
-        if subject_clecert_recu['organizationName'] != idmg:
-            raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
-
-        type_certificat_recu = subject_clecert_recu['organizationalUnitName']
-        if type_certificat_recu != role:
-            raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
+        # cert_subject = clecert_recu.formatter_subject()
+        #
+        # # Verifier le type de certificat - il determine le type de noeud:
+        # # intermediaire = noeud protege, prive = noeud prive, public = noeud public
+        # self.__logger.debug("Certificat recu : %s", str(cert_subject))
+        # subject_clecert_recu = clecert_recu.formatter_subject()
+        # if subject_clecert_recu['organizationName'] != idmg:
+        #     raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
+        #
+        # type_certificat_recu = subject_clecert_recu['organizationalUnitName']
+        # if type_certificat_recu != role:
+        #     raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
 
         # Comencer sauvegarde
         try:
@@ -2591,25 +2596,26 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor prive")
         # securite = Constantes.SECURITE_PRIVE
-        clecert_recu.password = None
-        cle_monitor = clecert_recu.private_key_bytes
-        secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
-            ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
+        # clecert_recu.password = None
+        # cle_monitor = clecert_recu.private_key_bytes
+        # secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
+        #     ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
 
+        raise NotImplementedError('TODO')
         gestionnaire_docker.sauvegarder_config(
             'pki.monitor.cert.' + date_key,
             '\n'.join(chaine)
         )
 
-        # Supprimer le CSR
-        try:
-            gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_intermediaire['date']))
-        except docker.errors.NotFound:
-            pass
-        try:
-            gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
-        except docker.errors.NotFound:
-            pass
+        # # Supprimer le CSR
+        # try:
+        #     gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_intermediaire['date']))
+        # except docker.errors.NotFound:
+        #     pass
+        # try:
+        #     gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
+        # except docker.errors.NotFound:
+        #     pass
 
         # Terminer configuration swarm docker
         gestionnaire_docker.initialiser_noeud(idmg=idmg)
@@ -2627,7 +2633,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             nom_service_nginx = 'nginx'
         try:
             self._gestionnaire_web.redeployer_nginx(nom_service=nom_service_nginx)
-            #gestionnaire_docker.maj_service(nom_service)
         except docker.errors.APIError as apie:
             if apie.status_code == 500:
                 self.__logger.warning(
@@ -2661,229 +2666,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         if self._securite is None:
             raise NotImplementedError("Securite n'existe pas - pas initialise")
         return self._securite
-
-
-# class ServiceMonitorExtension(ServiceMonitor):
-#     """
-#     Monitor pour le noeud d'extension
-#     """
-#
-#     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
-#         super().__init__(args, docker_client, configuration_json)
-#         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-#         self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
-#
-#     def run(self):
-#         self.__logger.info("Demarrage du ServiceMonitor")
-#
-#         try:
-#             self._charger_configuration()
-#             self.preparer_gestionnaire_certificats()
-#             self.configurer_millegrille()
-#             self.preparer_gestionnaire_commandes()
-#             self.preparer_web_api()
-#
-#             while not self._fermeture_event.is_set():
-#                 self._attente_event.clear()
-#
-#                 try:
-#                     self.__logger.debug("Cycle entretien ServiceMonitor")
-#
-#                     self.verifier_load()
-#
-#                     self._entretien_modules()
-#
-#                     if not self._connexion_middleware:
-#                         try:
-#                             self.connecter_middleware()
-#                         except BrokenBarrierError:
-#                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
-#
-#                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-#                 except Exception as e:
-#                     self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
-#                 finally:
-#                     self._attente_event.wait(30)
-#
-#         except ForcerRedemarrage:
-#             self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
-#             self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
-#
-#         except Exception:
-#             self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
-#
-#         self.__logger.info("Fermeture du ServiceMonitor")
-#         self.fermer()
-#
-#         # Fermer le service monitor, retourne exit code pour shell script
-#         sys.exit(self.exit_code)
-#
-#     def preparer_gestionnaire_certificats(self):
-#         params = dict()
-#         if self._args.dev:
-#             params['insecure'] = True
-#         if self._args.secrets:
-#             params['secrets'] = self._args.secrets
-#         self._gestionnaire_certificats = GestionnaireCertificatsNoeudPrive(self._docker, self, **params)
-#
-#     def preparer_gestionnaire_commandes(self):
-#         self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
-#
-#         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
-#
-#     def _initialiser_noeud(self, commande: CommandeMonitor, securite: str):
-#         """
-#         Initialise un noeud protege avec un certificat
-#         :param commande:
-#         :return:
-#         """
-#
-#         params = commande.contenu
-#         gestionnaire_docker = self.gestionnaire_docker
-#
-#         if securite == Constantes.SECURITE_PRIVE:
-#             gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
-#                 self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
-#             role = ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE
-#         elif securite == Constantes.SECURITE_PUBLIC:
-#             gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
-#                 self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
-#             role = ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC
-#         else:
-#             raise Exception("Niveau securite non supporte : %s" % securite)
-#
-#         gestionnaire_certs.generer_motsdepasse()
-#
-#         # Faire correspondre et sauvegarder certificat de noeud
-#         secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
-#         secret_date = secret_intermediaire['date']
-#
-#         if not self._args.dev:
-#             nom_fichier_key = 'pki.intermediaire.key.pem'
-#             nom_fichier_passwd = 'pki.intermediaire.passwd.txt'
-#         else:
-#             nom_fichier_key = 'pki.intermediaire.key.%s' % secret_date
-#             nom_fichier_passwd = 'pki.intermediaire.passwd.%s' % secret_date
-#
-#         with open(os.path.join(self._args.secrets, nom_fichier_key), 'rb') as fichier:
-#             intermediaire_key_pem = fichier.read()
-#         with open(os.path.join(self._args.secrets, nom_fichier_passwd), 'rb') as fichier:
-#             intermediaire_passwd_pem = fichier.read()
-#         certificat_pem = params['certificatPem']
-#         certificat_millegrille = params['chainePem'][-1]
-#         chaine = params['chainePem']
-#
-#         # Extraire IDMG
-#         self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
-#         clecert_millegrille = EnveloppeCleCert()
-#         clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
-#         idmg = clecert_millegrille.idmg
-#
-#         if self.idmg != idmg:
-#             raise ValueError("Le IDMG du certificat (%s) ne correspond pas a celui du noeud (%s)", (idmg, self.idmg))
-#
-#         clecert_recu = EnveloppeCleCert()
-#         clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
-#         if not clecert_recu.cle_correspondent():
-#             if self._args.dev is not None:
-#                 # Tenter de charger cle pour monitor - mode insecure
-#                 try:
-#                     config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
-#                     date_csr = config_csr['date']
-#                     with open(os.path.join(self._args.secrets, 'pki.monitor.key.%s' % date_csr), 'rb') as fichier:
-#                         monitor_key_pem = fichier.read()
-#                     clecert_recu = EnveloppeCleCert()
-#                     clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
-#                     if not clecert_recu.cle_correspondent():
-#                         raise ValueError('MODE DEV : Cle et Certificat monitor (mode insecure) ne correspondent pas')
-#                 except FileNotFoundError:
-#                     raise ValueError('MODE DEV : Cle associe au CSR monitor introuvable')
-#                 except AttributeError:
-#                     raise ValueError('MODE DEV : CSR monitor introuvable')
-#             else:
-#                 raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
-#
-#         # Verifier si on doit generer un certificat web SSL
-#         domaine_web = params.get('domaine')
-#         if domaine_web is not None:
-#             self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
-#             self.initialiser_domaine(commande)
-#
-#         cert_subject = clecert_recu.formatter_subject()
-#
-#         # Verifier le type de certificat - il determine le type de noeud:
-#         # intermediaire = noeud protege, prive = noeud prive, public = noeud public
-#         self.__logger.debug("Certificat recu : %s", str(cert_subject))
-#         subject_clecert_recu = clecert_recu.formatter_subject()
-#         if subject_clecert_recu['organizationName'] != idmg:
-#             raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
-#
-#         type_certificat_recu = subject_clecert_recu['organizationalUnitName']
-#         if type_certificat_recu != role:
-#             raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
-#
-#         # Comencer sauvegarde
-#         try:
-#             gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
-#         except APIError as apie:
-#             if apie.status_code == 400:
-#                 self.__logger.info("pki.millegrille.cert deja present, on ne le change pas : " + str(apie))
-#             else:
-#                 raise apie
-#
-#         self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor prive")
-#         # securite = Constantes.SECURITE_PRIVE
-#         clecert_recu.password = None
-#         cle_monitor = clecert_recu.private_key_bytes
-#         secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
-#             ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
-#
-#         # if self._args.dev:
-#         #     nom_key = ConstantesServiceMonitor.PKI_MONITOR_KEY + date_key
-#         #     with open(os.path.join(self._args.secrets, nom_key), 'w') as fichier:
-#         #         fichier.write(cle_monitor)
-#
-#         gestionnaire_docker.sauvegarder_config(
-#             'pki.monitor.cert.' + date_key,
-#             '\n'.join(chaine)
-#         )
-#
-#         # Supprimer le CSR
-#         try:
-#             gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_intermediaire['date']))
-#         except docker.errors.NotFound:
-#             pass
-#         try:
-#             gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
-#         except docker.errors.NotFound:
-#             pass
-#
-#         # Terminer configuration swarm docker
-#         gestionnaire_docker.initialiser_noeud(idmg=idmg)
-#
-#         self.sauvegarder_config_millegrille(idmg, securite)
-#
-#         # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
-#         # Redemarrage est implicite (fait a la fin de la prep)
-#         self._gestionnaire_web.regenerer_configuration(mode_installe=True)
-#
-#         # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
-#         try:
-#             gestionnaire_docker.maj_service('nginx')
-#         except docker.errors.APIError as apie:
-#             if apie.status_code == 500:
-#                 self.__logger.warning(
-#                     "Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
-#                 Event().wait(15)
-#                 gestionnaire_docker.maj_service('nginx')
-#             else:
-#                 raise apie
-#
-#         # Redemarrer / reconfigurer le monitor
-#         self.__logger.info("Configuration completee, redemarrer le monitor")
-#         gestionnaire_docker.configurer_monitor()
-#
-#         raise ForcerRedemarrage("Redemarrage")
 
 
 # Section main

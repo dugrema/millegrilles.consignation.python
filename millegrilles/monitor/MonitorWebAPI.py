@@ -89,10 +89,10 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         try:
             if path_split[3] == 'infoMonitor':
                 self.return_info_monitor()
-            elif path_split[3] == 'csr':
-                self.return_csr()
-            elif path_split[3] == 'csrIntermediaire':
-                self.return_csr_intermediaire()
+            # elif path_split[3] == 'csr':
+            #     self.return_csr()
+            # elif path_split[3] == 'csrIntermediaire':
+            #     self.return_csr_intermediaire()
             elif path_split[3] == 'services':
                 self.return_services_installes()
             elif path_split[3] == 'etatCertificatWeb':
@@ -111,9 +111,9 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         if path_split[3] == 'installer':
             self.post_installer(request_data)
             return
-        if path_split[3] == 'renouvellerIntermediaire':
-            self.post_renouveller_intermediaire(request_data)
-            return
+        # if path_split[3] == 'renouvellerIntermediaire':
+        #     self.post_renouveller_intermediaire(request_data)
+        #     return
 
         try:
             service_monitor = self.service_monitor
@@ -168,15 +168,15 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
         self.repondre_json(dict(), status_code=200)
 
-    def post_renouveller_intermediaire(self, request_data):
-        logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        logger.debug("post_renouveller_intermediaire : recu\n%s", json.dumps(request_data, indent=2))
-
-        request_data['commande'] = ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE
-        commande = CommandeMonitor(request_data)
-        self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
-
-        self.repondre_json(dict(), status_code=200)
+    # def post_renouveller_intermediaire(self, request_data):
+    #     logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+    #     logger.debug("post_renouveller_intermediaire : recu\n%s", json.dumps(request_data, indent=2))
+    #
+    #     request_data['commande'] = ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE
+    #     commande = CommandeMonitor(request_data)
+    #     self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+    #
+    #     self.repondre_json(dict(), status_code=200)
 
     def post_configurer_domaine(self, request_data):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -239,61 +239,61 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             reponse = {'err': str(e)}
             self.repondre_json(reponse, status_code=500)
 
-    def return_csr_intermediaire(self):
-        csr_intermediaire = self.service_monitor.csr_intermediaire
-        if csr_intermediaire is None:
-            self.__logger.exception("CSR intermediaire n'est pas en memoire, le charger de docker")
-            try:
-                csr_intermediaire = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
-            except AttributeError:
-                self.__logger.info("Generer un nouveau CSR intermediaire")
-                csr_intermediaire = self.service_monitor.generer_csr_intermediaire()
+    # def return_csr_intermediaire(self):
+    #     csr_intermediaire = self.service_monitor.csr_intermediaire
+    #     if csr_intermediaire is None:
+    #         self.__logger.exception("CSR intermediaire n'est pas en memoire, le charger de docker")
+    #         try:
+    #             csr_intermediaire = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+    #         except AttributeError:
+    #             self.__logger.info("Generer un nouveau CSR intermediaire")
+    #             csr_intermediaire = self.service_monitor.generer_csr_intermediaire()
+    #
+    #     # csr_intermediaire = csr_info['request']
+    #
+    #     self.send_response(200)
+    #     self.send_header("Content-type", "text/ascii")
+    #     self.send_header("Access-Control-Allow-Origin", "*")
+    #     self.end_headers()
+    #     self.wfile.write(csr_intermediaire)
 
-        # csr_intermediaire = csr_info['request']
-
-        self.send_response(200)
-        self.send_header("Content-type", "text/ascii")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(csr_intermediaire)
-
-    def return_csr(self):
-        try:
-            csr_intermediaire = self.service_monitor.csr_intermediaire
-        except AttributeError:
-            csr_intermediaire = None
-
-        # On est probablement dans un monitor instancie, charger avec docker
-        if csr_intermediaire is None:
-            try:
-                csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
-                    'pki.monitor.csr')
-            except AttributeError:
-                self.__logger.exception("CSR monitor introuvable, on verifier si le CSR intermediaire existe")
-                try:
-                    csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
-                        'pki.intermediaire.csr')
-                except AttributeError:
-                    csr_intermediaire_docker = None
-
-            if csr_intermediaire_docker is not None:
-                csr_b64 = csr_intermediaire_docker['config'].attrs['Spec']['Data'].encode('utf-8')
-                csr_intermediaire = b64decode(csr_b64)
-            else:
-                csr_intermediaire = None
-
-        if csr_intermediaire is not None:
-            self.send_response(200)
-            self.send_header("Content-type", "text/ascii")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(csr_intermediaire)
-        else:
-            self.send_response(410)
-            self.send_header("Content-type", "text/ascii")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.finish()
+    # def return_csr(self):
+    #     try:
+    #         csr_intermediaire = self.service_monitor.csr_intermediaire
+    #     except AttributeError:
+    #         csr_intermediaire = None
+    #
+    #     # On est probablement dans un monitor instancie, charger avec docker
+    #     if csr_intermediaire is None:
+    #         try:
+    #             csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
+    #                 'pki.monitor.csr')
+    #         except AttributeError:
+    #             self.__logger.exception("CSR monitor introuvable, on verifier si le CSR intermediaire existe")
+    #             try:
+    #                 csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
+    #                     'pki.intermediaire.csr')
+    #             except AttributeError:
+    #                 csr_intermediaire_docker = None
+    #
+    #         if csr_intermediaire_docker is not None:
+    #             csr_b64 = csr_intermediaire_docker['config'].attrs['Spec']['Data'].encode('utf-8')
+    #             csr_intermediaire = b64decode(csr_b64)
+    #         else:
+    #             csr_intermediaire = None
+    #
+    #     if csr_intermediaire is not None:
+    #         self.send_response(200)
+    #         self.send_header("Content-type", "text/ascii")
+    #         self.send_header("Access-Control-Allow-Origin", "*")
+    #         self.end_headers()
+    #         self.wfile.write(csr_intermediaire)
+    #     else:
+    #         self.send_response(410)
+    #         self.send_header("Content-type", "text/ascii")
+    #         self.send_header("Access-Control-Allow-Origin", "*")
+    #         self.end_headers()
+    #         self.finish()
 
     def return_etat_certificat_web(self):
         gestionnaire_docker = self.service_monitor.gestionnaire_docker

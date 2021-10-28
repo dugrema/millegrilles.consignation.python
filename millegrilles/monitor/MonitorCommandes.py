@@ -32,7 +32,7 @@ class GestionnaireCommandes:
         self.__thread_commandes: Thread
 
         self.__socket_fifo = None
-        self.__pipe_acteur: Optional[PipeActeur] = None
+        # self.__pipe_acteur: Optional[PipeActeur] = None
         self.__attente_acteur_mdns = Event()
         self.__reponse_acteur_mdns: Optional[dict] = None
         self.__handler_requetes: Optional[TraitementMQRequetesBlocking] = None
@@ -45,7 +45,7 @@ class GestionnaireCommandes:
 
         self.__thread_fifo.start()
         self.__thread_commandes.start()
-        self.__pipe_acteur = PipeActeur()  # Demarre une thread implicitement
+        # self.__pipe_acteur = PipeActeur()  # Demarre une thread implicitement
 
     def stop(self):
         self.__action_event.set()
@@ -54,7 +54,7 @@ class GestionnaireCommandes:
         if self.__socket_fifo:
             self.__socket_fifo.close()
 
-        self.__pipe_acteur.fermer()
+        # self.__pipe_acteur.fermer()
 
         os.remove(self._path_fifo)
 
@@ -266,7 +266,8 @@ class GestionnaireCommandes:
         :param commande:
         :return:
         """
-        self.__pipe_acteur.transmettre_commande(commande)
+        raise NotImplementedError("todo")
+        # self.__pipe_acteur.transmettre_commande(commande)
 
     def requete_mdns_acteur(self, idmg):
         commande = {
@@ -274,6 +275,7 @@ class GestionnaireCommandes:
             'idmg': idmg
         }
 
+        raise NotImplementedError("fix me")
         self.__attente_acteur_mdns.clear()
         self.__pipe_acteur.transmettre_commande(commande)
         self.__attente_acteur_mdns.wait(5)
