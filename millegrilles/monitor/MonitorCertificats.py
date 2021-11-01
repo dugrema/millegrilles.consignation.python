@@ -13,6 +13,7 @@ from typing import cast, Optional
 
 import docker
 from docker.types import SecretReference
+from docker.errors import APIError
 from cryptography import x509
 from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
@@ -590,7 +591,11 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             raise Exception("Mismatch idmg recu : %s" % idmg_recu)
 
         # labels_millegrille = {'mg_type': 'pki', 'role': 'millegrille', 'common_name': noeud_id}
-        self._docker.configs.create(name='pki.millegrille.cert', data=cert_millegrille)
+        try:
+            self._docker.configs.create(name='pki.millegrille.cert', data=cert_millegrille)
+        except APIError as apie:
+            if apie.status_code != 409:
+                raise apie
 
         secret = clecert.private_key_bytes
         labels = {'mg_type': 'pki', 'role': 'monitor', 'common_name': noeud_id}

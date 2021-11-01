@@ -19,8 +19,7 @@ from base64 import b64decode
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
-from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats, \
-    GestionnaireCertificatsNoeudProtegeDependant, GestionnaireCertificatsNoeudProtegePrincipal, \
+from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats, GestionnaireCertificatsNoeudProtegePrincipal, \
     GestionnaireCertificatsInstallation, GestionnaireCertificatsNoeudPrive, GestionnaireCertificatsNoeudPublic
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes, GestionnaireCommandesNoeudProtegeDependant
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
@@ -41,6 +40,7 @@ from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles, SignateurTransactionSimple
+from millegrilles.SecuritePKI import CertificatExpire
 
 
 class InitialiserServiceMonitor:
@@ -164,7 +164,7 @@ class InitialiserServiceMonitor:
             # Lance une exception si aucune configuration ne commence par pki.monitor.cert
             # monitor_cert = self.__docker.configs.list(filters={'name': 'pki.monitor.cert'})[0]
 
-            if securite == '1.public':
+            if securite == Constantes.SECURITE_PUBLIC:
                 self.__logger.info("Noeud public")
                 service_monitor_classe = ServiceMonitorPublic
             elif securite == Constantes.SECURITE_PRIVE:
@@ -185,7 +185,13 @@ class InitialiserServiceMonitor:
         self.__logger.info("Chargement d'un monitor type %s", class_noeud.__name__)
 
         service_monitor = class_noeud(self.__args, self.__docker, self._configuration_json)
-        service_monitor.run()
+        try:
+            service_monitor.run()
+        except CertificatExpire:
+            # Lancer en mode installation
+            self.__logger.exception("Certificat expire, on lance en mode installeur")
+            installeur = ServiceMonitorInstalleur(self.__args, self.__docker, self._configuration_json)
+            installeur.run()
 
 
 class ServiceMonitor:
@@ -1274,6 +1280,8 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
+        self._certificat_pret = False  # Flag qui indique que le certificat est pret et valide
+
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
 
@@ -1318,6 +1326,9 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         except ForcerRedemarrage:
             self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
             self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
+
+        except CertificatExpire as ce:
+            raise ce  # Passer l'execption
 
         except Exception:
             self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
@@ -1415,12 +1426,15 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             date_renouvellement = None
 
         if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
-            self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
+            self.__logger.warning("Certificat monitor expire, on doit attendre une reinitialisation via app web")
 
             # MAJ date pour creation de certificats
             self._gestionnaire_certificats.maj_date()
 
-            self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
+            try:
+                self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
+            except Exception:
+                raise CertificatExpire("Erreur renouvellement certificat")
             self._gestionnaire_docker.configurer_monitor()
             raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
 
