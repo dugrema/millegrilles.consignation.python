@@ -725,11 +725,11 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         csr = kwargs.get('csr')
         if csr:
             traiter_alternames = kwargs.get('altnames')
-            if not traiter_alternames and traiter_alternames is not False:
-                altnames = self.extraire_altnames(csr)
-                if altnames:
-                    liste_dnsnames = [x509.DNSName(domaine) for domaine in altnames]
-                    builder = builder.add_extension(x509.SubjectAlternativeName(liste_dnsnames), critical=False)
+            # if not traiter_alternames and traiter_alternames is not False:
+            #     altnames = self.extraire_altnames(csr)
+            #     if altnames:
+            #         liste_dnsnames = [x509.DNSName(domaine) for domaine in altnames]
+            #         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dnsnames), critical=False)
 
         return builder
 
@@ -2059,7 +2059,7 @@ class RenouvelleurCertificat:
             domaines_publics=domaines_publics
         )
 
-        certificat = generateur_instance.signer(csr, role, duree=duree)
+        certificat = generateur_instance.signer(csr, role, duree=duree, traiter_alternames=False)
         chaine = generateur_instance.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)
