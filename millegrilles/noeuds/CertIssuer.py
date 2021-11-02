@@ -280,7 +280,7 @@ class ServeurHttp(SimpleHTTPRequestHandler):
                 self.traiter_post_communs(path_request)
             elif path_request[1] == 'certissuerInterne':
                 # Path uniquement accessible de l'interne (network docker)
-                self.traiter_post_communs(path_request, interne=True)
+                self.traiter_post_internes(path_request)
             else:
                 self.send_error(404)
 
@@ -299,7 +299,7 @@ class ServeurHttp(SimpleHTTPRequestHandler):
         except:
             self.send_error(500)
 
-    def traiter_post_communs(self, path_request: list, interne=False):
+    def traiter_post_communs(self, path_request: list):
         commande = path_request[2]
 
         content_len = int(self.headers.get('content-length', 0))
@@ -311,13 +311,30 @@ class ServeurHttp(SimpleHTTPRequestHandler):
 
         try:
             if commande == 'issuer':
-                set_intermediaire(self, request_data, interne)
-            elif commande == 'signerModule':
-                signer_module(self, request_data, interne)
-            elif commande == 'signerUsager':
-                signer_usager(self, request_data, interne)
+                set_intermediaire(self, request_data, False)
             else:
                 self.send_error(404)
+        except:
+            self.__logger.exception("Erreur traitement http")
+            self.send_error(500)
+
+    def traiter_post_internes(self, path_request: list):
+        commande = path_request[2]
+
+        content_len = int(self.headers.get('content-length', 0))
+        post_body = self.rfile.read(content_len)
+        try:
+            request_data = json.loads(post_body)
+        except JSONDecodeError:
+            request_data = None
+
+        try:
+            if commande == 'signerModule':
+                signer_module(self, request_data, True)
+            elif commande == 'signerUsager':
+                signer_usager(self, request_data, True)
+            else:
+                self.traiter_post_communs(path_request)
         except:
             self.__logger.exception("Erreur traitement http")
             self.send_error(500)
