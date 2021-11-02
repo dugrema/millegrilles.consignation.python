@@ -103,6 +103,17 @@ class HandlerCertificats:
 
         return clecert
 
+    def signer_usager(self, nom_usager: str, user_id: str, securite: str, csr: str) -> EnveloppeCleCert:
+        # duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        # duree_certs = int(duree_certs)
+        # duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        # duree_certs_heures = int(duree_certs_heures)
+        # duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+
+        clecert = self.__renouvelleur.signer_navigateur(csr.encode('utf-8'), securite, nom_usager, user_id)
+
+        return clecert
+
     @property
     def chaine_certs(self):
         return self.__chaine_certs
@@ -295,6 +306,8 @@ class ServeurHttp(SimpleHTTPRequestHandler):
                 set_intermediaire(self, request_data, interne)
             elif commande == 'signerModule':
                 signer_module(self, request_data, interne)
+            elif commande == 'signerUsager':
+                signer_usager(self, request_data, interne)
             else:
                 self.send_error(404)
         except:
@@ -400,6 +413,46 @@ def signer_module(http_instance: ServeurHttp, request_data: dict, interne=False)
     logger.info("Signer nouveau certificat %s" % role)
 
     clecert_module = handler.generer_clecert_module(role, csr)
+    certificat = [clecert_module.cert_bytes.decode('utf-8')]
+    certificat.extend(handler.chaine_certs)
+    reponse = {
+        'ok': True,
+        'certificat': certificat,
+    }
+    reponse_bytes = json.dumps(reponse).encode('utf-8')
+
+    http_instance.send_response(200)
+    http_instance.send_header("Content-type", "application/json")
+    http_instance.end_headers()
+    http_instance.wfile.write(reponse_bytes)
+
+
+def signer_usager(http_instance: ServeurHttp, request_data: dict, interne=False):
+
+    if interne is False:
+        logger.warning("Erreur - signer_module demande externe - REFUSE")
+        http_instance.send_error(403)
+        return
+
+    handler: HandlerCertificats = http_instance.server.handler
+
+    # Verifier signature de la requete
+    enveloppe_certificat: EnveloppeCertificat = handler.verifier_message(request_data)
+
+    # Aucune exception, la signature est valide
+    if 'core' not in enveloppe_certificat.get_roles:
+        logger.warning("Erreur - signer_module demande avec certificat autre que core - REFUSE")
+        http_instance.send_error(403)
+        return
+
+    csr = request_data['csr']
+    nom_usager = request_data['nom_usager']
+    user_id = request_data['user_id']
+    securite = request_data['securite']
+
+    logger.info("Signer nouveau certificat usager %s (user_id: %s, securite: %s)" % (nom_usager, user_id, securite))
+
+    clecert_module = handler.signer_usager(nom_usager, user_id, securite, csr)
     certificat = [clecert_module.cert_bytes.decode('utf-8')]
     certificat.extend(handler.chaine_certs)
     reponse = {

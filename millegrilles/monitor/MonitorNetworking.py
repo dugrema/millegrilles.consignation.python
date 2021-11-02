@@ -211,8 +211,10 @@ location /coupdoeil {
             fichier.write(app_coupdoeil)
 
         domaine_installeur = 'monitor'
+        domaine_certissuer = 'certissuer'
         if self.__mode_dev:
             domaine_installeur = self.__service_monitor.nodename
+            domaine_certissuer = self.__service_monitor.nodename
 
         proxypass_installation = """
 set $upstream_installation http://%s:8280;
@@ -220,6 +222,13 @@ proxy_pass $upstream_installation;
         """ % domaine_installeur
         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
             fichier.write(proxypass_installation)
+
+        proxypass_certissuer = """
+set $upstream_certissuer http://%s:8380;
+proxy_pass $upstream_certissuer;
+        """ % domaine_certissuer
+        with open(path.join(self.__repertoire_modules, 'proxypass_certissuer.include'), 'w') as fichier:
+            fichier.write(proxypass_certissuer)
 
         resolver = """
 resolver 127.0.0.11 valid=30s;
@@ -398,6 +407,13 @@ location %s {
             "/administration",
         ]
 
+        location_certissuer_component = """
+location /certissuer {
+  include /etc/nginx/conf.d/modules/proxypass_certissuer.include;
+  include /etc/nginx/conf.d/component_base.include;
+}
+        """
+
         certificats = """
 location /certs {
   root /usr/share/nginx/files;
@@ -411,6 +427,7 @@ location /certs {
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
+        locations_list.append(location_certissuer_component)
 
         locations_content = '\n'.join(locations_list)
         with open(path.join(self.__repertoire_modules, 'locations.include'), 'w') as fichier:
