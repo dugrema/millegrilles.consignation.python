@@ -39,6 +39,10 @@ DICT_MODULES_PROTEGES = {
         'nom': ConstantesServiceMonitor.MODULE_ACME,
         'nom_image': ConstantesServiceMonitor.MODULE_ACME
     },
+    ConstantesServiceMonitor.MODULE_CERTISSUER: {
+        'nom': ConstantesServiceMonitor.MODULE_CERTISSUER,
+        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON
+    },
     ConstantesServiceMonitor.MODULE_NGINX: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
@@ -101,6 +105,7 @@ DICT_MODULES_PROTEGES = {
 
 # Liste de modules requis. L'ordre est important
 MODULES_REQUIS_INSTALLATION = [
+    ConstantesServiceMonitor.MODULE_CERTISSUER,
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX,
 ]
@@ -111,6 +116,7 @@ MODULES_REQUIS_PRIVE_PUBLIC = [
 ]
 
 MODULES_REQUIS_PRIMAIRE = [
+    ConstantesServiceMonitor.MODULE_CERTISSUER,
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_MQ,
