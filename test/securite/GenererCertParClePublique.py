@@ -68,7 +68,7 @@ class TestSignerCertNavigateur:
         public_key_str = public_key.decode('utf-8')
 
         print('Public key:\n%s' % public_key_str)
-        certificat = envcert.renouvelleur.signer_navigateur(public_key_str, 'testNavigateur')
+        certificat = envcert.renouvelleur.signer_usager(public_key_str, 'testNavigateur')
 
         cert_output = certificat.cert_bytes.decode('utf-8')
 
@@ -86,7 +86,7 @@ class TestSignerCertNavigateur:
         wrapped_public_key = PemHelpers.wrap_public_key(public_key_str)
 
         print('utiliser_publickey_navigateur:\n%s' % wrapped_public_key)
-        certificat = envcert.renouvelleur.signer_navigateur(wrapped_public_key, 'testNavigateur')
+        certificat = envcert.renouvelleur.signer_usager(wrapped_public_key, 'testNavigateur')
 
         cert_output = certificat.cert_bytes.decode('utf-8')
         fingerprint = certificat.fingerprint

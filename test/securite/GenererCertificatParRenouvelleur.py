@@ -71,7 +71,7 @@ def generer():
 
     request, private_key = generer_csr(user_name)
     csr = request.public_bytes(serialization.Encoding.PEM)
-    nouveau_clecert = renouvelleur.signer_navigateur(csr, '2.prive', user_name, 'mABCD1235')
+    nouveau_clecert = renouvelleur.signer_usager(csr, '2.prive', user_name, 'mABCD1235')
 
     pem_cert = nouveau_clecert.public_bytes
     with open('/tmp/cert.pem', 'wb') as fichier:

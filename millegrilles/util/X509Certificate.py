@@ -2120,14 +2120,22 @@ class RenouvelleurCertificat:
         clecert_csr = generateur_instance.preparer_request(common_name, None, liste_dns)
         return clecert_csr
 
-    def signer_navigateur(self, csr_pem: bytes, securite: str, nom_usager: str, user_id: str, **kwargs):
+    def signer_usager(self, csr_pem: bytes, nom_usager: str, user_id: str, **kwargs):
+        """
+        Signe un certificat d'usager
+        :param csr_pem:
+        :param nom_usager:
+        :param user_id:
+        :param kwargs: Optionnels : delegation_globale:str, delegations_domaines:list, compte_prive:bool,
+        :return:
+        """
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
         csr = x509.load_pem_x509_csr(csr_pem, backend=default_backend())
         if not csr.is_signature_valid:
             raise ValueError("Signature invalide")
 
-        certificat = generateur.signer(csr, securite=securite, role='Navigateur', nom_usager=nom_usager, user_id=user_id, **kwargs)
+        certificat = generateur.signer(csr, role='Usager', nom_usager=nom_usager, user_id=user_id, **kwargs)
         chaine = generateur.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)

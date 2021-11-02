@@ -103,14 +103,22 @@ class HandlerCertificats:
 
         return clecert
 
-    def signer_usager(self, nom_usager: str, user_id: str, securite: str, csr: str) -> EnveloppeCleCert:
+    def signer_usager(self, nom_usager: str, user_id: str, csr: str, request_data: dict = None) -> EnveloppeCleCert:
         # duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
         # duree_certs = int(duree_certs)
         # duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
         # duree_certs_heures = int(duree_certs_heures)
         # duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
 
-        clecert = self.__renouvelleur.signer_navigateur(csr.encode('utf-8'), securite, nom_usager, user_id)
+        # Parse request data au besoin
+        compte_prive = request_data.get('compte_prive')
+        delegation_globale = request_data.get('delegation_globale')
+
+        clecert = self.__renouvelleur.signer_usager(
+            csr.encode('utf-8'), nom_usager, user_id,
+            compte_prive=compte_prive,
+            delegation_globale=delegation_globale,
+        )
 
         return clecert
 
@@ -448,11 +456,10 @@ def signer_usager(http_instance: ServeurHttp, request_data: dict, interne=False)
     csr = request_data['csr']
     nom_usager = request_data['nom_usager']
     user_id = request_data['user_id']
-    securite = request_data['securite']
 
-    logger.info("Signer nouveau certificat usager %s (user_id: %s, securite: %s)" % (nom_usager, user_id, securite))
+    logger.info("Signer nouveau certificat usager %s (user_id: %s)" % (nom_usager, user_id))
 
-    clecert_module = handler.signer_usager(nom_usager, user_id, securite, csr)
+    clecert_module = handler.signer_usager(nom_usager, user_id, csr, request_data)
     certificat = [clecert_module.cert_bytes.decode('utf-8')]
     certificat.extend(handler.chaine_certs)
     reponse = {
