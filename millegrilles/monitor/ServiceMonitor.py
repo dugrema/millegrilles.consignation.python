@@ -1518,30 +1518,20 @@ class ServiceMonitorSatellite(ServiceMonitor):
 
             # Generer un nouveau CSR
             # Verifier si le CSR a deja ete genere, sinon le generer
-            try:
-                csr_docker = self._gestionnaire_docker.charger_config_recente('pki.%s.csr' % ConstantesGenerateurCertificat.ROLE_MONITOR)
-                csr_intermediaire = b64decode(csr_docker['config'].attrs['Spec']['Data']).decode('utf-8')
-            except AttributeError:
-                self.__logger.warning("Certificat monitor expire, on genere un nouveau CSR")
-
-                # Creer CSR pour le service monitor
-                csr_info = self._gestionnaire_certificats.generer_csr(
-                    ConstantesGenerateurCertificat.ROLE_MONITOR,
-                    insecure=self._args.dev,
-                    generer_password=False
-                )
-                csr_intermediaire = csr_info['request']
+            csr_pem = self.csr
 
             # Generer message a transmettre au monitor pour renouvellement
             commande = {
-                'csr': csr_intermediaire,
-                'securite': self.securite
+                'csr': csr_pem.decode('utf-8'),
+                'securite': self.securite,
+                'role': self.securite.split('.')[1]
             }
 
             try:
                 self.connexion_middleware.generateur_transactions.transmettre_commande(
                     commande,
-                    'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                    domaine='CorePki',
+                    action=Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
                     exchange=self.securite,
                     correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
                     reply_to=self.connexion_middleware.reply_q,
@@ -1551,10 +1541,6 @@ class ServiceMonitorSatellite(ServiceMonitor):
                 self.__logger.warning("Connexion MQ pas prete, on ne peut pas renouveller le certificat de monitor")
                 if self.__logger.isEnabledFor(logging.DEBUG):
                     self.__logger.exception("Connexion MQ pas prete")
-
-            # self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
-            # self._gestionnaire_docker.configurer_monitor()
-            # raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
 
         # Nettoyer certificats monitor
         self._supprimer_certificats_expires(['monitor'])
