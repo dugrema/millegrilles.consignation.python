@@ -13,11 +13,13 @@ from cryptography import x509
 from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
+from cryptography.x509.extensions import ExtensionNotFound
 from json.decoder import JSONDecodeError
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from os import environ, makedirs, path, chmod, rename, remove
 from threading import Event, Thread
 from typing import Optional, Union
+
 
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import EnveloppeCertificat
@@ -91,7 +93,7 @@ class HandlerCertificats:
         self.__renouvelleur = RenouvelleurCertificat(idmg, dict_ca, clecert, clecert_millegrille)
 
     def generer_clecert_module(self, role: str, csr: str) -> EnveloppeCleCert:
-        duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
+        duree_certs = environ.get('CERT_DUREE_MODULE') or environ.get('CERT_DUREE') or '3'  # Default 3 jours
         duree_certs = int(duree_certs)
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
         duree_certs_heures = int(duree_certs_heures)
@@ -104,11 +106,11 @@ class HandlerCertificats:
         return clecert
 
     def signer_usager(self, nom_usager: str, user_id: str, csr: str, request_data: dict = None) -> EnveloppeCleCert:
-        # duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
-        # duree_certs = int(duree_certs)
-        # duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
-        # duree_certs_heures = int(duree_certs_heures)
-        # duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+        duree_certs = environ.get('CERT_DUREE_USAGER') or environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = int(duree_certs)
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+        duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
 
         # Parse request data au besoin
         compte_prive = request_data.get('compte_prive')
@@ -118,7 +120,24 @@ class HandlerCertificats:
             csr.encode('utf-8'), nom_usager, user_id,
             compte_prive=compte_prive,
             delegation_globale=delegation_globale,
+            duree=duree
         )
+
+        return clecert
+
+    def signer_csr(self, csr: str, request_data: dict = None) -> EnveloppeCleCert:
+        duree_certs = environ.get('CERT_DUREE_CSR') or environ.get('CERT_DUREE') or '21'  # Default 21 jours
+        duree_certs = int(duree_certs)
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+        duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+
+        # Parse request data au besoin
+        try:
+            role = request_data.get('role')
+        except KeyError:
+            role = None
+        clecert = self.__renouvelleur.signer_csr(csr.encode('utf-8'), role=role, duree=duree)
 
         return clecert
 
@@ -345,6 +364,8 @@ class ServeurHttp(SimpleHTTPRequestHandler):
                 signer_module(self, request_data, True)
             elif commande == 'signerUsager':
                 signer_usager(self, request_data, True)
+            elif commande == 'signerCsr':
+                signer_csr(self, request_data, True)
             else:
                 self.traiter_post_communs(path_request, request_data=request_data)
         except:
@@ -468,7 +489,7 @@ def signer_module(http_instance: ServeurHttp, request_data: dict, interne=False)
 def signer_usager(http_instance: ServeurHttp, request_data: dict, interne=False):
 
     if interne is False:
-        logger.warning("Erreur - signer_module demande externe - REFUSE")
+        logger.warning("Erreur - signer_usager demande externe - REFUSE")
         http_instance.send_error(403)
         return
 
@@ -479,7 +500,7 @@ def signer_usager(http_instance: ServeurHttp, request_data: dict, interne=False)
 
     # Aucune exception, la signature est valide
     if 'core' not in enveloppe_certificat.get_roles:
-        logger.warning("Erreur - signer_module demande avec certificat autre que core - REFUSE")
+        logger.warning("Erreur - signer_usager demande avec certificat autre que core - REFUSE")
         http_instance.send_error(403)
         return
 
@@ -503,6 +524,56 @@ def signer_usager(http_instance: ServeurHttp, request_data: dict, interne=False)
     http_instance.end_headers()
     http_instance.wfile.write(reponse_bytes)
 
+
+def signer_csr(http_instance: ServeurHttp, request_data: dict, interne=False):
+
+    if interne is False:
+        logger.warning("Erreur - signer_csr demande externe - REFUSE")
+        http_instance.send_error(403)
+        return
+
+    handler: HandlerCertificats = http_instance.server.handler
+
+    # Verifier signature de la requete
+    enveloppe_certificat: EnveloppeCertificat = handler.verifier_message(request_data)
+
+    # Aucune exception, la signature est valide. Verifier autorisation.
+    try:
+        delegation_globale = enveloppe_certificat.get_delegation_globale
+    except ExtensionNotFound:
+        delegation_globale = None
+    try:
+        roles = enveloppe_certificat.get_roles
+    except ExtensionNotFound:
+        roles = None
+
+    if 'proprietaire' == delegation_globale:
+        pass  # Delegation globale, signature est autorisee
+    else:
+        # On doit s'assurer que c'est un renouvellement - e.g. prive peut renouveller prive, public => public, etc.
+        role = request_data['role']
+        if role not in roles:
+            logger.warning("Erreur - signer_module demande avec certificat autre que core - REFUSE")
+            http_instance.send_error(403)
+            return
+
+    csr = request_data['csr']
+
+    logger.info("Signer nouveau certificat via CSR")
+
+    clecert_module = handler.signer_csr(csr, request_data)
+    certificat = [clecert_module.cert_bytes.decode('utf-8')]
+    certificat.extend(handler.chaine_certs)
+    reponse = {
+        'ok': True,
+        'certificat': certificat,
+    }
+    reponse_bytes = json.dumps(reponse).encode('utf-8')
+
+    http_instance.send_response(200)
+    http_instance.send_header("Content-type", "application/json")
+    http_instance.end_headers()
+    http_instance.wfile.write(reponse_bytes)
 
 def sauvegarder_certificat(config: Config, chaine: list):
     # Marquer fichiers courantes comme .old
