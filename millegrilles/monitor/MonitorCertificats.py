@@ -177,14 +177,14 @@ class GestionnaireCertificats:
         cle_pem = info_cle['cle_pem']
         cle_passwd = info_cle.get('password')
 
-        if inserer_cle:
-            label_key_inter = 'pki.%s.key' % type_cle
-            self.ajouter_secret(label_key_inter, data=cle_pem)
-            if cle_passwd:
-                label_passwd_inter = 'pki.%s.passwd' % type_cle
-                self.ajouter_secret(label_passwd_inter, data=cle_passwd)
-            label_csr_inter = 'pki.%s.csr' % type_cle
-            self.ajouter_config(label_csr_inter, data=request_pem)
+        #if inserer_cle:
+        #    label_key_inter = 'pki.%s.key' % type_cle
+        #    self.ajouter_secret(label_key_inter, data=cle_pem)
+        #    if cle_passwd:
+        #        label_passwd_inter = 'pki.%s.passwd' % type_cle
+        #        self.ajouter_secret(label_passwd_inter, data=cle_passwd)
+        #    label_csr_inter = 'pki.%s.csr' % type_cle
+        #    self.ajouter_config(label_csr_inter, data=request_pem)
 
         return info_cle
 
@@ -307,12 +307,15 @@ class GestionnaireCertificats:
         return False
 
 
-class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
+class GestionnaireCertificatsSatellite(GestionnaireCertificats):
 
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         super().__init__(docker_client, service_monitor, **kwargs)
         self._passwd_mq: str = cast(str, None)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        
+        # CSR pour le prochain certificat de cette instance satellite
+        self.__csr_monitor: Optional[EnveloppeCleCert] = None
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
@@ -323,7 +326,7 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
             cert_pem = self._charger_certificat_docker('pki.monitor.cert')
         except AttributeError:
             # Le certificat est introuvable - probablement un reset manuel (config supprimee manuellement)
-            self.generer_csr_public()  # Creer CSR si pas deja fait
+            self.get_csr()  # Creer CSR si pas deja fait
         else:
             with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
                 key_pem = fichiers.read()
@@ -356,18 +359,17 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
         """
         pass  # Aucun mot de passe prive
 
-    def generer_csr_public(self):
-        try:
-            # Eviter de creer des doublons - on utilise le CSR deja genere si disponible
-            csr_bytes = self._charger_certificat_docker('pki.monitor.csr')
-            csr = csr_bytes.decode('utf-8')
-        except AttributeError:
-            # On doit creer nouveau CSR, attente connexion manuelle
-            self.__logger.warning("Generer un nouveau CSR pour le renouvellement du certificat de monitor")
+    def get_csr(self):
+        
+        if self.__csr_monitor is None:
+            self.__logger.info("Generer nouveau CSR pour le monitor")
             info_cle = self.generer_csr(ConstantesGenerateurCertificat.ROLE_MONITOR)
-            csr = info_cle['request']
+            self.__csr_monitor = info_cle
+            
+        return self.__csr_monitor['request']
 
-        return csr
+    def get_infocle(self):
+        return self.__csr_monitor
 
     def entretien_certificat(self):
         try:
@@ -404,43 +406,12 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
             self.__logger.exception("Erreur entretien certificat monitor")
 
 
-class GestionnaireCertificatsNoeudPrive(GestionnaireCertificatsNoeudPublic):
+class GestionnaireCertificatsNoeudPublic(GestionnaireCertificatsSatellite):
+    pass
 
-    def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
-        super().__init__(docker_client, service_monitor, **kwargs)
-        self._passwd_mq: str = cast(str, None)
 
-    # def charger_certificats(self):
-    #     secret_path = path.abspath(self.secret_path)
-    #     os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
-    #
-    #     # Charger information certificat monitor
-    #     try:
-    #         cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-    #     except AttributeError:
-    #         # Le certificat est introuvable - probablement un reset manuel (config supprimee manuellement)
-    #         # On doit creer nouveau CSR, attente connexion manuelle
-    #         pass
-    #     else:
-    #         with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
-    #             key_pem = fichiers.read()
-    #         clecert_monitor = EnveloppeCleCert()
-    #         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
-    #         self.clecert_monitor = clecert_monitor
-    #
-    #         # Conserver reference au cert monitor pour middleware
-    #         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-    #         self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
-    #
-    #         # Charger le certificat de millegrille
-    #         self._charger_certificat_docker('pki.millegrille.cert')
-    #
-    # def generer_motsdepasse(self):
-    #     """
-    #     Genere les mots de passes pour composants internes de middleware
-    #     :return:
-    #     """
-    #     pass  # Aucun mot de passe prive
+class GestionnaireCertificatsNoeudPrive(GestionnaireCertificatsSatellite):
+    pass
 
 
 class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudPrive):

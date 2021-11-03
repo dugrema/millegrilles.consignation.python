@@ -89,8 +89,8 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         try:
             if path_split[3] == 'infoMonitor':
                 self.return_info_monitor()
-            # elif path_split[3] == 'csr':
-            #     self.return_csr()
+            elif path_split[3] == 'csr':
+                self.return_csr()
             # elif path_split[3] == 'csrIntermediaire':
             #     self.return_csr_intermediaire()
             elif path_split[3] == 'services':
@@ -111,23 +111,10 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         if path_split[3] == 'installer':
             self.post_installer(request_data)
             return
-        # if path_split[3] == 'renouvellerIntermediaire':
-        #     self.post_renouveller_intermediaire(request_data)
-        #     return
 
         try:
             service_monitor = self.service_monitor
             if service_monitor.est_verrouille:
-                # S'assurer que la commande est correctement signee
-                # try:
-                #     connexion_middleware = service_monitor.connexion_middleware
-                #     validateur_message: ValidateurMessage = connexion_middleware.validateur_message
-                # except AttributeError:
-                #     #verificateur_transactions = service_monitor.verificateur_transactions
-                #     # La connexion et contexte de messagerie ne sont pas encore charges
-                #     # Utiliser un validateur "offline" qui utilise les certificats inline dans le message
-                #     validateur_message: ValidateurMessage = ValidateurMessage(idmg=service_monitor.idmg)
-
                 validateur_message = service_monitor.validateur_message
                 cert = validateur_message.verifier(request_data)
 
@@ -166,7 +153,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         commande = CommandeMonitor(request_data)
         self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
-        self.repondre_json(dict(), status_code=200)
+        self.repondre_json({'ok': True}, status_code=200)
 
     # def post_renouveller_intermediaire(self, request_data):
     #     logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -257,13 +244,15 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     #     self.end_headers()
     #     self.wfile.write(csr_intermediaire)
 
-    # def return_csr(self):
-    #     try:
-    #         csr_intermediaire = self.service_monitor.csr_intermediaire
-    #     except AttributeError:
-    #         csr_intermediaire = None
-    #
-    #     # On est probablement dans un monitor instancie, charger avec docker
+    def return_csr(self):
+        csr_monitor = self.service_monitor.csr
+        self.send_response(200)
+        self.send_header("Content-type", "text/ascii")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(csr_monitor)
+    
+    #    # On est probablement dans un monitor instancie, charger avec docker
     #     if csr_intermediaire is None:
     #         try:
     #             csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
