@@ -289,7 +289,7 @@ class ServeurHttp(SimpleHTTPRequestHandler):
         except:
             self.send_error(500)
 
-    def traiter_get_communs(self, path_request: list, interne=False):
+    def traiter_get_communs(self, path_request: list):
         requete = path_request[2]
         try:
             if requete == 'csr':
@@ -299,15 +299,21 @@ class ServeurHttp(SimpleHTTPRequestHandler):
         except:
             self.send_error(500)
 
-    def traiter_post_communs(self, path_request: list):
+    def traiter_post_communs(self, path_request: list, request_data: dict = None):
         commande = path_request[2]
 
-        content_len = int(self.headers.get('content-length', 0))
-        post_body = self.rfile.read(content_len)
-        try:
-            request_data = json.loads(post_body)
-        except JSONDecodeError:
-            request_data = None
+        if request_data is None:
+            content_len = int(self.headers.get('content-length', 0))
+            post_body = self.rfile.read(content_len)
+            if content_len > 0:
+                try:
+                    self.__logger.info("traiter_post_communs Contenu recu : %s", post_body)
+                    request_data = json.loads(post_body)
+                except JSONDecodeError as jde:
+                    self.__logger.exception("Erreur decodage request %s (len: %d)" % (path_request, content_len))
+                    raise jde
+            else:
+                request_data = None
 
         try:
             if commande == 'issuer':
@@ -323,18 +329,24 @@ class ServeurHttp(SimpleHTTPRequestHandler):
 
         content_len = int(self.headers.get('content-length', 0))
         post_body = self.rfile.read(content_len)
-        try:
-            request_data = json.loads(post_body)
-        except JSONDecodeError:
+        if content_len > 0:
+            try:
+                request_data = json.loads(post_body)
+            except JSONDecodeError as jde:
+                self.__logger.exception("Erreur decodage request %s (len: %d)" % (path_request, content_len))
+                raise jde
+        else:
             request_data = None
 
         try:
-            if commande == 'signerModule':
+            if commande == 'issuer':
+                set_intermediaire(self, request_data, True)
+            elif commande == 'signerModule':
                 signer_module(self, request_data, True)
             elif commande == 'signerUsager':
                 signer_usager(self, request_data, True)
             else:
-                self.traiter_post_communs(path_request)
+                self.traiter_post_communs(path_request, request_data=request_data)
         except:
             self.__logger.exception("Erreur traitement http")
             self.send_error(500)
@@ -360,6 +372,7 @@ def send_csr(http_instance: ServeurHttp):
 
 
 def set_intermediaire(http_instance: ServeurHttp, request_data: dict, interne=False):
+    logger.debug("Set certificat intermediaire (interne: %s): %s" % (interne, request_data))
     config = http_instance.server.config
 
     # Charger le certificat recu, verifier correspondence avec csr

@@ -555,6 +555,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__renouvelleur = RenouvelleurCertificat(service_monitor.idmg, dict(), None)
 
+    def get_url_certissuer(self):
+        url_issuer = os.environ.get('MG_CERTISSUER_URL') or 'http://certissuer:8380'
+        return url_issuer
+
     def recuperer_monitor_initial(self, info_installation: dict):
         """
         Sert a installer un certificat intermediaire dans le certissuer. Le certificat intermediaire (qui correspond
@@ -571,8 +575,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
                                'csr_monitor': clecert.csr_bytes.decode('utf-8')}
 
         # Faire un POST avec l'information pour installer le certificat intermediaire et recuperer le cert monitor
-        url_certissuer = 'http://mg-dev4.maple.maceroc.com:8380/certissuerInterne/issuer'
+        url_certissuer = self.get_url_certissuer()
+        url_certissuer = url_certissuer + '/certissuerInterne/issuer'
         reponse = requests.post(url_certissuer, json=commande_certissuer, timeout=5)
+        # reponse = requests.post("http://192.168.2.131:8380/certissuer/issuer", json=commande_certissuer, timeout=5)
         reponse.raise_for_status()
         reponse_json = reponse.json()
         cert_monitor = reponse_json['certificat_monitor']
@@ -632,7 +638,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         formatteur_message = self._service_monitor.get_formatteur_message(self.clecert_monitor)
         requete_signee, uuid_transaction = formatteur_message.signer_message(requete, 'certissuer', action="signer", ajouter_chaine_certs=True)
 
-        url_certissuer = 'http://mg-dev4.maple.maceroc.com:8380/certissuerInterne/signerModule'
+        url_certissuer = self.get_url_certissuer()
+        url_certissuer = url_certissuer + '/certissuerInterne/signerModule'
         reponse = requests.post(url_certissuer, json=requete_signee, timeout=10)
         reponse.raise_for_status()
         reponse_json = reponse.json()

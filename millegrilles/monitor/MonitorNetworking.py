@@ -214,7 +214,7 @@ location /coupdoeil {
         domaine_certissuer = 'certissuer'
         if self.__mode_dev:
             domaine_installeur = self.__service_monitor.nodename
-            domaine_certissuer = self.__service_monitor.nodename
+            # domaine_certissuer = self.__service_monitor.nodename
 
         proxypass_installation = """
 set $upstream_installation http://%s:8280;

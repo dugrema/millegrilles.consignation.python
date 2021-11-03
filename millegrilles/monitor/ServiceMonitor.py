@@ -2397,10 +2397,12 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
 
+        securite = params['securite']
+        certificat_millegrille = params['chainePem'][-1]
+
         gestionnaire_certs = GestionnaireCertificatsNoeudProtegePrincipal(
             self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
         clecert_monitor = gestionnaire_certs.recuperer_monitor_initial(params)
-        certificat_millegrille = params['chainePem'][-1]
 
         # Extraire IDMG
         self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
@@ -2420,7 +2422,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # if type_certificat_recu != 'intermediaire':
         #     raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
 
-        securite = Constantes.SECURITE_PROTEGE
+        # securite = params['securite']
         # gestionnaire_docker.sauvegarder_config(
         #     'pki.intermediaire.cert.' + str(intermediaire_key['date']),
         #     certificat_pem
