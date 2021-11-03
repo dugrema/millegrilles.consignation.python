@@ -6,14 +6,10 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 from json.decoder import JSONDecodeError
-from base64 import b64decode
-from docker.errors import NotFound
 
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
-from millegrilles.monitor.MonitorConstantes import CommandeMonitor
-from millegrilles.util.ValidateursMessages import ValidateurMessage
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ForcerRedemarrage
 
-from millegrilles.util.IpUtils import get_ip
 
 hostName = "0.0.0.0"
 serverPort = 8280
@@ -189,10 +185,12 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             return self.repondre_json({'ok': False, 'idmg': self.service_monitor.idmg}, status_code=403)
 
         try:
+            idmg = request_data['idmg']
+            securite = request_data['securite']
             # Valider input
             reponse = {
-                'idmg': request_data['idmg'],
-                'securite': request_data['securite'],
+                'idmg': idmg,
+                'securite': securite,
             }
 
             request_data['commande'] = ConstantesServiceMonitor.COMMANDE_CONFIGURER_IDMG
@@ -200,6 +198,8 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
             self.repondre_json(reponse, status_code=200)
+
+            raise ForcerRedemarrage("Lock %s avec idmg %s" % (securite, idmg))
         except Exception as e:
             self.__logger.exception("post_configurer_idmg: Erreur traitement")
             reponse = {'err': str(e)}

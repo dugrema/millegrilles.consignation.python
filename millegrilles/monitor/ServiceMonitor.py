@@ -2235,6 +2235,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         :param commande:
         :return:
         """
+        raise NotImplementedError("Obsolete")
 
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
