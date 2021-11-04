@@ -8,7 +8,7 @@ import tempfile
 import pytz
 
 from base64 import b64decode, b64encode
-from os import path, environ
+from os import path
 from typing import cast, Optional
 
 import docker
@@ -17,17 +17,13 @@ from docker.errors import APIError
 from cryptography import x509
 from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import asymmetric, hashes
-from certvalidator.errors import PathValidationError
-from cryptography.x509.extensions import ExtensionNotFound
+from cryptography.hazmat.primitives import hashes
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
-from millegrilles.dao.MessageDAO import CertificatInconnu
-from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException, ForcerRedemarrage
-# from millegrilles.monitor.ServiceMonitor import DOCKER_LABEL_TIME, GestionnaireModulesDocker
-from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat, \
-    GenerateurInitial, GenerateurCertificat, GenerateurCertificatNginxSelfsigned
+from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
+from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, \
+    ConstantesGenerateurCertificat, GenerateurCertificatNginxSelfsigned
 from millegrilles.monitor import MonitorConstantes
 
 
@@ -334,8 +330,7 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
             clecert_monitor.from_pem_bytes(key_pem, cert_pem)
 
             if not clecert_monitor.is_valid_at_current_time:
-                self.__logger.error("Certificat de monitor est expire")
-                self.generer_csr_public()  # Creer CSR si pas deja fait
+                self.__logger.warning("Certificat de monitor est expire")
             else:
                 self.clecert_monitor = clecert_monitor
 
@@ -379,7 +374,7 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
                     self.__logger.info("Certificat monitor eligible pour renouvellement, demande via MQ")
 
                     # Creer CSR si pas deja fait
-                    csr = self.generer_csr_public()
+                    csr = self.generer_csr()
 
                     # Demander un renouvellement via MQ
                     # Generer message a transmettre au monitor pour renouvellement
