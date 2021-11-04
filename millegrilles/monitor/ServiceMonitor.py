@@ -302,6 +302,8 @@ class ServiceMonitor:
                 os.remove(MonitorConstantes.PATH_FIFO)
             except Exception:
                 pass
+                
+            self.__logger.info("Fermeture ServiceMonitor en cours")
 
     def connecter_middleware(self):
         """
@@ -1962,6 +1964,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
     def fermer(self, signum=None, frame=None):
         super().fermer(signum, frame)
         self.__event_attente.set()
+        self.__logger.info("Fermeture ServiceMonitor (installeur) en cours")
 
     def trigger_event_attente(self):
         self.__event_attente.set()
@@ -2023,20 +2026,23 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         Mode d'operation de base du monitor, lorsque toute la configuration est completee.
         :return:
         """
-        self.__logger.info("Debut boucle d'entretien du service monitor")
+        self.__logger.info("Debut boucle d'entretien du service monitor (installeur)")
 
         while not self._fermeture_event.is_set():
-            self._attente_event.clear()
+            if self._fermeture_event.is_set():
+                self._attente_event.set()
+            else:
+                self._attente_event.clear()
 
             try:
-                self.__logger.debug("Cycle entretien ServiceMonitor")
+                self.__logger.debug("Cycle entretien ServiceMonitor (installeur)")
                 self.verifier_load()
 
                 if not self.limiter_entretien:
                     # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
                     self._gestionnaire_docker.entretien_services()
 
-                self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
+                self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor (installeur)")
             except Exception as e:
                 self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
             finally:
@@ -2113,6 +2119,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.initialiser_domaine(commande)
 
         self.sauvegarder_config_millegrille(idmg, securite)
+        
+        # self.service_monitor.fermer()
+        raise ForcerRedemarrage("Lock %s avec idmg %s" % (securite, idmg))
+        
 
     def initialiser_noeud(self, commande: CommandeMonitor):
         if self.__logger.isEnabledFor(logging.DEBUG):

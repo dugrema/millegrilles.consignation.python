@@ -198,9 +198,6 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
             self.repondre_json(reponse, status_code=200)
-
-            self.service_monitor.fermer()
-            raise ForcerRedemarrage("Lock %s avec idmg %s" % (securite, idmg))
         except Exception as e:
             self.__logger.exception("post_configurer_idmg: Erreur traitement")
             reponse = {'err': str(e)}
