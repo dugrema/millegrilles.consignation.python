@@ -92,7 +92,7 @@ class HandlerCertificats:
 
         self.__renouvelleur = RenouvelleurCertificat(idmg, dict_ca, clecert, clecert_millegrille)
 
-    def generer_clecert_module(self, role: str, csr: str) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, csr: str, liste_dns: list = None) -> EnveloppeCleCert:
         duree_certs = environ.get('CERT_DUREE_MODULE') or environ.get('CERT_DUREE') or '3'  # Default 3 jours
         duree_certs = int(duree_certs)
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
@@ -101,7 +101,7 @@ class HandlerCertificats:
         duree = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
 
         noeud_id = self.config.noeud_id
-        clecert = self.__renouvelleur.renouveller_avec_csr(role, noeud_id, csr.encode('utf-8'), duree)
+        clecert = self.__renouvelleur.renouveller_avec_csr(role, noeud_id, csr.encode('utf-8'), duree, liste_dns=liste_dns)
 
         return clecert
 
@@ -468,10 +468,11 @@ def signer_module(http_instance: ServeurHttp, request_data: dict, interne=False)
 
     csr = request_data['csr']
     role = request_data['role']
+    liste_dns = request_data['liste_dns']
 
     logger.info("Signer nouveau certificat %s" % role)
 
-    clecert_module = handler.generer_clecert_module(role, csr)
+    clecert_module = handler.generer_clecert_module(role, csr, liste_dns)
     certificat = [clecert_module.cert_bytes.decode('utf-8')]
     certificat.extend(handler.chaine_certs)
     reponse = {

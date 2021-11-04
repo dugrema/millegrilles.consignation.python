@@ -599,7 +599,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         clecert = self.__renouvelleur.preparer_csr_par_role(role, common_name, liste_dns)
 
         # Post vers certissuer pour signer avec l'autorite, obtenir le certificat
-        requete = {'csr': clecert.csr_bytes.decode('utf-8'), 'role': role}
+        requete = {'csr': clecert.csr_bytes.decode('utf-8'), 'role': role, 'liste_dns': liste_dns}
         # Signer avec certificat de monitor pour autoriser le certissuer
         formatteur_message = self._service_monitor.get_formatteur_message(self.clecert_monitor)
         requete_signee, uuid_transaction = formatteur_message.signer_message(requete, 'certissuer', action="signer", ajouter_chaine_certs=True)

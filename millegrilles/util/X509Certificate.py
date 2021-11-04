@@ -1514,6 +1514,9 @@ class GenererFichiers(GenerateurNoeud):
             x509.IPAddress(IPv6Address('::1')),
         ]
 
+        if self._domaines_publics is not None:
+            liste_dns.extend([x509.DNSName(d) for d in self._domaines_publics])
+
         # Ajouter noms DNS valides pour MQ
         try:
             builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -2041,22 +2044,24 @@ class RenouvelleurCertificat:
 
         return self.renouveller_avec_csr(role, common_name, csr_bytes, duree=duree)
 
-    def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes, duree: datetime.timedelta = None):
+    def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes, duree: datetime.timedelta = None, liste_dns: list = None):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
 
         # Extraire les extensions pour alt names
         # Copier les extensions fournies dans la requete (exemple subject alt names)
-        domaines_publics = None
+        domaines_publics = set()
+        if liste_dns is not None:
+            domaines_publics.update(liste_dns)
         try:
             subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-            domaines_publics = [d.value for d in subject_alt_names.value]
+            domaines_publics.update([d.value for d in subject_alt_names.value])
         except x509.extensions.ExtensionNotFound:
             pass
 
         generateur = self.__generateurs_par_role[role]
         generateur_instance = generateur(
             self.__idmg, role, node_name, self.__dict_ca, self.__clecert_intermediaire,
-            domaines_publics=domaines_publics
+            domaines_publics=list(domaines_publics)
         )
 
         certificat = generateur_instance.signer(csr, role, duree=duree, traiter_alternames=False)

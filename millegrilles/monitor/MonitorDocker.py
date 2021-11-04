@@ -357,8 +357,15 @@ class GestionnaireModulesDocker:
                     except AttributeError:
                         self.__logger.info("Le certificat n'existe pas, on va le creer : %s" % certificat_compte_cle)
                         try:
+                            info_monitor = self.__service_monitor.get_info_monitor()
+                            fqdn_noeud = info_monitor['fqdn_detecte']
+                            try:
+                                domaine_noeud = info_monitor['domaine']
+                            except KeyError:
+                                domaine_noeud = fqdn_noeud
+
                             enveloppe = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(
-                                cle_config_service, self.__service_monitor.noeud_id)
+                                cle_config_service, self.__service_monitor.noeud_id, liste_dns=[fqdn_noeud, domaine_noeud])
                         except GenerationCertificatNonSupporteeException:
                             self.__logger.warning("Application installee sans generer un certificat (noeud prive ou public)")
                         else:
