@@ -211,6 +211,9 @@ class CommandeMonitor:
     def message(self):
         return self.__message
 
+    def __str__(self):
+        return "%s = %s" % (self.nom_commande, self.__contenu)
+
 
 class ImageNonTrouvee(Exception):
 
