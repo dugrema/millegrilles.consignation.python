@@ -108,11 +108,13 @@ MODULES_REQUIS_INSTALLATION = [
     ConstantesServiceMonitor.MODULE_CERTISSUER,
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX,
+    ConstantesServiceMonitor.MODULE_REDIS,
 ]
 
 MODULES_REQUIS_PRIVE_PUBLIC = [
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+    ConstantesServiceMonitor.MODULE_REDIS,
 ]
 
 MODULES_REQUIS_PRIMAIRE = [
@@ -121,9 +123,9 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_MQ,
     ConstantesServiceMonitor.MODULE_MONGO,
+    ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
     ConstantesServiceMonitor.MODULE_CORE,
-    ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,

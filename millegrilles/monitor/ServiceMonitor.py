@@ -1138,6 +1138,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
         self._certificat_pret = False  # Flag qui indique que le certificat est pret et valide
+        self._connexion_middleware: Optional[ConnexionMiddleware] = None
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -2161,7 +2162,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Verifier si on doit generer un certificat web SSL
         domaine_web = params.get('domaine')
-        if domaine_web is not None:
+        if params.get('internetDisponible') is True and domaine_web is not None:
             self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
             self.initialiser_domaine(commande)
 
