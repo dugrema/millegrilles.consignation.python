@@ -1684,6 +1684,7 @@ class ConstantesGenerateurCertificat:
     ROLE_DOMAINES = 'domaines'
     ROLE_CORE = 'core'
     ROLE_FICHIERS = 'fichiers'
+    ROLE_COLLECTIONS = 'collections'
     ROLE_GROS_FICHIERS = 'grosfichiers'
     ROLE_MONGOEXPRESS = 'mongoexpress'
     ROLE_NAVIGATEUR = 'navigateur'
