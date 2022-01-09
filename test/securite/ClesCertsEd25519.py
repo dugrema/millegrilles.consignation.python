@@ -41,6 +41,18 @@ def signer_csr():
     cert = generateur.signer(clecert_csr.csr, role='monitor')
 
     logger.debug("Cert\n%s" % cert.public_bytes(Encoding.PEM).decode('utf-8'))
+    return cert
+
+
+def comparer_cles():
+    clecert1 = EnveloppeCleCert()
+    clecert1.from_files('/home/mathieu/git/millegrilles.consignation/playground/scripts/ca.key', '/home/mathieu/git/millegrilles.consignation/playground/scripts/ca.cert', None)
+
+    correspondent = clecert1.cle_correspondent()
+    logger.debug("Certificat et cle privee correspondent : %s" % correspondent)
+
+    clecert2 = EnveloppeCleCert()
+    clecert2.generer_private_key(generer_password=True)
 
 
 def main():
@@ -51,7 +63,8 @@ def main():
     logger.debug("Generer cles")
     #generer_cle()
     # generer_csr()
-    signer_csr()
+    # signer_csr()
+    comparer_cles()
 
 
 if __name__ == '__main__':

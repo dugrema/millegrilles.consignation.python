@@ -161,9 +161,8 @@ class GestionnaireCertificats:
         name = x509.Name(name_list)
         builder = builder.subject_name(name)
 
-        request = builder.sign(
-            info_cle['cle'], hashes.SHA256(), default_backend()
-        )
+        # request = builder.sign(info_cle['cle'], hashes.SHA256(), default_backend())
+        request = builder.sign(info_cle['cle'], None, default_backend())
         request_pem = request.public_bytes(primitives.serialization.Encoding.PEM)
         info_cle['request'] = request_pem
         info_cle['cle_pem'] = info_cle['pem']
@@ -590,7 +589,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         name = x509.Name(name_list)
         builder = builder.subject_name(name)
 
-        request = builder.sign(clecert_monitor.private_key, hashes.SHA256(), default_backend())
+        # request = builder.sign(clecert_monitor.private_key, hashes.SHA256(), default_backend())
+        request = builder.sign(clecert_monitor.private_key, None, default_backend())
         clecert_monitor.csr = request
 
         return clecert_monitor

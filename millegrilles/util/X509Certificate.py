@@ -147,13 +147,20 @@ class EnveloppeCleCert:
     def cle_correspondent(self):
         if self.private_key is not None and self.cert is not None:
             # Verifier que le cert et la cle privee correspondent
-            public1 = self.private_key.public_key().public_numbers()
-            public2 = self.cert.public_key().public_numbers()
+            # public1 = self.private_key.public_key().public_numbers()
+            # public2 = self.cert.public_key().public_numbers()
+            #
+            # n1 = public1.n
+            # n2 = public2.n
+            #
+            # return n1 == n2
 
-            n1 = public1.n
-            n2 = public2.n
+            public1_bytes = self.private_key.public_key().public_bytes(
+                primitives.serialization.Encoding.Raw, primitives.serialization.PublicFormat.Raw)
+            public2_bytes = self.cert.public_key().public_bytes(
+                primitives.serialization.Encoding.Raw, primitives.serialization.PublicFormat.Raw)
 
-            return n1 == n2
+            return public1_bytes == public2_bytes
 
         return False
 
@@ -501,9 +508,8 @@ class GenerateurCertificat:
         clecert.generer_private_key()
 
         builder = x509.CertificateSigningRequestBuilder()
-        request = builder.sign(
-            clecert.private_key, hashes.SHA256(), default_backend()
-        )
+        # request = builder.sign(clecert.private_key, hashes.SHA256(), default_backend())
+        request = builder.sign(clecert.private_key, None, default_backend())
         clecert.set_csr(request)
 
         return clecert
@@ -530,12 +536,8 @@ class GenerateurCertificat:
             # Ajouter noms DNS valides pour MQ
             builder = builder.add_extension(x509.SubjectAlternativeName(liste_names), critical=False)
 
-        # request = builder.sign(
-        #    clecert.private_key, hashes.SHA256(), default_backend()
-        # )
-        request = builder.sign(
-            clecert.private_key, None, default_backend()
-        )
+        # request = builder.sign(clecert.private_key, hashes.SHA256(), default_backend())
+        request = builder.sign(clecert.private_key, None, default_backend())
         clecert.set_csr(request)
 
         return clecert
@@ -560,9 +562,8 @@ class GenerateurCertificat:
             # Ajouter noms DNS valides pour MQ
             builder = builder.add_extension(x509.SubjectAlternativeName(liste_names), critical=False)
 
-        request = builder.sign(
-            clecert.private_key, hashes.SHA256(), default_backend()
-        )
+        # request = builder.sign(clecert.private_key, hashes.SHA256(), default_backend())
+        request = builder.sign(clecert.private_key, None, default_backend())
         clecert.set_csr(request)
 
         return clecert
@@ -651,12 +652,16 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
     def signer(self, builder) -> x509.Certificate:
 
         cle_autorite = self._autorite.private_key
+        # certificate = builder.sign(
+        #     private_key=cle_autorite,
+        #     algorithm=hashes.SHA256(),
+        #     backend=default_backend()
+        # )
         certificate = builder.sign(
             private_key=cle_autorite,
-            algorithm=hashes.SHA256(),
+            algorithm=None,
             backend=default_backend()
         )
-
         return certificate
 
     def aligner_chaine(self, certificat: x509.Certificate):
@@ -863,7 +868,8 @@ class GenerateurCertificatNginxSelfsigned:
 
         certificate = builder.sign(
             private_key=clecert.private_key,
-            algorithm=hashes.SHA512(),
+            # algorithm=hashes.SHA512(),
+            algorithm=None,
             backend=default_backend()
         )
 
@@ -999,7 +1005,8 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
         certificate = builder.sign(
             private_key=clecert.private_key,
-            algorithm=hashes.SHA512(),
+            # algorithm=hashes.SHA512(),
+            algorithm=None,
             backend=default_backend()
         )
 

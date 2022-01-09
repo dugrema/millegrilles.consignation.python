@@ -25,3 +25,5 @@ py-multihash>=0.8.2
 py-multibase>=1.0.3
 ipfshttpclient>=0.6.1
 fido2>=0.9.1
+
+pyopenssl
