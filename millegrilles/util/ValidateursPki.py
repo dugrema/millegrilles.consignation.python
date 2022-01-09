@@ -3,11 +3,13 @@ import datetime
 import logging
 import json
 import pytz
+import OpenSSL
 
-from typing import Optional, Union, Dict
-from certvalidator import CertificateValidator, ValidationContext
-from certvalidator.errors import PathValidationError, PathBuildingError
+# from six import b
 from threading import Event, Barrier
+from typing import Optional, Union, Dict
+# from certvalidator import CertificateValidator, ValidationContext
+# from certvalidator.errors import PathValidationError, PathBuildingError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
@@ -23,16 +25,17 @@ class ValidateurCertificat:
     def __init__(self, idmg: str, certificat_millegrille: Union[bytes, str, list] = None):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__idmg = idmg
-
-        # # Validation context pour le idmg courant
-        # self.__validation_context: Optional[ValidationContext] = None
+        self.__store = OpenSSL.crypto.X509Store()
+        self.__root_cert_openssl = None
 
         if certificat_millegrille is not None:
             enveloppe = self._charger_certificat(certificat_millegrille)
-            if enveloppe.idmg != idmg:
+            enveloppe_idmg = enveloppe.idmg
+            if enveloppe_idmg != idmg:
                 raise ValueError("Le certificat en parametre ne correspond pas au idmg %s" % idmg)
             certificat_millegrille_pem = enveloppe.certificat_pem
-            # self.__validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
+            self.__root_cert_openssl = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, certificat_millegrille_pem)
+            self.__store.add_cert(self.__root_cert_openssl)
 
     def _charger_certificat(self, certificat: Union[bytes, str, list]) -> EnveloppeCertificat:
         if isinstance(certificat, bytes):
@@ -44,58 +47,58 @@ class ValidateurCertificat:
 
         return certificat
 
-    def _preparer_validation_context(
-            self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None, idmg: str = None
-    ) -> ValidationContext:
-        if enveloppe.reste_chaine_pem is not None:
-            # L'enveloppe a deja la chaine complete, on fait juste la passer au validateur
-            validation_context = self.__preparer_validation_context(enveloppe, date_reference, idmg)
-        else:
-            raise PathBuildingError("Impossible de preparer la chaine de validation du certificat (chaine manquante)")
-        return validation_context
+    # def _preparer_validation_context(
+    #         self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None, idmg: str = None
+    # ) -> ValidationContext:
+    #     if enveloppe.reste_chaine_pem is not None:
+    #         # L'enveloppe a deja la chaine complete, on fait juste la passer au validateur
+    #         validation_context = self.__preparer_validation_context(enveloppe, date_reference, idmg)
+    #     else:
+    #         raise PathBuildingError("Impossible de preparer la chaine de validation du certificat (chaine manquante)")
+    #     return validation_context
 
-    def __preparer_validation_context(
-            self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None, idmg: str = None
-    ) -> ValidationContext:
+    # def __preparer_validation_context(
+    #         self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None, idmg: str = None
+    # ) -> ValidationContext:
+    #
+    #     # Raccourci - si on a idmg et date par defaut et un validator deja construit
+    #     # Note : le validation context conserve la date courante - l'utiliser avec caching devrait etre fait pour
+    #     # une tres courte periode de temps (desactive pour l'instant)
+    #     # if self.__validation_context is not None and date_reference is None and idmg is None:
+    #     #     return self.__validation_context
+    #
+    #     # Extraire le certificat de millegrille, verifier le idmg et construire le contexte
+    #     idmg_effectif = idmg or self.__idmg
+    #     certificat_millegrille_pem = enveloppe.reste_chaine_pem[-1]
+    #     certificat_millegrille = EnveloppeCertificat(certificat_pem=certificat_millegrille_pem)
+    #     if certificat_millegrille.idmg != idmg_effectif:
+    #         raise PathValidationError("Certificat de millegrille (idmg: %s) ne correspond pas au idmg: %s" % (certificat_millegrille.idmg, idmg_effectif))
+    #
+    #     if date_reference is not None:
+    #         validation_context = ValidationContext(
+    #             moment=date_reference,
+    #             trust_roots=[certificat_millegrille_pem.encode('utf-8')]
+    #         )
+    #     else:
+    #         validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
+    #
+    #         # if idmg_effectif == self.__idmg and self.__validation_context is None:
+    #         #     # Conserver l'instance du validation context pour reutilisation
+    #         #     self.__logger.debug("Conserver instance pour validation de certificat idmg = %s" % idmg_effectif)
+    #         #     self.__validation_context = validation_context
+    #
+    #     return validation_context
 
-        # Raccourci - si on a idmg et date par defaut et un validator deja construit
-        # Note : le validation context conserve la date courante - l'utiliser avec caching devrait etre fait pour
-        # une tres courte periode de temps (desactive pour l'instant)
-        # if self.__validation_context is not None and date_reference is None and idmg is None:
-        #     return self.__validation_context
-
-        # Extraire le certificat de millegrille, verifier le idmg et construire le contexte
-        idmg_effectif = idmg or self.__idmg
-        certificat_millegrille_pem = enveloppe.reste_chaine_pem[-1]
-        certificat_millegrille = EnveloppeCertificat(certificat_pem=certificat_millegrille_pem)
-        if certificat_millegrille.idmg != idmg_effectif:
-            raise PathValidationError("Certificat de millegrille (idmg: %s) ne correspond pas au idmg: %s" % (certificat_millegrille.idmg, idmg_effectif))
-
-        if date_reference is not None:
-            validation_context = ValidationContext(
-                moment=date_reference,
-                trust_roots=[certificat_millegrille_pem.encode('utf-8')]
-            )
-        else:
-            validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
-
-            # if idmg_effectif == self.__idmg and self.__validation_context is None:
-            #     # Conserver l'instance du validation context pour reutilisation
-            #     self.__logger.debug("Conserver instance pour validation de certificat idmg = %s" % idmg_effectif)
-            #     self.__validation_context = validation_context
-
-        return validation_context
-
-    def __run_validation_context(self, enveloppe: EnveloppeCertificat, validation_context: ValidationContext, usages: set):
-        cert_pem = enveloppe.certificat_pem.encode('utf-8')
-        inter_list = [c.encode('utf-8') for c in enveloppe.reste_chaine_pem[:-1]]
-        validator = CertificateValidator(
-            cert_pem,
-            intermediate_certs=inter_list,
-            validation_context=validation_context
-        )
-        # validator.validate_usage({'digital_signature'})
-        validator.validate_usage(usages)
+    # def __run_validation_context(self, enveloppe: EnveloppeCertificat, validation_context: ValidationContext, usages: set):
+    #     cert_pem = enveloppe.certificat_pem.encode('utf-8')
+    #     inter_list = [c.encode('utf-8') for c in enveloppe.reste_chaine_pem[:-1]]
+    #     validator = CertificateValidator(
+    #         cert_pem,
+    #         intermediate_certs=inter_list,
+    #         validation_context=validation_context
+    #     )
+    #     # validator.validate_usage({'digital_signature'})
+    #     validator.validate_usage(usages)
 
     def valider(
             self,
@@ -113,7 +116,7 @@ class ValidateurCertificat:
         :param usages: Usages du certificat
 
         :return: Enveloppe avec le certificat valide.
-        :raise PathValidationError: Si la chaine de certificat est invalide.
+        :raise OpenSSL.crypto.X509StoreContextError: Si la chaine de certificat est invalide.
         """
         enveloppe = self._charger_certificat(certificat)
 
@@ -125,25 +128,46 @@ class ValidateurCertificat:
         except AttributeError:
             pass  # Ok, le certificat n'est pas connu ou dans le cache
 
-        validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
+        store = self.__preparer_store(date_reference)
+
+        chaine = [OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert) for cert in enveloppe.reste_chaine_pem]
+        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, enveloppe.certificat_pem.encode('utf-8'))
+        store_ctx = OpenSSL.crypto.X509StoreContext(store, cert, chaine)
         try:
-            self.__run_validation_context(enveloppe, validation_context, usages)
-        except PathBuildingError as pbe:
-            # Verifier si l'echec est du a un certificat d'un IDMG different
-            if idmg is None:
-                idmg_certificat = enveloppe.subject_organization_name
-                if self.__idmg != idmg_certificat:
-                    raise PathValidationError("Certificat pour le mauvais IDMG sans X-Signing : %s" % idmg_certificat)
-            raise pbe
+            store_ctx.verify_certificate()
+        except OpenSSL.crypto.X509StoreContextError as ce:
+            raise ce  # TODO Verifier si IDMG different
+
+        # validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
+        # try:
+        #     self.__run_validation_context(enveloppe, validation_context, usages)
+        # except PathBuildingError as pbe:
+        #     # Verifier si l'echec est du a un certificat d'un IDMG different
+        #     if idmg is None:
+        #         idmg_certificat = enveloppe.subject_organization_name
+        #         if self.__idmg != idmg_certificat:
+        #             raise PathValidationError("Certificat pour le mauvais IDMG sans X-Signing : %s" % idmg_certificat)
+        #     raise pbe
 
         if date_reference is None and (idmg is None or idmg == self.__idmg):
-            # Validation completee, certificat est valide (sinon PathValidationError est lancee)
+            # Validation completee, certificat est valide (sinon OpenSSL.crypto.X509StoreContextError est lancee)
             enveloppe.set_est_verifie(True)
 
         # La chaine est valide (potentiellement avec conditions comme idmg ou date_reference)
         self._conserver_enveloppe(enveloppe)
 
         return enveloppe
+
+    def __preparer_store(self, date_reference: datetime.datetime = None) -> OpenSSL.crypto.X509Store:
+        if date_reference is None:
+            return self.__store
+        else:
+            # Creer store avec date de validation differente
+            store = OpenSSL.crypto.X509Store()
+            store.add_cert(self.__root_cert_openssl)
+            store.set_time(date_reference)
+            return store
+
 
     def _conserver_enveloppe(self, enveloppe: EnveloppeCertificat):
         """

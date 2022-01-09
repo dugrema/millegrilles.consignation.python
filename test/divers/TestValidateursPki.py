@@ -1,6 +1,7 @@
 import datetime
 import pytz
 import logging
+import OpenSSL
 
 from os import path
 from certvalidator.errors import PathValidationError
@@ -14,52 +15,45 @@ from millegrilles.util.X509Certificate import RenouvelleurCertificat, EnveloppeC
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 mgdev_certs = '/home/mathieu/mgdev/certs'
-idmg = 'QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST'
+idmg = 'z2oPZ96cRaFJYqUXcMtmap1KKaNtLXGwakfWcqBnj4HFrjdEbZeqgB'
 
 
-cert_millegrille = """
+cert_millegrille = b"""
 -----BEGIN CERTIFICATE-----
-MIIDKDCCAhCgAwIBAgIKAwFHBgZAdyMmADANBgkqhkiG9w0BAQ0FADAnMQ8wDQYD
-VQQDEwZSYWNpbmUxFDASBgNVBAoTC01pbGxlR3JpbGxlMB4XDTIwMTAwMTIzMTUz
-NFoXDTIxMTAwMTIzMTUzNFowJzEPMA0GA1UEAxMGUmFjaW5lMRQwEgYDVQQKEwtN
-aWxsZUdyaWxsZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALN3Oqa0
-pme6ckKPaOj9ViWHYbshBZShbr27M4UQbJFuWPGczDuWYRA4o+G2XtYvN7IKix4F
-Jk5KAhvaBlX6TERZpqTCbmZDg5okkr7LSUroiH4TSjuPqfAqI2XoeHTKQ4QOEKWd
-53eu+nbtJ9NDnCe6HYs0nNhsH4DluiCWeoPp862mFPs77Vi00JM8WuQZxrzv0kMi
-1izPv0P0DHQ7PLtoVwi7to0GCgXeun4bWGbA3jYjd52IwVSsN34ICLhwu7NxjTEA
-qCmqOoxuwZeF9mtOZpyufMT+9M2yRiQ/M3ORSO0DbiyfnERMSEK1y6cDNIoqSm3E
-Kq80fkKUmjeGtwMCAwEAAaNWMFQwEgYDVR0TAQH/BAgwBgEB/wIBBTAdBgNVHQ4E
-FgQUz0uNp3laAnmytcjpRPxeffzn4YIwHwYDVR0jBBgwFoAUz0uNp3laAnmytcjp
-RPxeffzn4YIwDQYJKoZIhvcNAQENBQADggEBADlSMp60EefJ6RezKMf6WP2VYZsC
-iM8/HtGmHBk6Y0EEbX0BZlifufrNB3YH8klfYBrxkwPOhku1vaylAtf5xxB3kD+1
-Vmxr2mkO9PSJTw+ehDs7tAfOFC/kOy7MCywB/Ysg1oEiQ/uVT51c3zAXDWn+H84k
-Vx/4wYGdLVamGVYFU7NSVhzfFED6zZRDn7S+/ncZwhkxmZXIBOl3moWRUA8dBBZp
-kD5whYSBNXy9CnaVaVjMW/AwynM+bBiUlVEXXIUw6wyLdkh76srVpyAGm0kVJ4J/
-CH5fQslgzRhcQBInXaaV+vB9ac624tzpUy+Mt4vmEsoVbDMGZewpH8hFvtM=
+MIIBUzCCAQWgAwIBAgIUbl3363S2J56H0agwMXf0a94C9RgwBQYDK2VwMBcxFTAT
+BgNVBAMMDG1pbGxlZ3JpbGxlczAeFw0yMjAxMDkxMTM1NTVaFw00MjAxMDQxMTM1
+NTVaMBcxFTATBgNVBAMMDG1pbGxlZ3JpbGxlczAqMAUGAytlcAMhAGQZ8QkmNIZQ
+tqJS2Tcu0g7rIpprCOKz5gZUvzFVjsI4o2MwYTAPBgNVHRMBAf8EBTADAQH/MB0G
+A1UdDgQWBBQJRu4NOqtYiAxQbbZNpgNQZ2vvczAfBgNVHSMEGDAWgBQJRu4NOqtY
+iAxQbbZNpgNQZ2vvczAOBgNVHQ8BAf8EBAMCAaYwBQYDK2VwA0EA8yDLg6Mlx+L1
+e/v99BfqbVQEqaNJpBCc9Eueoj45cFf1gVuM9h3FWFUb9TiP1+P0lQY4u+j8HnWE
+72+IybWLBw==
 -----END CERTIFICATE-----
 """
 
 cert_1_intermediaire = """
 -----BEGIN CERTIFICATE-----
-MIIDfzCCAmegAwIBAgIKBHMSAgGWVkgAADANBgkqhkiG9w0BAQ0FADAnMQ8wDQYD
-VQQDEwZSYWNpbmUxFDASBgNVBAoTC01pbGxlR3JpbGxlMB4XDTIxMDEwODIwNTcz
-NVoXDTI0MDExMTIwNTczNVowfjEtMCsGA1UEAxMkMmRkYjJiNDktMTZhNS00MmMy
-LTg3NzItYzJiZTRhNDdmN2M1MRYwFAYDVQQLEw1pbnRlcm1lZGlhaXJlMTUwMwYD
-VQQKEyxRTUU4U2poYUNGeVNEOXFCdDFBaWtRMVU3V3hpZUpZMnhEZzJKQ01jekpT
-VDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANQlnhWapHBfWgFxJHkt
-uY1kojDMrW1OsN/5Z9xsZzxFd6K7Y6Ezr+fgcIij+2kMPLCSH2cNNcwuclJEnHWT
-n4xM/MpmALC08cftiqC92QzbonnLGFUuZvk5dXup+sfLkP7rXlHEqfYVsHCuKr8e
-YGBZ0pJesgPAvStAFLHqbv/aKBgSd0gWJvlM0rF7QKIOUueamgZNutvPf49Vv+uT
-/sKK1VvlJifvL1CIRMzwYcHzSFz24xey7RIMQMpNOzLfw+gddidAivlFHOOthRPx
-1qGHM5oPUOBw0LDFX01CopCzXv2LpXD3gFKguwdW2tcAU15ggWzfy2YPeYLb/A3v
-JYsCAwEAAaNWMFQwEgYDVR0TAQH/BAgwBgEB/wIBBDAdBgNVHQ4EFgQUHBhBnTsD
-AdlyW/8WGcU4St+LtLowHwYDVR0jBBgwFoAUz0uNp3laAnmytcjpRPxeffzn4YIw
-DQYJKoZIhvcNAQENBQADggEBAD578RJjXQppZD4iiG9uyQFIl4vqTjsM/+RdWI20
-iDsR1Bi9j07y8+5H5nW/Nqsu541bYx1XkdkG596m1gB2gJcNT0cGJpPG8NNfsDaw
-9cvudLCJAIJyU0KYHGhJYnGjcBcSV8isYOEgKfRCxBp5KuPNXrANznvmEe/NOZQb
-Z0FzCi7RCVMKQ3b46Nrmd+qpzESTyuEaB5yTTZZlqrb49BePi+KR/5NkIP+kK8QH
-Y3zrbUFrVbYftK3BKuaACIOnIqafOpMJ1zi7co26LaWj9syETwRt+EjxoQzgiN08
-QHg5RZ88D4WtDr+1jYvT4F3Kb03Ms27jy+F42XI51uoNhIo=
+MIIBODCB66ADAgECAgEFMAUGAytlcDAXMRUwEwYDVQQDDAxtaWxsZWdyaWxsZXMw
+HhcNMjIwMTA5MTgxMzIxWhcNMjIwMjA4MTgxMzIxWjAQMQ4wDAYDVQQDDAVpbnRl
+cjAqMAUGAytlcAMhAIL23KJlKrzb+fO+aUajBS7026rLt+yZVUymRTLa3hT2o2Mw
+YTAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQvytsPp0ay7OvPJL1W/tv8+v0z
+3TAfBgNVHSMEGDAWgBQJRu4NOqtYiAxQbbZNpgNQZ2vvczAOBgNVHQ8BAf8EBAMC
+AaYwBQYDK2VwA0EAdR/R2/tooeE3CEANxWWt+tpZW4ksBJBexG2BixgmueGGnrCG
+KqmSTfUlewWAxFcDau05GOR6Hwj3tp9/IVQAAw==
+-----END CERTIFICATE-----
+"""
+
+cert_1_valide = """
+-----BEGIN CERTIFICATE-----
+MIIBrDCCAV6gAwIBAgIBAjAFBgMrZXAwEDEOMAwGA1UEAwwFaW50ZXIwHhcNMjIw
+MTA5MTgxMzI1WhcNMjIwMjA4MTgxMzI1WjAPMQ0wCwYDVQQDDARsZWFmMCowBQYD
+K2VwAyEAp2DEptlRhoIFY3v6mGtPvpRLcABaUQflvPZDLoxdDqejgd0wgdowCQYD
+VR0TBAIwADALBgNVHQ8EBAMCBaAwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUF
+BwMCMGEGA1UdEQRaMFiHBH8AAAGHEAAAAAAAAAAAAAAAAAAAAAGHBMCoAsOCGW1n
+LWRldjUubWFwbGUubWFjZXJvYy5jb22CBW1vbmdvgglsb2NhbGhvc3SCB21nLWRl
+djWCAm1xMB0GA1UdDgQWBBTRQCkQ9Qq/FzVBFQIz6hI6yQhjaDAfBgNVHSMEGDAW
+gBQvytsPp0ay7OvPJL1W/tv8+v0z3TAFBgMrZXADQQCRylN4qsuBNyx6PINYizcL
+wfnQvWJeyVYTR7UIXQIT4SOaAssxF8zXbEJ1uAXjVxYiZRv71cUuU2UqUqdz3uoN
 -----END CERTIFICATE-----
 """
 
@@ -117,24 +111,26 @@ def generer_certificat_valide() -> EnveloppeCleCert:
 
 class ValiderCertificat:
 
-    def __init__(self, certs: Dict[str, EnveloppeCleCert]):
-        self.certs = certs
+    def __init__(self, ca_pem, certs_pems: list):
+        self.ca_pem = ca_pem
+        self.certs_pems = certs_pems
         self.__logger = logging.getLogger('__main__.ValiderCertificat')
 
         self.contexte = None
         self.validateur = None
 
     def test_valider_1(self):
-        validateur = ValidateurCertificat(idmg=idmg)
+        validateur = ValidateurCertificat(idmg=idmg, certificat_millegrille=self.ca_pem)
 
-        enveloppe1 = self.certs['1']
+        enveloppe1 = EnveloppeCleCert()
+        enveloppe1.cert_from_pem_bytes('\n'.join(self.certs_pems).encode('utf-8'))
         validateur.valider(enveloppe1.chaine)
 
         date_reference = datetime.datetime(year=2010, month=1, day=1, hour=0, minute=0, tzinfo=pytz.UTC)
         try:
             validateur.valider(enveloppe1.chaine, date_reference=date_reference)
-        except PathValidationError as pve:
-            self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
+        except OpenSSL.crypto.X509StoreContextError as ce:
+            self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % ce)
         else:
             raise Exception("Erreur de validation, date n'a pas ete flaggee comme invalide")
 
@@ -248,17 +244,12 @@ def main():
     logging.getLogger('__main__').setLevel(logging.DEBUG)
     logging.getLogger('millegrilles.util.ValidateursPki').setLevel(logging.DEBUG)
 
-    cert_valide_1 = generer_certificat_valide()
-    certs = {
-        '1': cert_valide_1,
-    }
-
-    test = ValiderCertificat(certs)
-    # test.test_valider_1()
+    test = ValiderCertificat(cert_millegrille, [cert_1_valide, cert_1_intermediaire])
+    test.test_valider_1()
     # test.test_valider_cache()
 
-    test.initialiser_contexte()
-    test.test_valider_mq()
+    #test.initialiser_contexte()
+    #test.test_valider_mq()
     # test.test_recherche_cert_absent()
 
     # Event().wait(120)
