@@ -4,6 +4,9 @@ from cryptography.hazmat.primitives import hashes, padding, serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from ipaddress import IPv4Address, IPv6Address
 from typing import Union
 from multihash.constants import HASH_CODES
@@ -373,11 +376,12 @@ class EnveloppeCleCert:
         if generer_password:
             self.password = base64.b64encode(secrets.token_bytes(16))
 
-        self.private_key = asymmetric.rsa.generate_private_key(
-            public_exponent=public_exponent,
-            key_size=keysize,
-            backend=default_backend()
-        )
+        #self.private_key = asymmetric.rsa.generate_private_key(
+        #    public_exponent=public_exponent,
+        #    key_size=keysize,
+        #    backend=default_backend()
+        #)
+        self.private_key = Ed25519PrivateKey.generate()
 
     @staticmethod
     def get_authority_identifier(certificat):
@@ -526,8 +530,11 @@ class GenerateurCertificat:
             # Ajouter noms DNS valides pour MQ
             builder = builder.add_extension(x509.SubjectAlternativeName(liste_names), critical=False)
 
+        # request = builder.sign(
+        #    clecert.private_key, hashes.SHA256(), default_backend()
+        # )
         request = builder.sign(
-            clecert.private_key, hashes.SHA256(), default_backend()
+            clecert.private_key, None, default_backend()
         )
         clecert.set_csr(request)
 
@@ -772,7 +779,8 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         cle_autorite = self._autorite.private_key
         certificate = builder.sign(
             private_key=cle_autorite,
-            algorithm=hashes.SHA256(),
+            # algorithm=hashes.SHA256(),
+            algorithm=None,
             backend=default_backend()
         )
         return certificate

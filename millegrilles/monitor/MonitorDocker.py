@@ -469,6 +469,9 @@ class GestionnaireModulesDocker:
         if format_cle == 'openssh':
             generateur = GenerateurRsa()
             valeur = generateur.generer_private_openssh()
+        elif format_cle == 'openssh_ed25519':
+            generateur = GenerateurEd25519()
+            valeur = generateur.generer_private_openssh()
         else:
             raise ValueError('Type cle inconnu : %s', format_cle)
 

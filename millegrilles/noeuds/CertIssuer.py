@@ -694,7 +694,8 @@ def generer_csr(config: Config):
     name = x509.Name(name_list)
     builder = builder.subject_name(name)
 
-    request = builder.sign(clecert.private_key, hashes.SHA256(), default_backend())
+    request = builder.sign(clecert.private_key, None, default_backend())
+    # request = builder.sign(clecert.private_key, hashes.SHA256(), default_backend())
     csr = request.public_bytes(primitives.serialization.Encoding.PEM)
 
     with open(path_key, 'wb') as fichier:
