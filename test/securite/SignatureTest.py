@@ -42,6 +42,7 @@ class PreparateurMessage:
 class SignateurTest:
 
     CERT_FOLDER = '/home/mathieu/mgdev/certs'
+    CERT_FOLDER = '/home/mathieu/git/millegrilles.consignation/playground/scripts'
 
     def __init__(self):
         self.cle = None
@@ -52,7 +53,7 @@ class SignateurTest:
         self._hash_function = hashes.SHA512
 
     def load_cle(self):
-        with open('%s/pki.domaines.key' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/leaf.key' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             cle = serialization.load_pem_private_key(
                 key_file.read(),
                 password=None,
@@ -62,7 +63,7 @@ class SignateurTest:
             self._logger.debug("Cle privee chargee")
 
     def load_certificat(self):
-        with open('%s/pki.domaines.cert' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/leaf.cert' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             certificat = x509.load_pem_x509_certificate(
                 key_file.read(),
                 backend=default_backend()
@@ -101,16 +102,16 @@ class SignateurTest:
         cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
         self._logger.debug("Common Name: %s" % cn)
 
-        message_noeud = dict_message['en-tete'].get('noeud')
-        if '@' in message_noeud:
-            message_noeud = message_noeud.split('@')[1]
+        # message_noeud = dict_message['en-tete'].get('noeud')
+        # if '@' in message_noeud:
+        #     message_noeud = message_noeud.split('@')[1]
 
-        resultat_comparaison = (cn == message_noeud)
-        if not resultat_comparaison:
-            raise Exception(
-                "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
-                (message_noeud, cn)
-            )
+        # resultat_comparaison = (cn == message_noeud)
+        # if not resultat_comparaison:
+        #     raise Exception(
+        #         "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
+        #         (message_noeud, cn)
+        #     )
 
     def signer_json(self, dict_message):
         # Copier la base du message et l'en_tete puisqu'ils seront modifies
@@ -138,11 +139,11 @@ class SignateurTest:
 
         signature = self.cle.sign(
             message_bytes,
-            padding.PSS(
-                mgf=padding.MGF1(self._hash_function()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            self._hash_function()
+            # padding.PSS(
+            #     mgf=padding.MGF1(self._hash_function()),
+            #     salt_length=padding.PSS.MAX_LENGTH
+            # ),
+            # self._hash_function()
         )
 
         signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')

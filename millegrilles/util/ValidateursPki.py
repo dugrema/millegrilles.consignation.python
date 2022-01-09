@@ -47,59 +47,6 @@ class ValidateurCertificat:
 
         return certificat
 
-    # def _preparer_validation_context(
-    #         self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None, idmg: str = None
-    # ) -> ValidationContext:
-    #     if enveloppe.reste_chaine_pem is not None:
-    #         # L'enveloppe a deja la chaine complete, on fait juste la passer au validateur
-    #         validation_context = self.__preparer_validation_context(enveloppe, date_reference, idmg)
-    #     else:
-    #         raise PathBuildingError("Impossible de preparer la chaine de validation du certificat (chaine manquante)")
-    #     return validation_context
-
-    # def __preparer_validation_context(
-    #         self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None, idmg: str = None
-    # ) -> ValidationContext:
-    #
-    #     # Raccourci - si on a idmg et date par defaut et un validator deja construit
-    #     # Note : le validation context conserve la date courante - l'utiliser avec caching devrait etre fait pour
-    #     # une tres courte periode de temps (desactive pour l'instant)
-    #     # if self.__validation_context is not None and date_reference is None and idmg is None:
-    #     #     return self.__validation_context
-    #
-    #     # Extraire le certificat de millegrille, verifier le idmg et construire le contexte
-    #     idmg_effectif = idmg or self.__idmg
-    #     certificat_millegrille_pem = enveloppe.reste_chaine_pem[-1]
-    #     certificat_millegrille = EnveloppeCertificat(certificat_pem=certificat_millegrille_pem)
-    #     if certificat_millegrille.idmg != idmg_effectif:
-    #         raise PathValidationError("Certificat de millegrille (idmg: %s) ne correspond pas au idmg: %s" % (certificat_millegrille.idmg, idmg_effectif))
-    #
-    #     if date_reference is not None:
-    #         validation_context = ValidationContext(
-    #             moment=date_reference,
-    #             trust_roots=[certificat_millegrille_pem.encode('utf-8')]
-    #         )
-    #     else:
-    #         validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
-    #
-    #         # if idmg_effectif == self.__idmg and self.__validation_context is None:
-    #         #     # Conserver l'instance du validation context pour reutilisation
-    #         #     self.__logger.debug("Conserver instance pour validation de certificat idmg = %s" % idmg_effectif)
-    #         #     self.__validation_context = validation_context
-    #
-    #     return validation_context
-
-    # def __run_validation_context(self, enveloppe: EnveloppeCertificat, validation_context: ValidationContext, usages: set):
-    #     cert_pem = enveloppe.certificat_pem.encode('utf-8')
-    #     inter_list = [c.encode('utf-8') for c in enveloppe.reste_chaine_pem[:-1]]
-    #     validator = CertificateValidator(
-    #         cert_pem,
-    #         intermediate_certs=inter_list,
-    #         validation_context=validation_context
-    #     )
-    #     # validator.validate_usage({'digital_signature'})
-    #     validator.validate_usage(usages)
-
     def valider(
             self,
             certificat: Union[bytes, str, list],
@@ -156,7 +103,6 @@ class ValidateurCertificat:
             store.add_cert(self.__root_cert_openssl)
             store.set_time(date_reference)
             return store
-
 
     def _conserver_enveloppe(self, enveloppe: EnveloppeCertificat):
         """
@@ -236,8 +182,8 @@ class ValidateurCertificatCache(ValidateurCertificat):
 
         # Tenter de charger l'enveloppe a partir du cache - elle serait deja verifiee
         fingerprint = enveloppe.fingerprint
-        entree_cache = self.__enveloppe_leaf_par_fingerprint.get(fingerprint)
         try:
+            entree_cache = self.__enveloppe_leaf_par_fingerprint.get(fingerprint)
             enveloppe_verifiee = entree_cache.enveloppe  # self.get_enveloppe(fingerprint)
             if enveloppe_verifiee.est_verifie:
                 return enveloppe_verifiee
@@ -299,6 +245,9 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
     def __init__(self, contexte, idmg: str = None, certificat_millegrille: Union[bytes, str, list] = None):
         if idmg is None:
             idmg = contexte.idmg
+        if certificat_millegrille is None:
+            with open(contexte.configuration.mq_cafile, 'r') as fichier:
+                certificat_millegrille = fichier.read()
         super().__init__(idmg, certificat_millegrille)
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)

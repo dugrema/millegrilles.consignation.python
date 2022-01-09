@@ -5,6 +5,7 @@ import multibase
 import uuid
 
 from typing import Union
+from cryptography.hazmat.primitives import hashes
 
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import SignateurTransaction, UtilCertificats
@@ -46,10 +47,16 @@ class SignateurTransactionSimple:
         # message_bytes = self.preparer_transaction_bytes(dict_message)
         message_bytes = UtilCertificats.preparer_message_bytes(dict_message)
         self._logger.debug("Message en format json: %s" % message_bytes)
-        signature = self.__clecert.signer(message_bytes)
+
+        # Hacher le message avec BLAKE2b pour supporter message de grande taille avec Ed25519
+        hash = hashes.Hash(hashes.BLAKE2b(64))
+        hash.update(message_bytes)
+        hash_value = hash.finalize()
+
+        signature = self.__clecert.signer(hash_value)
         # signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')
 
-        VERSION_SIGNATURE = 1
+        VERSION_SIGNATURE = 2
         signature = bytes([VERSION_SIGNATURE]) + signature
 
         signature_encodee = multibase.encode('base64', signature).decode('utf-8')
@@ -128,7 +135,7 @@ class FormatteurMessageMilleGrilles:
         # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
         self.__logger.debug("Message a hacher : %s" % enveloppe_bytes.decode('utf-8'))
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = hacher(
-            enveloppe_bytes, hashing_code='sha2-256', encoding='base64')
+            enveloppe_bytes, hashing_code='blake2s-256', encoding='base64')
 
         # Recuperer le dict de message (deserialiser), ajouter l'entete pour signer le message
         enveloppe = json.loads(enveloppe_bytes)

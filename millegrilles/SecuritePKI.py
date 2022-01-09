@@ -30,7 +30,8 @@ class EnveloppeCertificat:
     """ Encapsule un certificat. """
 
     ENCODING_FINGERPRINT = 'base58btc'
-    HASH_FINGERPRINT = 'sha2-256'
+    # HASH_FINGERPRINT = 'sha2-256'
+    HASH_FINGERPRINT = 'blake2s-256'
 
     def __init__(self, certificat=None, certificat_pem=None, fingerprint=None):
         """
@@ -402,7 +403,7 @@ class UtilCertificats:
         self._enveloppe: Optional[EnveloppeCertificat] = None
         self._chaine: Optional[list] = None
 
-        self.__validation_context: Optional[ValidationContext] = None
+        # self.__validation_context: Optional[ValidationContext] = None
         self.__cert_millegrille: Optional[bytes] = None
         self.__autorisations_idmg: dict = autorisations_idmg()  # Autorisations pour idmg tierces
 
@@ -424,7 +425,7 @@ class UtilCertificats:
 
         # Verifier que le certificat peut bien etre utilise pour signer des transactions
         # Valide aussi la chaine et les dates d'expiration
-        self.valider_x509_enveloppe(self._enveloppe)
+        # self.valider_x509_enveloppe(self._enveloppe)
 
     def preparer_transaction_bytes(self, transaction_dict):
         """
@@ -806,18 +807,23 @@ class SignateurTransaction(UtilCertificats):
         message_bytes = self.preparer_transaction_bytes(dict_message)
         self._logger.debug("Message en format json: %s" % message_bytes)
 
+        # Hacher le message avec BLAKE2b pour supporter message de grande taille avec Ed25519
+        hash = hashes.Hash(hashes.BLAKE2b(64))
+        hash.update(message_bytes)
+        hash_value = hash.finalize()
+
         signature = self._cle.sign(
-            message_bytes,
-            asymmetric.padding.PSS(
-                mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
-                # salt_length=asymmetric.padding.PSS.MAX_LENGTH
-                salt_length=64   # Maximum supporte sur iPhone
-            ),
-            self._sign_hash_function()
+            hash_value,
+            # asymmetric.padding.PSS(
+            #     mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
+            #     # salt_length=asymmetric.padding.PSS.MAX_LENGTH
+            #     salt_length=64   # Maximum supporte sur iPhone
+            # ),
+            # self._sign_hash_function()
         )
         # signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')
 
-        VERSION_SIGNATURE = 1
+        VERSION_SIGNATURE = 2
         signature = bytes([VERSION_SIGNATURE]) + signature
 
         signature_encodee = multibase.encode('base64', signature).decode('utf-8')

@@ -167,6 +167,14 @@ class ValidateurMessage:
                 ),
                 self.__signature_hash_function()
             )
+        elif version_signature == 2:
+            hash = hashes.Hash(hashes.BLAKE2b(64))
+            hash.update(message_bytes)
+            hash_value = hash.finalize()
+            cle_publique.verify(
+                signature_bytes,
+                hash_value
+            )
         else:
             raise ValueError("Version de signature non supportee : %d" % version_signature)
 

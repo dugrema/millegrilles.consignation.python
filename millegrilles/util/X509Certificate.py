@@ -88,7 +88,8 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
 
 class EnveloppeCleCert:
 
-    HASH_FINGERPRINT = 'sha2-256'
+    # HASH_FINGERPRINT = 'sha2-256'
+    HASH_FINGERPRINT = 'blake2s-256'
     ENCODING_FINGERPRINT = 'base58btc'
 
     def __init__(self, private_key=None, cert: x509.Certificate = None, password=None):
@@ -186,10 +187,13 @@ class EnveloppeCleCert:
 
     def from_files(self, private_key, cert, password_bytes=None):
         with open(cert, 'rb') as fichier:
-            self.cert = x509.load_pem_x509_certificate(fichier.read(), default_backend())
+            contenu_pem = fichier.read()
+            self.cert = x509.load_pem_x509_certificate(contenu_pem, default_backend())
+            self.set_chaine_str(contenu_pem.decode('utf-8'))
 
-        with open(private_key, 'rb') as fichier:
-            self.key_from_pem_bytes(fichier.read(), password_bytes)
+        if private_key is not None:
+            with open(private_key, 'rb') as fichier:
+                self.key_from_pem_bytes(fichier.read(), password_bytes)
 
     def chiffrage_asymmetrique(self, cle_secrete):
         public_key = self.cert.public_key()
@@ -231,12 +235,12 @@ class EnveloppeCleCert:
     def signer(self, message_bytes: bytes):
         signature = self.private_key.sign(
             message_bytes,
-            asymmetric.padding.PSS(
-                mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
-                # salt_length=asymmetric.padding.PSS.MAX_LENGTH
-                salt_length=64   # Maximum supporte sur iPhone
-            ),
-            self._sign_hash_function()
+            # asymmetric.padding.PSS(
+            #     mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
+            #     # salt_length=asymmetric.padding.PSS.MAX_LENGTH
+            #     salt_length=64   # Maximum supporte sur iPhone
+            # ),
+            # self._sign_hash_function()
         )
 
         return signature
@@ -319,7 +323,7 @@ class EnveloppeCleCert:
     @fingerprint.setter
     def fingerprint(self, fingerprint: str):
         """
-        Set le fingerprint multibase base58btc, multihash SHA2-256
+        Set le fingerprint multibase base58btc, multihash BLAKE2s-256
         :param fingerprint:
         :return:
         """
@@ -331,7 +335,7 @@ class EnveloppeCleCert:
         pem = pk.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
         pem_bytes = ''.join(pem.strip().decode('utf-8').split('\n')[1:-1]).encode('utf-8')
         pk_bytes = base64.b64decode(pem_bytes)
-        return hacher(pk_bytes, hashing_code='sha2-256', encoding='base64')
+        return hacher(pk_bytes, hashing_code='blake2s-256', encoding='base64')
 
     @property
     def idmg(self) -> str:

@@ -29,7 +29,8 @@ class IdmgUtil:
     }
 
     ENCODING = 'base58btc'
-    HASH_FUNCTION = 'sha2-256'
+    # HASH_FUNCTION = 'sha2-256'
+    HASH_FUNCTION = 'blake2s-256'
 
     def __init__(self):
         pass
@@ -44,12 +45,12 @@ class IdmgUtil:
         return verifier_idmg(idmg, certificat_pem)
 
 
-def encoder_idmg(certificat_pem: str, version=IdmgUtil.VERSION_ACTIVE, hashing_code: Union[int, str] = 'sha2-256'):
+def encoder_idmg(certificat_pem: str, version=IdmgUtil.VERSION_ACTIVE, hashing_code: Union[int, str] = 'blake2s-256'):
     cert_x509 = x509.load_pem_x509_certificate(certificat_pem.encode('utf-8'), default_backend())
     return encoder_idmg_cert(cert_x509, version, hashing_code)
 
 
-def encoder_idmg_cert(cert_x509: x509, version=IdmgUtil.VERSION_ACTIVE, hashing_code: Union[int, str] = 'sha2-256'):
+def encoder_idmg_cert(cert_x509: x509, version=IdmgUtil.VERSION_ACTIVE, hashing_code: Union[int, str] = 'blake2s-256'):
     if isinstance(hashing_code, str):
         hashing_code = HASH_CODES[hashing_code]
     hashing_function = map_code_to_hashes(hashing_code)
