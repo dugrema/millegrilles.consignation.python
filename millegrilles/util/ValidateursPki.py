@@ -138,17 +138,6 @@ class ValidateurCertificat:
         except OpenSSL.crypto.X509StoreContextError as ce:
             raise ce  # TODO Verifier si IDMG different
 
-        # validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
-        # try:
-        #     self.__run_validation_context(enveloppe, validation_context, usages)
-        # except PathBuildingError as pbe:
-        #     # Verifier si l'echec est du a un certificat d'un IDMG different
-        #     if idmg is None:
-        #         idmg_certificat = enveloppe.subject_organization_name
-        #         if self.__idmg != idmg_certificat:
-        #             raise PathValidationError("Certificat pour le mauvais IDMG sans X-Signing : %s" % idmg_certificat)
-        #     raise pbe
-
         if date_reference is None and (idmg is None or idmg == self.__idmg):
             # Validation completee, certificat est valide (sinon OpenSSL.crypto.X509StoreContextError est lancee)
             enveloppe.set_est_verifie(True)
