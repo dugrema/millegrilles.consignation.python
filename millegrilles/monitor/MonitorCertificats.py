@@ -547,6 +547,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         reponse.raise_for_status()
         reponse_json = reponse.json()
         cert_monitor = reponse_json['certificat_monitor']
+        cert_ca = reponse_json['ca']
 
         # Charger le certificat, verifier correspondance
         chaine_cert = ''.join(cert_monitor).encode('utf-8')
@@ -554,16 +555,16 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         if clecert.cle_correspondent() is False:
             raise Exception("erreur, cle prive/public ne correspondent pas")
 
-        cert_millegrille = cert_monitor[-1].encode('utf-8')
         clecert_millegrille = EnveloppeCleCert()
-        clecert_millegrille.cert_from_pem_bytes(cert_millegrille)
+        clecert_millegrille.cert_from_pem_bytes(cert_ca.encode('utf-8'))
+
         idmg_recu = clecert_millegrille.idmg
         if idmg_recu != idmg:
             raise Exception("Mismatch idmg recu : %s" % idmg_recu)
 
         # labels_millegrille = {'mg_type': 'pki', 'role': 'millegrille', 'common_name': noeud_id}
         try:
-            self._docker.configs.create(name='pki.millegrille.cert', data=cert_millegrille)
+            self._docker.configs.create(name='pki.millegrille.cert', data=cert_ca)
         except APIError as apie:
             if apie.status_code != 409:
                 raise apie

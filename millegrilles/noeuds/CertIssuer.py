@@ -68,7 +68,8 @@ class HandlerCertificats:
         :raises PathValidationError: Certificat intermediaire invalide
         """
         self.__clecert = clecert
-        cert_ca = clecert.chaine[-1]
+        chaine = clecert.chaine
+        cert_ca = chaine.pop()  # retirer le dernier cert (CA) de la chaine
         self.cert_ca = cert_ca
 
         # Charger cert CA (millegrille), calculer idmg
@@ -82,7 +83,7 @@ class HandlerCertificats:
         self.__validateur = ValidateurCertificat(idmg, cert_ca)
         self.__validateur.valider(clecert.chaine, usages={'key_cert_sign'})
 
-        self.__validateur_messages = ValidateurMessage(idmg=idmg)
+        self.__validateur_messages = ValidateurMessage(idmg=idmg, certificat_millegrille=cert_ca)
 
         # Creer instance de renouvelleur de certificats
         dict_ca = {
@@ -384,7 +385,8 @@ def send_csr(http_instance: ServeurHttp):
         http_instance.send_header("Access-Control-Allow-Origin", "*")
         http_instance.end_headers()
         http_instance.wfile.write(csr)
-    except:
+    except Exception as e:
+        logger.exception("Erreur traitement CSR")
         http_instance.send_response(410)
         http_instance.send_header("Content-type", "text/ascii")
         http_instance.send_header("Access-Control-Allow-Origin", "*")
@@ -431,7 +433,9 @@ def set_intermediaire(http_instance: ServeurHttp, request_data: dict, interne=Fa
                 clecert_monitor = handler.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, csr_monitor)
                 certificat = [clecert_monitor.cert_bytes.decode('utf-8')]
                 certificat.extend(handler.chaine_certs)
+                certificat.pop()  # Retirer le dernier certificat (root self-signed)
                 reponse['certificat_monitor'] = certificat
+                reponse['ca'] = handler.cert_ca
             except KeyError:
                 pass  # Aucun certificat monitor a generer
 
@@ -475,9 +479,11 @@ def signer_module(http_instance: ServeurHttp, request_data: dict, interne=False)
     clecert_module = handler.generer_clecert_module(role, csr, liste_dns)
     certificat = [clecert_module.cert_bytes.decode('utf-8')]
     certificat.extend(handler.chaine_certs)
+    certificat.pop()  # Retirer le dernier certificat (root self-signed)
     reponse = {
         'ok': True,
         'certificat': certificat,
+        'ca': handler.cert_ca
     }
     reponse_bytes = json.dumps(reponse).encode('utf-8')
 
@@ -517,6 +523,7 @@ def signer_usager(http_instance: ServeurHttp, request_data: dict, interne=False)
     reponse = {
         'ok': True,
         'certificat': certificat,
+        'ca': handler.cert_ca,
     }
     reponse_bytes = json.dumps(reponse).encode('utf-8')
 
@@ -568,6 +575,7 @@ def signer_csr(http_instance: ServeurHttp, request_data: dict, interne=False):
     reponse = {
         'ok': True,
         'certificat': certificat,
+        'ca': handler.cert_ca,
     }
     reponse_bytes = json.dumps(reponse).encode('utf-8')
 

@@ -20,7 +20,7 @@ class ValidateurMessage:
     Validateur de messages. Verifie le hachage et la signature.
     """
 
-    def __init__(self, contexte=None, idmg=None):
+    def __init__(self, contexte=None, idmg=None, certificat_millegrille: str = None):
         """
         :param contexte: millegrilles.dao.Configuration.ContexteRessourcesMilleGrilles [Optionnel]
                          Permet de faire des requetes MQ pour charger les certificats par fingerprint
@@ -31,7 +31,7 @@ class ValidateurMessage:
         if contexte is not None:
             self.__validateur = ValidateurCertificatRequete(contexte)
         elif idmg is not None:
-            self.__validateur = ValidateurCertificatCache(idmg)
+            self.__validateur = ValidateurCertificatCache(idmg, certificat_millegrille=certificat_millegrille)
         else:
             raise ValueError("Il faut fournir le contexte ou le idmg")
 
