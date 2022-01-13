@@ -258,8 +258,10 @@ class GestionnaireComptesMongo:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def entretien(self):
-        if not self.__rs_init_ok:
-            self.init_replication()
+        pass
+        # 2022-01-13 Retrait de la replication
+        #if not self.__rs_init_ok:
+        #    self.init_replication()
 
         # if not self.__compte_monitor_ok:
         #     with open(self.__connexion.monitor_cert_file, 'rb') as fichier:
