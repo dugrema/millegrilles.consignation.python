@@ -975,20 +975,37 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
         :return:
         """
         generateur = GenerateurCertificatNginxSelfsigned()
-        clecert = generateur.generer('Installation')
 
-        cle_pem_bytes = clecert.private_key_bytes
+        clecert_ed25519 = generateur.generer('Installation')
+        cle_pem_bytes_ed25519 = clecert_ed25519.private_key_bytes
+        cert_pem_ed25519 = clecert_ed25519.public_bytes
 
-        self.ajouter_secret('pki.nginx.key', data=cle_pem_bytes)
-        self.ajouter_config('pki.nginx.cert', data=clecert.public_bytes)
+        clecert_web = generateur.generer('Installation', rsa=True)
+        cle_pem_web = clecert_web.private_key_bytes
+        cert_pem_web = clecert_web.public_bytes
+
+        # Certificat interne
+        self.ajouter_secret('pki.nginx.key', data=cle_pem_bytes_ed25519)
+        self.ajouter_config('pki.nginx.cert', data=cert_pem_ed25519)
+
+        # Certificat web
+        self.ajouter_secret('pki.web.key', data=cle_pem_web)
+        self.ajouter_config('pki.web.cert', data=cert_pem_web)
 
         if insecure:  # Mode insecure
             key_path = path.join(self.secret_path, 'pki.nginx.key.pem')
             try:
                 with open(key_path, 'xb') as fichier:
-                    fichier.write(cle_pem_bytes)
+                    fichier.write(cle_pem_bytes_ed25519)
             except FileExistsError:
                 pass
 
-        return clecert
+            key_path = path.join(self.secret_path, 'pki.web.key.pem')
+            try:
+                with open(key_path, 'xb') as fichier:
+                    fichier.write(cle_pem_web)
+            except FileExistsError:
+                pass
+
+        return clecert_ed25519
 

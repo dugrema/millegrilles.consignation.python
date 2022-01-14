@@ -383,16 +383,18 @@ class EnveloppeCleCert:
 
         return cle_privee_bytes
 
-    def generer_private_key(self, generer_password=False, keysize=2048, public_exponent=65537):
+    def generer_private_key(self, generer_password=False, keysize=None, public_exponent=65537):
         if generer_password:
             self.password = base64.b64encode(secrets.token_bytes(16))
 
-        #self.private_key = asymmetric.rsa.generate_private_key(
-        #    public_exponent=public_exponent,
-        #    key_size=keysize,
-        #    backend=default_backend()
-        #)
-        self.private_key = Ed25519PrivateKey.generate()
+        if keysize is None:
+            self.private_key = Ed25519PrivateKey.generate()
+        else:
+            self.private_key = asymmetric.rsa.generate_private_key(
+               public_exponent=public_exponent,
+               key_size=keysize,
+               backend=default_backend()
+            )
 
     @staticmethod
     def get_authority_identifier(certificat):
@@ -832,9 +834,13 @@ class GenerateurCertificatNginxSelfsigned:
     Genere un certificat self-signed pour Nginx pour l'installation d'un nouveau noeud.
     """
 
-    def generer(self, server_name: str):
+    def generer(self, server_name: str, rsa=False):
         clecert = EnveloppeCleCert()
-        clecert.generer_private_key(generer_password=False, keysize=2048)
+        if rsa is True:
+            clecert.generer_private_key(generer_password=False, keysize=2048)
+        else:
+            # Va utilise type par defaut (EdDSA25519)
+            clecert.generer_private_key(generer_password=False)
 
         public_key = clecert.private_key.public_key()
         builder = x509.CertificateBuilder()
@@ -870,12 +876,18 @@ class GenerateurCertificatNginxSelfsigned:
             critical=False
         )
 
-        certificate = builder.sign(
-            private_key=clecert.private_key,
-            # algorithm=hashes.SHA512(),
-            algorithm=None,
-            backend=default_backend()
-        )
+        if rsa is True:
+            certificate = builder.sign(
+                private_key=clecert.private_key,
+                algorithm=hashes.SHA512(),
+                backend=default_backend()
+            )
+        else:
+            certificate = builder.sign(
+                private_key=clecert.private_key,
+                algorithm=None,
+                backend=default_backend()
+            )
 
         clecert.set_cert(certificate)
 
