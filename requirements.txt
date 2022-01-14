@@ -12,7 +12,7 @@ pymongo>=3.11.2,<4.0
 cssutils>=1.0.2,<2.0
 diff-match-patch>=20200713
 openpyxl>=3.0.5
-requests>=2.25.1
+requests>=2.26.0
 
 docker>=4.4.0
 zeroconf>=0.28.7

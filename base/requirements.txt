@@ -1,5 +1,5 @@
 certifi>=2020.12.5
-pika==0.13.1
+pika==1.2.0
 pytz>=2020.4
 feedparser>=6.0.2
 cryptography>=3.1.1
@@ -12,7 +12,7 @@ pymongo>=3.11.2,<4.0
 cssutils>=1.0.2,<2.0
 diff-match-patch>=20200713
 openpyxl>=3.0.5
-requests>=2.25.1
+requests>=2.26.0
 
 docker>=4.4.0
 zeroconf>=0.28.7
@@ -25,3 +25,5 @@ py-multihash>=0.8.2
 py-multibase>=1.0.3
 ipfshttpclient>=0.6.1
 fido2>=0.9.1
+
+pyopenssl
