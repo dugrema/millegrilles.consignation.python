@@ -880,7 +880,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
         exchange_defaut = self.configuration.exchange_defaut
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key, callback=None)
-        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+        self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=True)
         self.__routing_cert = routing_key
 
     def __on_channel_close(self, channel=None, code=None, reason=None):

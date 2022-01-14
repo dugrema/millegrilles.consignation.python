@@ -72,15 +72,21 @@ class ConnexionWrapper:
         }
 
         if self.configuration.mq_ssl == 'on':
-            ssl_options = {
-                'ssl_version': ssl.PROTOCOL_TLSv1_2,
-                'keyfile': self.configuration.mq_keyfile,
-                'certfile': self.configuration.mq_certfile,
-                'ca_certs': self.configuration.mq_cafile,
-                'cert_reqs': ssl.CERT_REQUIRED
-            }
+            tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            tls_context.verify_mode = ssl.CERT_REQUIRED
+            tls_context.load_verify_locations(self.configuration.mq_cafile)
+            tls_context.load_cert_chain(self.configuration.mq_certfile, self.configuration.mq_keyfile)
+            ssl_options = pika.SSLOptions(tls_context, 'mq')
 
-            connection_parameters['ssl'] = True
+            # ssl_options = {
+            #     'ssl_version': ssl.PROTOCOL_TLSv1_2,
+            #     'keyfile': self.configuration.mq_keyfile,
+            #     'certfile': self.configuration.mq_certfile,
+            #     'ca_certs': self.configuration.mq_cafile,
+            #     'cert_reqs': ssl.CERT_REQUIRED
+            # }
+
+            # connection_parameters['ssl'] = True
             connection_parameters['ssl_options'] = ssl_options
 
         self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
@@ -589,7 +595,7 @@ class PikaDAO:
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
         with self.lock_transmettre_message:
-            self.__channel_consumer.basic_consume(callback, queue=queue_name, no_ack=False)
+            self.__channel_consumer.basic_consume(queue_name, callback, auto_ack=True)
 
     def inscrire_topic(self, exchange, routing: list, callback):
         def callback_inscrire(
@@ -603,7 +609,7 @@ class PikaDAO:
             with self.lock_transmettre_message:
                 for routing_key in bindings:
                     self.__channel_consumer.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
-                tag_queue = self.__channel_consumer.basic_consume(callback_in, queue=nom_queue, no_ack=False)
+                tag_queue = self.__channel_consumer.basic_consume(nom_queue, callback_in, auto_ack=True)
                 self._logger.debug("Tag queue: %s" % tag_queue)
 
         self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
@@ -612,15 +618,14 @@ class PikaDAO:
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
         with self.lock_transmettre_message:
-            self.__channel_consumer.basic_consume(callback, queue=queue_name, no_ack=False)
+            self.__channel_consumer.basic_consume(queue_name, callback, auto_ack=True)
 
     def demarrer_lecture_etape_processus(self, callback):
         """ Demarre la lecture de la queue mgp_processus. Appel bloquant. """
 
         with self.lock_transmettre_message:
-            self.__channel_consumer.basic_consume(callback,
-                                                  queue=self.queuename_mgp_processus(),
-                                                  no_ack=False)
+            self.__channel_consumer.basic_consume(self.queuename_mgp_processus(), callback,
+                                                  auto_ack=True)
         self.start_consuming()
 
     ''' 
@@ -1792,11 +1797,11 @@ class TraitementMQRequetesBlocking(BaseCallback):
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
 
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
         self.__event_q_ready.set()
 
     def __on_channel_close(self, channel=None, code=None, reason=None):

@@ -276,12 +276,12 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=False, exclusive=True, callback=self.queue_open)
+        channel.queue_declare('', durable=False, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
         self.__logger.info("ValidateurCertificatRequete Queue: %s" % self.queue_name)
-        self.channel.basic_consume(self.__handler.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.queue_name, self.__handler.callbackAvecAck, auto_ack=True)
 
         # Ajouter routing keys
         routing_key = ConstantesPki.EVENEMENT_CERTIFICAT_EMIS

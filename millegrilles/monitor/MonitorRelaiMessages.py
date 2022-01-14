@@ -79,11 +79,11 @@ class TraitementMessagesMiddleware(BaseCallback):
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
 
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
 
         if self.__securite == Constantes.SECURITE_PROTEGE:
             routing_keys = [
@@ -214,11 +214,11 @@ class TransfertMessages(BaseCallback):
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=50)
 
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -370,7 +370,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
 
         # Ajouter les routing keys
         routing_keys = [
