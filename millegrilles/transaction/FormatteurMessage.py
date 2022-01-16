@@ -120,28 +120,28 @@ class FormatteurMessageMilleGrilles:
         if idmg_destination is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION] = idmg_destination
 
-        enveloppe = message.copy()
-        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
+        message_copy = message.copy()
+        message_copy[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
         try:
-            del enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+            del message_copy[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         except KeyError:
             pass  # L'entete n'existait pas
 
         # Nettoyer le message, serialiser pour eliminer tous les objets
-        enveloppe_bytes = UtilCertificats.preparer_message_bytes(enveloppe)
+        message_bytes = UtilCertificats.preparer_message_bytes(message_copy)
         # enveloppe_bytes = self.__signateur_transactions.preparer_transaction_bytes(enveloppe)
 
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
         # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
-        self.__logger.debug("Message a hacher : %s" % enveloppe_bytes.decode('utf-8'))
+        self.__logger.debug("Message a hacher : %s" % message_bytes.decode('utf-8'))
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = hacher(
-            enveloppe_bytes, hashing_code='blake2s-256', encoding='base64')
+            message_bytes, hashing_code='blake2s-256', encoding='base64')
 
         # Recuperer le dict de message (deserialiser), ajouter l'entete pour signer le message
-        enveloppe = json.loads(enveloppe_bytes)
-        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = meta
+        message_copy = json.loads(message_bytes)
+        message_copy[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = meta
 
-        message_signe = self.__signateur_transactions.signer(enveloppe)
+        message_signe = self.__signateur_transactions.signer(message_copy)
 
         if ajouter_chaine_certs:
             # Ajouter un element _certificats = [cert, inter, millegrilles]
