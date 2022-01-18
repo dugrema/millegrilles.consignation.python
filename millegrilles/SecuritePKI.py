@@ -872,7 +872,6 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
         self.__logger.debug("Transmission certificat PKI a l'initialisation")
         signateur_transactions = self.contexte.signateur_transactions
-        signateur_transactions.emettre_certificat()
 
         enveloppe = signateur_transactions.enveloppe_certificat_courant
         fingerprint = enveloppe.fingerprint
@@ -880,7 +879,8 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
         exchange_defaut = self.configuration.exchange_defaut
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key, callback=None)
-        self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=True)
+        self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
+        signateur_transactions.emettre_certificat()
         self.__routing_cert = routing_key
 
     def __on_channel_close(self, channel=None, code=None, reason=None):

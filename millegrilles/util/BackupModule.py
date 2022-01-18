@@ -1698,7 +1698,7 @@ class ArchivesBackupParser:
 
     def q_ouverte(self, queue):
         self.__nom_queue = queue.method.queue
-        self.__channel.basic_consume(self.__handler_messages.callbackAvecAck, queue=self.__nom_queue, no_ack=False)
+        self.__channel.basic_consume(self.__handler_messages.callbackAvecAck, queue=self.__nom_queue, auto_ack=False)
         self.__thread.start()
 
     def nouveau_message(self, message_dict):

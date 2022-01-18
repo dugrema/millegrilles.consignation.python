@@ -40,7 +40,7 @@ class DomaineTest(BaseCallback):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, auto_ack=False)
 
         thread = Thread(name="executer", target=self.executer)
         thread.start()

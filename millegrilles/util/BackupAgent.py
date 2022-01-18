@@ -230,7 +230,7 @@ class TraiterMessage(BaseCallback):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, auto_ack=False)
 
         routing_keys = [
             'commande.backupApplication.backup',

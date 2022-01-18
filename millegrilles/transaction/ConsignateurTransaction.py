@@ -136,7 +136,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         queue_name = self.contexte.configuration.queue_nouvelles_transactions
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=5)
-        channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
+        channel.basic_consume(self.callbackAvecAck, queue=queue_name, auto_ack=False)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -640,7 +640,7 @@ class EvenementTransactionCallback(BaseCallback):
         evenements_queue_name = self.contexte.configuration.queue_evenements_transactions
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(self.callbackAvecAck, queue=evenements_queue_name, no_ack=False)
+        channel.basic_consume(self.callbackAvecAck, queue=evenements_queue_name, auto_ack=False)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -923,7 +923,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         self.__channel = channel
         channel.basic_qos(prefetch_count=50)
         queue_name = Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS
-        channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
+        channel.basic_consume(self.callbackAvecAck, queue=queue_name, auto_ack=False)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None

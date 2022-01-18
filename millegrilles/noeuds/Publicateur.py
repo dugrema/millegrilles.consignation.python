@@ -105,7 +105,7 @@ class Publicateur(ModeleConfiguration):
         for routing_key in routing_keys:
             self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
 
-        self.__channel.basic_consume(self._message_handler.callbackAvecAck, queue=nom_queue, no_ack=False)
+        self.__channel.basic_consume(self._message_handler.callbackAvecAck, queue=nom_queue, auto_ack=False)
 
     def requete_certs_ca(self, nom_queue):
         """

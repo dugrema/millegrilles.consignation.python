@@ -132,11 +132,6 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE:
                 self.ajouter_comptes(contenu)
 
-            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT:
-                self.activer_hebergement(contenu)
-            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT:
-                self.desactiver_hebergement(contenu)
-
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION:
                 reponse = self._service_monitor.gestionnaire_applications.installer_application(commande)
 

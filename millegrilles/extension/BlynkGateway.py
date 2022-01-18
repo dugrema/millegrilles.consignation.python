@@ -153,7 +153,7 @@ class GatewayBlynk:
                     callback=None
                 )
 
-        self._ctag = channel.basic_consume(self._traitement_messages.callbackAvecAck, queue=self._queue, no_ack=False)
+        self._ctag = channel.basic_consume(self._traitement_messages.callbackAvecAck, queue=self._queue, auto_ack=False)
 
     def configurer_gateway(self, noeud_doc: dict):
         """

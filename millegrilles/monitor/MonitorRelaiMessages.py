@@ -83,7 +83,7 @@ class TraitementMessagesMiddleware(BaseCallback):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
 
         if self.__securite == Constantes.SECURITE_PROTEGE:
             routing_keys = [
@@ -218,7 +218,7 @@ class TransfertMessages(BaseCallback):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -370,7 +370,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
 
         # Ajouter les routing keys
         routing_keys = [

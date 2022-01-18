@@ -857,7 +857,7 @@ class GestionnaireDomaine:
 
         self.__logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
         with self.message_dao.lock_transmettre_message:
-            ctag = self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
+            ctag = self.channel_mq.basic_consume(callback, queue=nom_queue, auto_ack=False)
 
         # Conserver le ctag - permet de faire cancel au besoin (e.g. long running process)
         self._consumer_tags_parQ[nom_queue] = ctag

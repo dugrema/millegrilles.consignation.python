@@ -281,7 +281,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
         self.__logger.info("ValidateurCertificatRequete Queue: %s" % self.queue_name)
-        self.channel.basic_consume(self.queue_name, self.__handler.callbackAvecAck, auto_ack=True)
+        self.channel.basic_consume(self.queue_name, self.__handler.callbackAvecAck, auto_ack=False)
 
         # Ajouter routing keys
         routing_key = ConstantesPki.EVENEMENT_CERTIFICAT_EMIS

@@ -595,7 +595,7 @@ class PikaDAO:
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
         with self.lock_transmettre_message:
-            self.__channel_consumer.basic_consume(queue_name, callback, auto_ack=True)
+            self.__channel_consumer.basic_consume(queue_name, callback, auto_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
         def callback_inscrire(
@@ -609,7 +609,7 @@ class PikaDAO:
             with self.lock_transmettre_message:
                 for routing_key in bindings:
                     self.__channel_consumer.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
-                tag_queue = self.__channel_consumer.basic_consume(nom_queue, callback_in, auto_ack=True)
+                tag_queue = self.__channel_consumer.basic_consume(nom_queue, callback_in, auto_ack=False)
                 self._logger.debug("Tag queue: %s" % tag_queue)
 
         self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
@@ -618,14 +618,14 @@ class PikaDAO:
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
         with self.lock_transmettre_message:
-            self.__channel_consumer.basic_consume(queue_name, callback, auto_ack=True)
+            self.__channel_consumer.basic_consume(queue_name, callback, auto_ack=False)
 
     def demarrer_lecture_etape_processus(self, callback):
         """ Demarre la lecture de la queue mgp_processus. Appel bloquant. """
 
         with self.lock_transmettre_message:
             self.__channel_consumer.basic_consume(self.queuename_mgp_processus(), callback,
-                                                  auto_ack=True)
+                                                  auto_ack=False)
         self.start_consuming()
 
     ''' 
@@ -1801,7 +1801,7 @@ class TraitementMQRequetesBlocking(BaseCallback):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=True)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.__event_q_ready.set()
 
     def __on_channel_close(self, channel=None, code=None, reason=None):

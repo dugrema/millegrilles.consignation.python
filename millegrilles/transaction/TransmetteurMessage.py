@@ -82,12 +82,13 @@ class TransmetteurMessageMilleGrilles:
 
     def __confirm_delivery(self, frame):
         self.__logger.debug("Delivery: %s" % str(frame))
-        if isinstance(frame.method, Basic.Nack):
+        confirmation_type = frame.method.NAME.split('.')[1].lower()
+        if confirmation_type == 'ack':
+            self.__publish_confirm_event.set()
+        elif confirmation_type == 'nack':
             self.__logger.error("Delivery NACK")
             if self.__callback_enter_error_state is not None:
                 self.__callback_enter_error_state()
-        else:
-            self.__publish_confirm_event.set()
 
     def is_channel_open(self):
         return self.__channel is not None
