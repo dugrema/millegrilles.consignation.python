@@ -400,6 +400,9 @@ class ServiceMonitor:
             monitor_cert = gestionnaire_docker.charger_config_recente('pki.monitor.cert')
             monitor_cert = b64decode(monitor_cert['config'].attrs['Spec']['Data']).decode('utf-8')
             dict_infomillegrille['certificat'] = monitor_cert
+            ca_cert = gestionnaire_docker.charger_config_recente('pki.millegrille.cert')
+            ca_cert = b64decode(ca_cert['config'].attrs['Spec']['Data']).decode('utf-8')
+            dict_infomillegrille['ca'] = ca_cert
         except (IndexError, AttributeError):
             self.__logger.info("Certificat de monitor n'existe pas")
 
