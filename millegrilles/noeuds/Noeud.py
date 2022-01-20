@@ -762,16 +762,16 @@ class GestionnaireMessages(BaseCallback):
 
         exchange_defaut = self.configuration.exchange_defaut
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key, callback=None)
-        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, auto_ack=False)
+        self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
         self.__routing_cert = routing_key
 
         routing_key_cedule = 'evenement.global.cedule'
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_cedule, callback=None)
-        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, auto_ack=False)
+        self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
 
         routing_key_commandes = 'commande.senseurpassif.%s.*' % self.__noeud.noeud_id
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_commandes, callback=None)
-        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, auto_ack=False)
+        self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
 
         # Premiere demande d'information
         self.__noeud.demander_informations_noeud()
