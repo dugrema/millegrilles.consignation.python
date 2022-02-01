@@ -157,7 +157,7 @@ class BackupAgent(ModeleConfiguration):
 
     def preparer_catalogue(self, nom_application: str):
         date_formattee = datetime.datetime.utcnow().strftime(BackupAgent.FORMAT_HEURE)
-        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs2' % (nom_application, date_formattee)
+        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs3' % (nom_application, date_formattee)
         nom_fichier_catalogue = 'application_%s_catalogue_%s.json' % (nom_application, date_formattee)
 
         catalogue_backup = {
