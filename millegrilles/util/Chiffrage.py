@@ -57,6 +57,7 @@ class CipherMgs1(RawIOBase):
         meta_info = {
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: multibase.encode('base64', self._iv).decode('utf-8'),
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: self.digest,
+            'cle_secrete': multibase.encode('base64', self._password).decode('utf-8'),
         }
         return meta_info
 
@@ -300,6 +301,8 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
         self._public_key = public_key
         self._public_peer_x25519: Optional[X25519PublicKey] = None
         self._tag: Optional[bytes] = None
+        self._poly1305: Optional[poly1305.Poly1305] = None
+        # self._iv: Optional[bytes] = None
         super().__init__(output_stream, password, padding=False, encoding_digest=encoding_digest, hashing_code='blake2b-512')
 
     def _generer(self):
@@ -358,7 +361,7 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
 
         meta_info = super().get_meta()
         meta_info[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = multibase.encode('base64', self._tag).decode('utf-8')
-        meta_info[Constantes.ConstantesMaitreDesCles.TRANSACTION_CLE] = public_peer_str
+        meta_info['cle_chiffree'] = public_peer_str
         return meta_info
 
     def chiffrer_motdepasse_enveloppe(self, enveloppe: EnveloppeCertificat):
@@ -367,7 +370,8 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
 
 class CipherMgs3Dechiffrer(CipherMsg1Dechiffrer):
     """
-    Dechiffrage avec GCM, tag de 128 bits
+    Chiffrage avec ChaCha20-Poly1305, tag de 96 bits
+    Cle chiffree avec EdDSA25519
     """
 
     def __init__(self, iv: Union[str, bytes], password: bytes, compute_tag: Union[str, bytes]):
@@ -377,12 +381,37 @@ class CipherMgs3Dechiffrer(CipherMsg1Dechiffrer):
         if isinstance(compute_tag, str):
             compute_tag = multibase.decode(compute_tag.encode('utf-8'))
 
+        self._poly1305 = poly1305.Poly1305(password)
+
         self._compute_tag = compute_tag
         super().__init__(iv, password, padding=False)
 
     def _ouvrir_cipher(self):
         backend = default_backend()
-        self._cipher = Cipher(algorithms.AES(self._password), modes.GCM(self._iv, self._compute_tag), backend=backend)
+        # ChaCha20Poly1305 : 96 bits + block 1 = 12 bytes + [0x00000001]
+        iv = self._iv + bytes([0, 0, 0, 1])
+        self._cipher = Cipher(algorithms.ChaCha20(self._password, iv), None, backend=backend)
+
+    def update(self, data: bytes):
+        self._poly1305.update(data)
+        data = self._context.update(data)
+        return data
+
+    def finalize(self):
+        data = self._context.finalize()
+
+        if len(data) > 0:
+            self._poly1305.update(data)
+        self._poly1305.verify(self._compute_tag)
+
+        return data
+
+    @staticmethod
+    def dechiffrer_cle(enveloppe: EnveloppeCleCert, cle_chiffree):
+        """
+        Utilise la cle privee dans l'enveloppe pour dechiffrer la cle secrete chiffree
+        """
+        return dechiffrer_cle_ed25519(enveloppe, cle_chiffree)
 
 
 class DigestStream(RawIOBase):
@@ -538,6 +567,10 @@ def dechiffrer_cle_ed25519(enveloppe: EnveloppeCleCert, cle_secrete: str) -> str
     cle_handshake = private_key.exchange(x25519_public_key)
     # Hacher avec blake2s-256
     password = hacher_to_digest(cle_handshake, 'blake2s-256')
+
+    if len(cle_secrete_bytes) == 32:
+        # Le password est la cle derivee secrete du message (chiffree avec la cle de millegrille)
+        return password
 
     # Deriver le nonce a partir de la cle publique
     nonce = hacher_to_digest(cle_secrete_bytes[0:32], 'blake2s-256')[0:12]

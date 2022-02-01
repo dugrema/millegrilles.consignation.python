@@ -102,13 +102,6 @@ class TestChiffrageMgs3:
 
         self.contenu = None
 
-        self.contenu = {
-            "contenu_chiffre": "is3XXgbDgigKA1HZwJc=",
-            "iv": "zkLhAjKVG/Tq+h25ku8ftw==",
-            "cle_secrete": "ZjBkOTFjN2NmODg5YzdkODMyMjE3Zjg1ZmRjMmYxZmIxNTgwYzhjNDFhNGMwMDM2NzA1MDU5YTRiMDU3NmVmMA==",
-            "compute_tag": "EuAIcvP8yFDfHsZfy6kUTQ==",
-        }
-
         self.contenu_dechiffre = None
 
     def chiffrer_contenu(self):
@@ -134,31 +127,33 @@ class TestChiffrageMgs3:
 
     def dechiffrer_contenu(self):
 
-        iv = b64decode(self.contenu['iv'].encode('utf-8'))
-        compute_tag = b64decode(self.contenu['compute_tag'].encode('utf-8'))
+        iv = self.contenu['iv']
+        compute_tag = self.contenu['tag']
 
-        cle_secrete = b64decode(self.contenu['cle_secrete'].encode('utf-8'))
-        # Unhexlify
-        try:
-            cle_secrete = binascii.unhexlify(cle_secrete)
-        except Exception:
-            self.__logger.info("Cle pas en format hex")
+        cle_secrete = CipherMgs3Dechiffrer.dechiffrer_cle(self.clecert_ca, self.contenu['cle_chiffree'])
+        # S'assurer que la cle secrete correspond
+        cle_secrete_originale = multibase.decode(self.contenu['cle_secrete'].encode('utf-8'))
+        if cle_secrete_originale != cle_secrete:
+            raise Exception("Erreur preparer cle secrete, mismatch")
 
-        decipher = CipherMsg2Dechiffrer(iv, cle_secrete, compute_tag)
-        contenu = decipher.update(b64decode(self.contenu['contenu_chiffre'].encode('utf-8'))) + decipher.finalize()
+        decipher = CipherMgs3Dechiffrer(iv, cle_secrete_originale, compute_tag)
+        contenu_chiffre = multibase.decode(self.contenu['contenu_chiffre'].encode('utf-8'))
+
+        contenu_dechiffre = decipher.update(contenu_chiffre)
+        decipher.finalize()
 
         # iv_dechiffre = contenu[0:16]
         # print("IV dechiffre : %s" % b64encode(iv_dechiffre))
         #if iv_dechiffre != iv:
         #    raise Exception("IV!")
-        self.contenu_dechiffre = contenu.decode('utf-8')
+        self.contenu_dechiffre = contenu_dechiffre.decode('utf-8')
 
         print("Contenu dechiffre : %s" % self.contenu_dechiffre)
 
     def executer(self):
         self.__logger.debug("Executer")
         self.chiffrer_contenu()
-        # self.dechiffrer_contenu()
+        self.dechiffrer_contenu()
 
 
 class TestChiffrageEd25519:
