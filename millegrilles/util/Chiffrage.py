@@ -6,16 +6,20 @@ from uuid import uuid4
 from io import RawIOBase
 from base64 import b64encode
 from typing import Optional, Union
-from cryptography.hazmat.primitives import asymmetric, padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import asymmetric, hashes, padding, poly1305
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, CipherContext
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+
 from base64 import b64decode
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.SecuritePKI import EnveloppeCertificat
-from millegrilles.util.Hachage import Hacheur, VerificateurHachage
+from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.util.Hachage import Hacheur, VerificateurHachage, hacher_to_digest
 
 
 class CipherMgs1(RawIOBase):
@@ -24,7 +28,7 @@ class CipherMgs1(RawIOBase):
     Implemente RawIOBase - permet d'utiliser le cipher comme fileobj (stream)
     """
 
-    def __init__(self, password: bytes = None, encoding_digest='base64'):
+    def __init__(self, password: bytes = None, encoding_digest='base64', hashing_code='sha2-512'):
         self.__skip_iv = False
 
         self._iv: Optional[bytes] = None
@@ -34,7 +38,7 @@ class CipherMgs1(RawIOBase):
 
         self._context: Optional[CipherContext] = None
 
-        self._hacheur = Hacheur(hashing_code='sha2-512', encoding=encoding_digest)
+        self._hacheur = Hacheur(hashing_code=hashing_code, encoding=encoding_digest)
         self._digest_result: Optional[str] = None
 
     def _ouvrir_cipher(self):
@@ -66,11 +70,11 @@ class CipherMsg1Chiffrer(CipherMgs1):
     Helper method : chiffrer_motdepasse pour chiffrer le secret avec la cle publique (cert)
     """
 
-    def __init__(self, output_stream=None, password: bytes = None, padding=True, encoding_digest='base64'):
+    def __init__(self, output_stream=None, password: bytes = None, padding=True, encoding_digest='base64', hashing_code='sha2-512'):
         """
         :param output_stream: Optionnel - permet d'utiliser le cipher comme stream (fileobj)
         """
-        super().__init__(password=password, encoding_digest=encoding_digest)
+        super().__init__(password=password, encoding_digest=encoding_digest, hashing_code=hashing_code)
         self.__output_stream = output_stream
         self.__padder: Optional[padding.PaddingContext] = None
         self._generer()
@@ -286,6 +290,101 @@ class CipherMsg2Dechiffrer(CipherMsg1Dechiffrer):
         self._cipher = Cipher(algorithms.AES(self._password), modes.GCM(self._iv, self._compute_tag), backend=backend)
 
 
+class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
+    """
+    Chiffrage avec ChaCha20-Poly1305, tag de 96 bits
+    Cle chiffree avec EdDSA25519
+    """
+
+    def __init__(self, public_key: X25519PublicKey, output_stream=None, password: bytes = None, encoding_digest='base58btc'):
+        self._public_key = public_key
+        self._public_peer_x25519: Optional[X25519PublicKey] = None
+        self._tag: Optional[bytes] = None
+        super().__init__(output_stream, password, padding=False, encoding_digest=encoding_digest, hashing_code='blake2b-512')
+
+    def _generer(self):
+        """
+        Generer la cle secrete a partir d'une cle publique
+        """
+        # Generer cle peer
+        key_x25519 = X25519PrivateKey.generate()
+        self._public_peer_x25519 = key_x25519.public_key()
+
+        # Extraire la cle secrete avec exchange
+        cle_handshake = key_x25519.exchange(self._public_key)
+        # Hacher avec blake2s-256
+        self._password = hacher_to_digest(cle_handshake, 'blake2s-256')
+
+        self._poly1305 = poly1305.Poly1305(self._password)
+
+        # ChaCha20Poly1305 : 96 bits + block 1 = 12 bytes + [0x00000001]
+        self._iv = secrets.token_bytes(12)  # + bytes([0, 0, 0, 1])
+
+    def _ouvrir_cipher(self):
+        backend = default_backend()
+        # ChaCha20Poly1305 : 96 bits + block 1 = 12 bytes + [0x00000001]
+        iv = self._iv + bytes([0, 0, 0, 1])
+        self._cipher = Cipher(algorithms.ChaCha20(self._password, iv), None, backend=backend)
+
+    def update(self, data: bytes):
+        """ Ajout donnees chiffrees pour MAC """
+        output = super().update(data)
+        self._poly1305.update(output)
+        return output
+
+    def finalize(self):
+        output = super().finalize()
+        if len(output) > 0:
+            self._poly1305.update(output)
+
+        self._tag = self._poly1305.finalize()
+
+        return output
+
+    @property
+    def tag(self):
+        """
+        :return: Compute tag necessaire pour verifier le dechiffrage
+        """
+        return self._tag
+
+    def public_peer_str(self) -> str:
+        public_peer = self._public_peer_x25519
+        public_bytes = public_peer.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        return multibase.encode('base64', public_bytes).decode('utf-8')
+
+    def get_meta(self):
+        public_peer_str = self.public_peer_str()
+
+        meta_info = super().get_meta()
+        meta_info[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = multibase.encode('base64', self._tag).decode('utf-8')
+        meta_info[Constantes.ConstantesMaitreDesCles.TRANSACTION_CLE] = public_peer_str
+        return meta_info
+
+    def chiffrer_motdepasse_enveloppe(self, enveloppe: EnveloppeCertificat):
+        return chiffrer_cle_ed25519(enveloppe, self._password)
+
+
+class CipherMgs3Dechiffrer(CipherMsg1Dechiffrer):
+    """
+    Dechiffrage avec GCM, tag de 128 bits
+    """
+
+    def __init__(self, iv: Union[str, bytes], password: bytes, compute_tag: Union[str, bytes]):
+        if isinstance(iv, str):
+            iv = multibase.decode(iv.encode('utf-8'))
+
+        if isinstance(compute_tag, str):
+            compute_tag = multibase.decode(compute_tag.encode('utf-8'))
+
+        self._compute_tag = compute_tag
+        super().__init__(iv, password, padding=False)
+
+    def _ouvrir_cipher(self):
+        backend = default_backend()
+        self._cipher = Cipher(algorithms.AES(self._password), modes.GCM(self._iv, self._compute_tag), backend=backend)
+
+
 class DigestStream(RawIOBase):
 
     def __init__(self, file_object, hachage: str = None):
@@ -400,3 +499,51 @@ class DechiffrerChampDict:
         valeur = decipher.update(contenu_bytes) + decipher.finalize()
 
         return valeur
+
+
+def chiffrer_cle_ed25519(enveloppe, cle_secrete: bytes) -> str:
+    public_key: X25519PublicKey = enveloppe.get_public_x25519()
+
+    # Generer peer pour chiffrer la cle
+    key_x25519 = X25519PrivateKey.generate()
+
+    # Extraire la cle secrete avec exchange
+    cle_handshake = key_x25519.exchange(public_key)
+    # Hacher avec blake2s-256
+    password = hacher_to_digest(cle_handshake, 'blake2s-256')
+
+    # Deriver le nonce a partir de la cle publique
+    key_x25519_public_bytes = key_x25519.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    nonce = hacher_to_digest(key_x25519_public_bytes, 'blake2s-256')[0:12]
+
+    # Chiffrer la cle secrete avec chacha20poly1305 (one pass)
+    chacha = ChaCha20Poly1305(password)
+    cyphertext_tag = chacha.encrypt(nonce, cle_secrete, None)
+
+    cle_complete = key_x25519_public_bytes + cyphertext_tag
+    cle_str = multibase.encode('base64', cle_complete).decode('utf-8')
+
+    return cle_str
+
+
+def dechiffrer_cle_ed25519(enveloppe: EnveloppeCleCert, cle_secrete: str) -> str:
+    private_key: X25519PrivateKey = enveloppe.get_private_x25519()
+
+    cle_secrete_bytes = multibase.decode(cle_secrete.encode('utf-8'))
+
+    x25519_public_key = X25519PublicKey.from_public_bytes(cle_secrete_bytes[0:32])
+    cle_chiffree_tag = cle_secrete_bytes[32:]
+
+    # Extraire la cle secrete avec exchange
+    cle_handshake = private_key.exchange(x25519_public_key)
+    # Hacher avec blake2s-256
+    password = hacher_to_digest(cle_handshake, 'blake2s-256')
+
+    # Deriver le nonce a partir de la cle publique
+    nonce = hacher_to_digest(cle_secrete_bytes[0:32], 'blake2s-256')[0:12]
+
+    # Chiffrer la cle secrete avec chacha20poly1305 (one pass)
+    chacha = ChaCha20Poly1305(password)
+    password_dechiffre = chacha.decrypt(nonce, cle_chiffree_tag, None)
+
+    return password_dechiffre
