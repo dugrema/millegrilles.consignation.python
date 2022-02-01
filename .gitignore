@@ -6,3 +6,4 @@ dist
 venv/
 venv3.6/
 version.txt
+base/requirements.txt
