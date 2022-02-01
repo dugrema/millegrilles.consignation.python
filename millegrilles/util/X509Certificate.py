@@ -1,15 +1,16 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat import primitives
 from cryptography.hazmat.primitives import hashes, padding, serialization
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey, X25519PrivateKey
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
-
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from ipaddress import IPv4Address, IPv6Address
 from typing import Union
 from multihash.constants import HASH_CODES
+from nacl.signing import SigningKey, VerifyKey
 
 import datetime
 import secrets
@@ -450,6 +451,38 @@ class EnveloppeCleCert:
         is_valid_to = (now < pytz.utc.localize(self.cert.not_valid_after))
 
         return is_valid_from and is_valid_to
+
+    def get_public_x25519(self) -> X25519PublicKey:
+        if self.cert is not None:
+            public_key = self.cert.public_key()
+        elif self.private_key is not None:
+            public_key = self.private_key.public_key()
+        else:
+            raise Exception("Cle publique non disponible")
+
+        cle_public_bytes = public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+        cle_nacl_verifykey = VerifyKey(cle_public_bytes).to_curve25519_public_key()
+        x25519_public_key = X25519PublicKey.from_public_bytes(cle_nacl_verifykey.encode())
+
+        return x25519_public_key
+
+    def get_private_x25519(self) -> X25519PrivateKey:
+        if self.private_key is not None:
+            private_key = self.private_key
+        else:
+            raise Exception("Cle privee non disponible")
+
+        cle_private_bytes = private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+        cle_nacl_signingkey = SigningKey(cle_private_bytes)
+        cle_x25519_prive = cle_nacl_signingkey.to_curve25519_private_key()
+        x25519_private_key = X25519PrivateKey.from_private_bytes(cle_x25519_prive.encode())
+
+        return x25519_private_key
 
 
 class GenerateurCertificat:
