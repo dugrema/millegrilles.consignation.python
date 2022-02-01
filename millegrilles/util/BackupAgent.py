@@ -17,7 +17,7 @@ from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication,
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking, BaseCallback
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesBackupApplications, ConstantesMaitreDesCles
-from millegrilles.util.Chiffrage import CipherMsg2Dechiffrer, DecipherStream
+from millegrilles.util.Chiffrage import DecipherStream, CipherMgs3Dechiffrer
 
 
 class BackupAgent(ModeleConfiguration):
@@ -226,11 +226,11 @@ class TraiterMessage(BaseCallback):
         channel.add_on_close_callback(self.on_channel_close)
         self.__channel = channel
 
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, auto_ack=False)
+        self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
 
         routing_keys = [
             'commande.backupApplication.backup',
@@ -239,8 +239,8 @@ class TraiterMessage(BaseCallback):
 
         for rk in routing_keys:
             self.__channel.queue_bind(
-                exchange=Constantes.SECURITE_PROTEGE,
                 queue=self.queue_name,
+                exchange=Constantes.SECURITE_PROTEGE,
                 routing_key=rk,
                 callback=None
             )
@@ -396,8 +396,9 @@ class RestaurerApplication:
 
             raise Exception("Acces refuse (%s) a la cle pour le backup d'application %s" % (resultat_cle['acces'], self.__nom_application))
         cle = resultat_cle['cles'][archive_hachage]
-        cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(cle['cle'])
-        decipher = CipherMsg2Dechiffrer(cle['iv'], cle_dechiffree, compute_tag=cle['tag'])
+
+        cle_dechiffree = CipherMgs3Dechiffrer.dechiffrer_cle(contexte.configuration.cle, cle['cle'])
+        decipher = CipherMgs3Dechiffrer(cle['iv'], cle_dechiffree, compute_tag=cle['tag'])
 
         wrapper = WrapperDownload(r.iter_content(chunk_size=10 * 1024))
         decipher_stream = DecipherStream(decipher, wrapper)

@@ -24,6 +24,7 @@ from millegrilles import Constantes
 from millegrilles.util.IdmgUtil import encoder_idmg_cert
 from millegrilles.SecuritePKI import ConstantesSecurityPki
 from millegrilles.util.Hachage import map_code_to_hashes, hacher
+from millegrilles.util.Ed25519 import chiffrer_cle_ed25519, dechiffrer_cle_ed25519
 
 
 class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
@@ -197,15 +198,16 @@ class EnveloppeCleCert:
                 self.key_from_pem_bytes(fichier.read(), password_bytes)
 
     def chiffrage_asymmetrique(self, cle_secrete):
-        public_key = self.cert.public_key()
-        cle_secrete_backup = public_key.encrypt(
-            cle_secrete,
-            asymmetric.padding.OAEP(
-                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
+        # public_key = self.cert.public_key()
+        # cle_secrete_backup = public_key.encrypt(
+        #     cle_secrete,
+        #     asymmetric.padding.OAEP(
+        #         mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+        #         algorithm=hashes.SHA256(),
+        #         label=None
+        #     )
+        # )
+        cle_secrete_backup = chiffrer_cle_ed25519(self, cle_secrete)
         fingerprint = self.fingerprint
         return cle_secrete_backup, fingerprint
 
@@ -321,14 +323,14 @@ class EnveloppeCleCert:
 
         return self.__fingerprint
 
-    @fingerprint.setter
-    def fingerprint(self, fingerprint: str):
-        """
-        Set le fingerprint multibase base58btc, multihash BLAKE2s-256
-        :param fingerprint:
-        :return:
-        """
-        self.__fingerprint = fingerprint
+    # @fingerprint.setter
+    # def fingerprint(self, fingerprint: str):
+    #     """
+    #     Set le fingerprint multibase base58btc, multihash BLAKE2s-256
+    #     :param fingerprint:
+    #     :return:
+    #     """
+    #     self.__fingerprint = fingerprint
 
     @property
     def fingerprint_cle_publique(self) -> str:

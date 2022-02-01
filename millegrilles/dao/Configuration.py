@@ -190,11 +190,15 @@ class TransactionConfiguration:
 
                 self.__cle = clecert
 
-                if clecert.chaine is not None:
-                    pem_millegrille = clecert.chaine[-1].encode('utf-8')
-                    clecert_millegrille = EnveloppeCleCert()
-                    clecert_millegrille.cert_from_pem_bytes(pem_millegrille)
-                    self.__certificat_millegrille = clecert_millegrille
+        # Charger certificat de millegrille
+        try:
+            with open(self.pki_cafile, 'rb') as fichier:
+                pem_millegrille = fichier.read()
+            clecert_millegrille = EnveloppeCleCert()
+            clecert_millegrille.cert_from_pem_bytes(pem_millegrille)
+            self.__certificat_millegrille = clecert_millegrille
+        except FileNotFoundError:
+            self.__logger.exception("Erreur chargement certificat de millegrille")
 
         self.__logger.info("Configuration MQ: host: %s, port: %s" % (self.mq_host, self.mq_port))
         self.__logger.info("Configuration Mongo: host: %s, port: %s" % (self.mongo_host, self.mongo_port))

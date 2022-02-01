@@ -24,7 +24,7 @@ from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu, EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert
-from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer, DecipherStream, DigestStream
+from millegrilles.util.Chiffrage import CipherMgs3Chiffrer, CipherMgs3Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback
 from millegrilles.util.Hachage import hacher, Hacheur, VerificateurHachage, ErreurHachage
@@ -163,26 +163,29 @@ class BackupUtil:
         :param output_stream: Optionnel, stream/fichier d'output. Permet d'utiliser le cipher comme output stream dans un pipe.
         :return:
         """
-        cipher = CipherMsg2Chiffrer(output_stream=output_stream, encoding_digest='base58btc')
+        cle = self.__contexte.configuration.cle
+        cle_publique = cle.get_public_x25519()
+        cipher = CipherMgs3Chiffrer(cle_publique, output_stream=output_stream, encoding_digest='base58btc')
         iv = multibase.encode('base64', cipher.iv).decode('utf-8')
 
         # Conserver iv/tag et cle chiffree avec cle de millegrille (restore dernier recours)
-        enveloppe_millegrille: EnveloppeCertificat = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
-        cert_millegrille = enveloppe_millegrille.chaine_enveloppes()[-1]
+        enveloppe_millegrille: EnveloppeCleCert = self.__contexte.configuration.certificat_millegrille  # self.__contexte.signateur_transactions.get_enveloppe_millegrille()
+        cert_millegrille_pem = enveloppe_millegrille.public_bytes.decode('utf-8')
         fingerprint_millegrille = enveloppe_millegrille.fingerprint
-        catalogue_backup['cle'] = multibase.encode('base64', cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
+        catalogue_backup['cle'] = cipher.public_peer_str()
         catalogue_backup['iv'] = iv
         catalogue_backup['tag'] = '!!!REMPLACER!!!'
-        catalogue_backup['format'] = 'mgs2'
+        catalogue_backup['format'] = 'mgs3'
 
         # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
         cert_maitredescles = info_cles['certificat'][0]
         certs_cles_backup = [
             cert_maitredescles,  # info_cles['certificat'][0],  # Certificat de maitredescles
-            cert_millegrille.certificat_pem,  # info_cles['certificat_millegrille'],  # Certificat de millegrille
+            # cert_millegrille_pem,  # info_cles['certificat_millegrille'],  # Certificat de millegrille
         ]
         # certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
+        cles_chiffrees[fingerprint_millegrille] = cipher.public_peer_str()
 
         # Recuperer le fingerprint du cert du maitre des cles
         fingerprint_cert = None
@@ -202,7 +205,7 @@ class BackupUtil:
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'iv': iv,
             'tag': '!!!REMPLACER!!!!',
-            'format': 'mgs2',
+            'format': 'mgs3',
             'cles': cles_chiffrees,
             'domaine': ConstantesBackup.DOMAINE_NOM,
             '_fingerprint': fingerprint_cert
@@ -216,10 +219,11 @@ class BackupUtil:
             clecert = EnveloppeCleCert()
             clecert.cert_from_pem_bytes(pem.encode('utf-8'))
             fingerprint = clecert.fingerprint
+            # cle_chiffree, fingerprint_encodage = clecert.chiffrage_asymmetrique(cle_secrete)
             cle_chiffree, fingerprint_encodage = clecert.chiffrage_asymmetrique(cle_secrete)
 
-            cle_chiffree_mb = multibase.encode('base64', cle_chiffree).decode('utf-8')
-            cles[fingerprint] = cle_chiffree_mb
+            # cle_chiffree_mb = multibase.encode('base64', cle_chiffree).decode('utf-8')
+            cles[fingerprint] = cle_chiffree
 
         return cles
 
@@ -1847,9 +1851,10 @@ class ArchivesBackupParser:
                     # compute_tag = multibase.decode(cle_iv['tag'].encode('utf-8'))
 
                     cle = cle_iv['cle']
-                    cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
-
-                    decipher = CipherMsg2Dechiffrer(cle_iv['iv'], cle_dechiffree, cle_iv['tag'])
+                    enveloppe_privee = self.__contexte.configuration.cle
+                    cle_dechiffree = CipherMgs3Dechiffrer.dechiffrer_cle(enveloppe_privee, cle)
+                    # cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
+                    decipher = CipherMgs3Dechiffrer(cle_iv['iv'], cle_dechiffree, cle_iv['tag'])
                     stream = DecipherStream(decipher, file_object)
 
                     # Wrapper le stream dans un decodeur lzma
