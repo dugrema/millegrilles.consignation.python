@@ -219,31 +219,35 @@ class TransactionConfiguration:
 
         config_mongo = dict()
 
-        parametres_mongo = ['host']
+        parametres_mongo = ['host', 'username', 'password']
         parametres_mongo_int = ['port']
 
         # Configuration specifique pour ssl
         mongo_ssl_param = self._mongo_config.get(Constantes.CONFIG_MONGO_SSL)
-        config_mongo['ssl'] = mongo_ssl_param in ['on', 'nocert', 'x509']  # Mettre ssl=True ou ssl=False
+        config_mongo['tls'] = mongo_ssl_param in ['on', 'nocert', 'x509']  # Mettre ssl=True ou ssl=False
         config_mongo['authSource'] = self._mongo_config.get(Constantes.CONFIG_MONGO_AUTHSOURCE) or self.idmg
         if mongo_ssl_param == 'on':
-            config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
+            config_mongo['tlsAllowInvalidCertificates'] = False
             # parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs', 'username', 'password'])
             parametres_mongo.extend(['username', 'password'])
         elif mongo_ssl_param == 'x509':
-            config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
+            config_mongo['tlsAllowInvalidCertificates'] = False
             config_mongo['authMechanism'] = 'MONGODB-X509'
             # parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
             del config_mongo['authSource']
         elif mongo_ssl_param == 'nocert':
-            config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
+            config_mongo['tlsAllowInvalidCertificates'] = True
             parametres_mongo.extend(['username', 'password'])
 
         if mongo_ssl_param in ['x509', 'on']:
-            # Copier key/cert MQ. Va etre override au besoin
-            config_mongo['ssl_certfile'] = self.mq_certfile
-            config_mongo['ssl_keyfile'] = self.mq_keyfile
-            config_mongo['ssl_ca_certs'] = self.mq_cafile
+            # Copier key/cert MQ vers un seul fichier keycert.pem
+            with open('/tmp/keycert.pem', 'w') as out_cert:
+                with open(self.mq_keyfile, 'r') as fichier:
+                    out_cert.write(fichier.read())
+                with open(self.mq_certfile, 'r') as fichier:
+                    out_cert.write(fichier.read())
+            config_mongo['tlsCertificateKeyFile'] = '/tmp/keycert.pem'
+            config_mongo['tlsCAFile'] = self.mq_cafile
 
         # Copier toutes les valeurs necessaires, enlever le prefixe mongo_ de chaque cle.
         for cle in self._mongo_config:

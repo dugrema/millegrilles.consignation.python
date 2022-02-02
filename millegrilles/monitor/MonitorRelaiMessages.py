@@ -855,9 +855,9 @@ class ConnexionMiddlewareProtege(ConnexionMiddleware):
             'MG_MONGO_USERNAME': 'admin',
             'MG_MONGO_PASSWORD': mongo_passwd,
             'MG_MONGO_AUTHSOURCE': 'admin',
-            'MG_MONGO_SSL': 'on',
-            'MG_MONGO_SSL_CA_CERTS': ca_certs_file,
-            'MG_MONGO_SSL_CERTFILE': monitor_keycert_file,
+            'MG_MONGO_TLS': 'on',
+            'MG_MONGO_TLS_CA_CERTS': ca_certs_file,
+            'MG_MONGO_TLS_CERTFILE': monitor_keycert_file,
         })
 
         return additionnals
