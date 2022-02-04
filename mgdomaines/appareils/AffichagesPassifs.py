@@ -134,7 +134,7 @@ class AfficheurDocumentMAJDirecte:
             for exchange in exchanges:
                 self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=rk, callback=None)
 
-        tag_queue = self.channel.basic_consume(self.traitement_callback.callbackAvecAck, queue=nom_queue, no_ack=False)
+        tag_queue = self.channel.basic_consume(nom_queue, self.traitement_callback.callbackAvecAck, auto_ack=False)
         self.__logger.debug("Queue %s, tag queue: %s" % (queue.method.queue, tag_queue))
 
         self.initialiser_documents()
