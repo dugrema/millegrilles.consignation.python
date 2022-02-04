@@ -2,7 +2,7 @@
 
 # Fichier de setup pour container Docker (doit etre execute dans le container via Dockerfile)
 
-GIT_NAME=MilleGrilles.consignation.python
+GIT_NAME=millegrilles.consignation.python
 GIT_FOLDER=$SRC_FOLDER/$GIT_NAME
 
 # Note: les requirements doivent etre installes dans l'image Python de base
