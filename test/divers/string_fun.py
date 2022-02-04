@@ -18,3 +18,6 @@ locations_content = location_base_component.format(**{
 })
 
 print(locations_content)
+
+formattage_nb = 'Nombre : "{: 8.1f}"'
+print(formattage_nb.format(4))
