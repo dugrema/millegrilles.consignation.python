@@ -263,6 +263,7 @@ class ConnexionWrapper:
         if code_erreur == 403:
             self._logger.warn("Acces refuse, on tente d ecreer un compte MQ")
             # Acces refuse, on tente de transmettre notre certificat pour creer le compte
+            self._logger.info("Connexion a MQ refusee (403), tenter de creer un compte")
             compte_ok = self._creer_compte_mq()
             if compte_ok:
                 self._logger.debug("Compte MQ cree sur serveur")

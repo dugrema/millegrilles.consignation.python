@@ -9,6 +9,7 @@ PATH_PKI = '/var/opt/millegrilles/pki'
 DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
 PATH_SECRET_DEFAUT = '/run/secrets'
+PATH_SOURCE_SECRET_DEFAUT = '/var/opt/millegrilles_secrets'
 
 DICT_MODULES_PUBLICS = {
     ConstantesServiceMonitor.MODULE_ACME: {

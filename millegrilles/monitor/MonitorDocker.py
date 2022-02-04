@@ -1012,12 +1012,12 @@ class GestionnaireModulesDocker:
             mounts = list()
             dict_config_docker['mounts'] = mounts
 
-        path_secrets = self.__service_monitor.path_secrets
-        if path_secrets != MonitorConstantes.PATH_SECRET_DEFAUT:
-            self.__logger.debug("Configuration container : Path secret externe : %s" % path_secrets)
+        if self.__service_monitor.is_dev_mode:
+            # On est en mode developpment, utiliser /var/opt/millegrilles_secrets
+            self.__logger.debug("Configuration container : Path secret externe : %s" % MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT)
             mounts.append({
                 'target': MonitorConstantes.PATH_SECRET_DEFAUT,
-                'source': path_secrets,
+                'source': MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT,
                 'type': 'bind'
             })
         else:
