@@ -250,12 +250,18 @@ class ConnexionWrapper:
                 self.__ouvrir_channel_listener(listener)
 
     def __on_open_error(self, connection, exception):
+        self._logger.error("ERREUR %s" % exception)
         try:
             code_erreur = exception.args[0]
+            if code_erreur != 403 and "(403)" in str(code_erreur):
+                code_erreur = 403
         except AttributeError:
             code_erreur = -1
 
+        self._logger.exception("Erreur connexion, code __%s__" % code_erreur)
+
         if code_erreur == 403:
+            self._logger.warn("Acces refuse, on tente d ecreer un compte MQ")
             # Acces refuse, on tente de transmettre notre certificat pour creer le compte
             compte_ok = self._creer_compte_mq()
             if compte_ok:
@@ -362,7 +368,8 @@ class ConnexionWrapper:
         Creer un compte sur MQ via https (monitor).
         :return:
         """
-
+        self._logger.info("Creation compte MQ avec %s" % self.configuration.mq_host)
+        
         # Le monitor peut etre trouve via quelques hostnames :
         #  nginx : de l'interne, est le proxy web qui est mappe vers le monitor
         #  mq_host : de l'exterieur, est le serveur mq qui est sur le meme swarm docker que nginx
