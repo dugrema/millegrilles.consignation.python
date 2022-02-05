@@ -1691,6 +1691,72 @@ class GenererCollections(GenerateurNoeud):
         return builder
 
 
+class GenererMessagerie(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ','.join([Constantes.SECURITE_SECURE]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_MESSAGERIE.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            # x509.DNSName(u'messagerie'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'localhost'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
+class GenererMessagerieWeb(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_MESSAGERIE.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'messagerie'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'localhost'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        # Ajouter noms DNS valides
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
 class GenererMedia(GenerateurNoeud):
 
     def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
@@ -2100,6 +2166,8 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS: GenererGrosFichiers,
             ConstantesGenerateurCertificat.ROLE_MEDIA: GenererMedia,
             ConstantesGenerateurCertificat.ROLE_COLLECTIONS: GenererCollections,
+            ConstantesGenerateurCertificat.ROLE_MESSAGERIE: GenererMessagerie,
+            ConstantesGenerateurCertificat.ROLE_MESSAGERIE_WEB: GenererMessagerieWeb,
         }
 
         # S'assurer que le dict contient reference aux CAs
