@@ -1840,7 +1840,7 @@ class ConstantesServiceMonitor:
 
 class ConstantesTopologie:
 
-    DOMAINE_NOM = 'Topologie'
+    DOMAINE_NOM = 'CoreTopologie'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM

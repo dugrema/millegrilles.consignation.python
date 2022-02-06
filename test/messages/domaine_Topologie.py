@@ -246,8 +246,21 @@ class MessagesSample(DomaineTest):
 
         print("Contenu dechiffre : %s" % contenu_dechiffre)
 
+    def resolve_idmg(self):
+        requete = {
+            'dns': ['mg-dev5.maple.maceroc.com'],
+        }
+        domaine_action = ConstantesTopologie.DOMAINE_NOM
+        action = 'resolveIdmg'
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, domaine_action, action=action, securite=Constantes.SECURITE_PRIVE,
+            reply_to=self.queue_name, correlation_id='efgh',
+            ajouter_certificats=True
+        )
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def executer(self):
-        sample.requete_liste_domaines()
+        # sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
         # sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
@@ -258,6 +271,7 @@ class MessagesSample(DomaineTest):
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
+        sample.resolve_idmg()
 
 # --- MAIN ---
 sample = MessagesSample()

@@ -190,9 +190,9 @@ class GenerateurTransaction:
 
     def transmettre_commande(self, commande_dict, domaine, channel=None, encoding=DateFormatEncoder,
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None,
-                             reply_to=None, correlation_id=None, ajouter_certificats=False, action: str = None):
+                             reply_to=None, correlation_id=None, ajouter_certificats=False, action: str = None, version=1):
 
-        enveloppe = self.preparer_enveloppe(commande_dict, domaine=domaine, idmg_destination=idmg_destination, action=action)
+        enveloppe = self.preparer_enveloppe(commande_dict, domaine=domaine, idmg_destination=idmg_destination, action=action, version=version)
 
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
