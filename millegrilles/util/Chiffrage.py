@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, CipherContext
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from base64 import b64decode
 
@@ -18,7 +19,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert
-from millegrilles.util.Hachage import Hacheur, VerificateurHachage, hacher_to_digest
+from millegrilles.util.Hachage import Hacheur, VerificateurHachage, hacher_to_digest, hacher
 from millegrilles.util.Ed25519 import chiffrer_cle_ed25519, dechiffrer_cle_ed25519
 
 
@@ -52,6 +53,10 @@ class CipherMgs1(RawIOBase):
         :return:
         """
         return self._digest_result
+
+    @digest.setter
+    def digest(self, digest):
+        self._digest_result = digest
 
     def get_meta(self):
         meta_info = {
@@ -331,6 +336,7 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
 
     def update(self, data: bytes):
         """ Ajout donnees chiffrees pour MAC """
+        raise NotImplemented("Fix - pas bonne implementation, voir a integrer rust")
         output = super().update(data)
         self._poly1305.update(output)
         return output
@@ -344,12 +350,31 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
 
         return output
 
+    def encrypt(self, data: bytes) -> bytes:
+        """
+        Effectuer chiffrage/hachage avec methode OpenSSL (integree)
+        """
+        chacha = ChaCha20Poly1305(self.password)
+        valeur_chiffree_tag = chacha.encrypt(self._iv, data, None)
+        valeur_chiffree = valeur_chiffree_tag[:-16]
+        self._tag = valeur_chiffree_tag[-16:]
+        hachage_bytes = hacher(valeur_chiffree, hashing_code='blake2b-512', encoding='base58btc')
+        self.digest = hachage_bytes
+
+        self._cipher = None  # Retirer context de chiffrage
+
+        return valeur_chiffree
+
     @property
     def tag(self):
         """
         :return: Compute tag necessaire pour verifier le dechiffrage
         """
         return self._tag
+
+    @tag.setter
+    def tag(self, tag):
+        self._tag = tag
 
     def public_peer_str(self) -> str:
         public_peer = self._public_peer_x25519
@@ -388,11 +413,12 @@ class CipherMgs3Dechiffrer(CipherMsg1Dechiffrer):
 
     def _ouvrir_cipher(self):
         backend = default_backend()
-        # ChaCha20Poly1305 : 96 bits + block 1 = 12 bytes + [0x00000001]
-        iv = self._iv + bytes([0, 0, 0, 1])
+        # ChaCha20Poly1305 : 96 bits + block 0 = 12 bytes + [0x00000000]
+        iv = self._iv + bytes([0, 0, 0, 0])
         self._cipher = Cipher(algorithms.ChaCha20(self._password, iv), None, backend=backend)
 
     def update(self, data: bytes):
+        raise NotImplemented("Fix - pas bonne implementation, voir a integrer rust")
         self._poly1305.update(data)
         data = self._context.update(data)
         return data
@@ -476,6 +502,8 @@ class ChiffrerChampDict:
         env_maitrecles = EnveloppeCertificat(certificat_pem=cert_maitrecles['certificat'][0])
         env_millegrille = EnveloppeCertificat(certificat_pem=cert_maitrecles['certificat_millegrille'])
 
+        partition = env_maitrecles.fingerprint
+
         if isinstance(valeur, dict):
             valeur = json.dumps(valeur)
         elif not isinstance(valeur, str):
@@ -483,48 +511,66 @@ class ChiffrerChampDict:
 
         valeur_bytes = valeur.encode('utf-8')
 
-        cipher = CipherMsg2Chiffrer(encoding_digest='base58btc')
-        valeur_chiffree = cipher.start_encrypt() + cipher.update(valeur_bytes) + cipher.finalize()
-        cle_secrete = cipher.password
+        cle_x25519_millegrille = env_millegrille.get_public_x25519()
 
-        domaine_action_requete = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
-        # cert_maitrecles = self.__message_handler.requete(domaine_action_requete)
+        # Cipher3 n'est pas fonctionnel, utiliser pour les cles uniquement
+        cipher = CipherMgs3Chiffrer(cle_x25519_millegrille, encoding_digest='base58btc')
+        valeur_chiffree = cipher.encrypt(valeur_bytes)
+
+        # cle_secrete = cipher.password
+        # cle_secrete_dec = []
+        # for i in cle_secrete:
+        #     cle_secrete_dec.append(str(int(i)))
+        # print("Cle secrete decimal : %s" % ', '.join(cle_secrete_dec))
+        # iv_dec = []
+        # for i in cipher.iv:
+        #     iv_dec.append(str(int(i)))
+        # print("IV decimal : %s" % ', '.join(iv_dec))
 
         cles = dict()
-        envs = [env_maitrecles, env_millegrille]
+        envs = [env_maitrecles]
         for env in envs:
-            cles[env.fingerprint] = multibase.encode('base64', env.chiffrage_asymmetrique(cle_secrete)[0]).decode('utf-8')
+            pwd_chiffre = cipher.chiffrer_motdepasse_enveloppe(env)
+            cles[env.fingerprint] = pwd_chiffre  # multibase.encode('base64', env.chiffrage_asymmetrique(cle_secrete)[0]).decode('utf-8')
 
         meta = cipher.get_meta()
+        cles[env_millegrille.fingerprint] = meta['cle_chiffree']
+        del meta['cle_chiffree']
+        del meta['cle_secrete']
 
         msg_maitredescles = {
             'identificateurs_document': identificateurs_document,
             'domaine': domaine,
-            'format': 'mgs2',
+            'format': 'mgs3',
             "cles": cles,
             'hachage_bytes': cipher.digest,
         }
         msg_maitredescles.update(meta)
 
         msg_maitrecles_signe = self.__contexte.generateur_transactions.preparer_enveloppe(
-            msg_maitredescles, Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE)
+            msg_maitredescles, Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+            action=Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            partition=partition
+        )
 
         return {
             'maitrecles': msg_maitrecles_signe,
             'secret_chiffre': multibase.encode('base64', valeur_chiffree).decode('utf-8'),
+            'partition': partition,
+            'cle_secrete': cipher.password,
         }
 
 
-class DechiffrerChampDict:
-
-    def __init__(self, contexte):
-        self.__contexte = contexte
-
-    def dechiffrer(self, contenu_chiffre: dict, iv_base64: str, cle_bytes: bytes) -> str:
-        iv_bytes = b64decode(iv_base64.encode('utf-8'))
-        decipher = CipherMsg1Dechiffrer(iv_bytes, cle_bytes)
-        contenu_bytes = b64decode(contenu_chiffre['secret_chiffre'].encode('utf-8'))
-
-        valeur = decipher.update(contenu_bytes) + decipher.finalize()
-
-        return valeur
+# class DechiffrerChampDict:
+#
+#     def __init__(self, contexte):
+#         self.__contexte = contexte
+#
+#     def dechiffrer(self, contenu_chiffre: dict, iv_base64: str, cle_bytes: bytes) -> str:
+#         iv_bytes = b64decode(iv_base64.encode('utf-8'))
+#         decipher = CipherMsg1Dechiffrer(iv_bytes, cle_bytes)
+#         contenu_bytes = b64decode(contenu_chiffre['secret_chiffre'].encode('utf-8'))
+#
+#         valeur = decipher.update(contenu_bytes) + decipher.finalize()
+#
+#         return valeur

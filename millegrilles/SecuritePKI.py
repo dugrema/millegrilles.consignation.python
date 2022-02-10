@@ -394,8 +394,8 @@ class EnveloppeCertificat:
         public_key = self.certificat.public_key().public_bytes(encoding=serialization.Encoding.Raw,
                                                                format=serialization.PublicFormat.Raw)
 
-        cle_public_bytes = public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
-        cle_nacl_verifykey = VerifyKey(cle_public_bytes).to_curve25519_public_key()
+        # cle_public_bytes = public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+        cle_nacl_verifykey = VerifyKey(public_key).to_curve25519_public_key()
         x25519_public_key = X25519PublicKey.from_public_bytes(cle_nacl_verifykey.encode())
 
         return x25519_public_key

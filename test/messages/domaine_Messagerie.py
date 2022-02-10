@@ -3,11 +3,21 @@ from millegrilles.Constantes import ConstantesMessagerie
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.util.Chiffrage import ChiffrerChampDict
+from millegrilles.SecuritePKI import EnveloppeCertificat
 from threading import Event
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 import json
 import datetime
 import uuid
+import logging
+import multibase
+
+logging.basicConfig(level=logging.ERROR)
+logging.getLogger('millegrilles').setLevel(logging.INFO)
+logger = logging.getLogger('__main__')
+logger.setLevel(logging.DEBUG)
 
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
@@ -17,24 +27,35 @@ class MessagesSample(BaseCallback):
 
     def __init__(self):
         super().__init__(contexte)
-        self.contexte.message_dao.register_channel_listener(self)
-        self.generateur = GenerateurTransaction(self.contexte)
 
         self.queue_name = None
-
         self.channel = None
         self.event_recu = Event()
+
+        with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'r') as fichier:
+            cert_maitrecles = fichier.read()
+            cert_enveloppe = EnveloppeCertificat(certificat_pem=cert_maitrecles)
+            self.cert_maitrecles = cert_enveloppe.chaine_pem()
+
+        with open(self.contexte.configuration.mq_cafile, 'r') as fichier:
+            self.cacert = fichier.read()
+
+        self.contexte.message_dao.register_channel_listener(self)
+        self.generateur = GenerateurTransaction(self.contexte)
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
+        logger.debug("Channel open %s" % channel)
         channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
 
     def queue_open_local(self, queue):
         self.queue_name = queue.method.queue
-        print("Queue: %s" % str(self.queue_name))
+        logger.debug("Queue open: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
+
+        logger.debug("Demarrer execution")
         self.executer()
 
     def run_ioloop(self):
@@ -49,30 +70,102 @@ class MessagesSample(BaseCallback):
         print(json.dumps(message, indent=4))
 
     def poster_message(self):
-        requete = {
-            'to': ['@proprietaire/mg-dev5.maple.maceroc.com'],
-            'cc': [],
-            'bcc': [],
+        to = ['@proprietaire/mg-dev5.maple.maceroc.com', '@p/mg-dev5.maple.maceroc.com']
+        cc = ['@buzzah/mg-dev5.maple.maceroc.com']
+        attachments = ["zIJKL9012"]
+        message = {
+            'to': to,
+            'cc': cc,
             'from': '@mathieu/mg-dev5.maple.maceroc.com',
             'reply_to': '@mathieu/mg-dev5.maple.maceroc.com',
             'subject': 'Un message de test',
             'content': 'Du contenu de message test.',
-            'attachments': [],
+            'attachments': attachments,
+        }
+
+        message_signe = self.generateur.preparer_enveloppe(message, version=1)
+        logger.debug("Message signe\n%s" % json.dumps(message_signe, indent=2))
+
+        # message_chiffre = {
+        #     'hachage_bytes': 'mABCD1234',
+        #     'contenu': 'mEFGH5678',
+        # }
+
+        dests = to.copy()
+        dests.extend(cc)
+
+        cert_maitrecles = {
+            'certificat': self.cert_maitrecles,
+            'certificat_millegrille': self.cacert,
+        }
+        chiffreur = ChiffrerChampDict(contexte)
+        message_chiffre_info = chiffreur.chiffrer(cert_maitrecles, ConstantesMessagerie.DOMAINE_NOM, {"message": 'true'}, message_signe)
+        message_maitredescles = message_chiffre_info['maitrecles']
+        logger.debug("Emettre message maitre des cles %s" % json.dumps(message_maitredescles, indent=2))
+
+        del message_maitredescles['en-tete']
+        del message_maitredescles['_signature']
+        message_chiffre = message_chiffre_info['secret_chiffre']
+        partition = message_chiffre_info['partition']
+
+        # Valider chiffrage (pour test/debug)
+        chacha = ChaCha20Poly1305(message_chiffre_info['cle_secrete'])
+        message_chiffre_tag = multibase.decode(message_chiffre) + multibase.decode(message_maitredescles['tag'])
+        iv_bytes = multibase.decode(message_maitredescles['iv'])
+        message_str = chacha.decrypt(iv_bytes, message_chiffre_tag, None)
+        logger.debug("Message dechiffre (**TEST**)\n%s" % message_str)
+
+        self.generateur.transmettre_commande(
+            message_maitredescles,
+            domaine=Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+            action=Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            partition=partition,
+            exchange=Constantes.SECURITE_PRIVE,
+            correlation_id='abcd-1234', reply_to=self.queue_name,
+            ajouter_certificats=True,
+        )
+
+        commande = {
+            'message_chiffre': message_chiffre,
+            'hachage_bytes': message_maitredescles['hachage_bytes'],
+            'attachments': attachments,
+            'to': dests,
+            'bcc': ['@mathieu/mg-dev5.maple.maceroc.com'],
+            'fingerprint_certificat': message_signe['en-tete']['fingerprint_certificat'],
         }
         domaine = ConstantesMessagerie.DOMAINE_NOM
         action = 'poster'
+        logger.debug("Emettre message chiffre %s" % json.dumps(commande, indent=2))
         enveloppe = self.generateur.transmettre_commande(
-            requete,
+            commande,
             domaine=domaine, action=action, exchange=Constantes.SECURITE_PRIVE,
             correlation_id='abcd-1234', reply_to=self.queue_name,
             ajouter_certificats=True,
         )
 
-        print("Envoi : %s" % enveloppe)
+        logger.debug("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def get_liste_messages(self):
+        requete = {}
+        domaine = ConstantesMessagerie.DOMAINE_NOM
+        action = 'getMessages'
+        self.generateur.transmettre_requete(
+            requete,
+            domaine=domaine, action=action, securite=Constantes.SECURITE_PRIVE,
+            correlation_id='abcd-1234', reply_to=self.queue_name,
+            ajouter_certificats=True,
+        )
+
     def executer(self):
-        self.poster_message()
+        event = Event()
+        event.wait(2)
+
+        try:
+            self.poster_message()
+            # self.get_liste_messages()
+        except:
+            logger.exception("Erreur execution")
 
 
 # --- MAIN ---
@@ -81,7 +174,7 @@ sample = MessagesSample()
 # TEST
 
 # FIN TEST
-sample.event_recu.wait(5)
+sample.event_recu.wait(60)
 sample.deconnecter()
 
 

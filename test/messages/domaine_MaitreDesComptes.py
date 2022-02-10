@@ -26,13 +26,13 @@ class MessagesSample(BaseCallback):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
 
     def queue_open_local(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.executer()
 
     def run_ioloop(self):
@@ -73,6 +73,14 @@ class MessagesSample(BaseCallback):
         # domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_LISTE_USAGERS])
         # enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
         enveloppe = self.generateur.transmettre_requete(requete, 'CoreMaitreDesComptes', 'abcd-1234', self.queue_name, action="getListeUsagers")
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def requete_userid_par_nomusager(self):
+        requete = {'noms_usagers': ['proprietaire', 'buzzah', 'p']}
+        enveloppe = self.generateur.transmettre_requete(
+            requete, 'CoreMaitreDesComptes', 'abcd-1234', self.queue_name, action='getUserIdParNomUsager', securite=Constantes.SECURITE_SECURE, ajouter_certificats=True)
 
         print("Envoi : %s" % enveloppe)
         return enveloppe
@@ -219,7 +227,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # self.requete_info_proprietaire()
-        self.requete_profil_usager()
+        # self.requete_profil_usager()
+        self.requete_userid_par_nomusager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
         # self.transaction_maj_motdepasse()

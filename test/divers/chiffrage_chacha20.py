@@ -34,9 +34,9 @@ def dechiffrer_chacha20poly1305():
 def chiffrer_avec_update():
     key = multibase.decode(key_1)
     nonce = multibase.decode(nonce_1)
-    nonce = nonce + bytes([0, 0, 0, 1])
+    nonce_complet = nonce + bytes([0, 0, 0, 1])
 
-    algorithm = algorithms.ChaCha20(key, nonce)
+    algorithm = algorithms.ChaCha20(key, nonce_complet)
     p = poly1305.Poly1305(key)
     cipher = Cipher(algorithm, mode=None)
     encryptor = cipher.encryptor()
@@ -49,6 +49,13 @@ def chiffrer_avec_update():
 
     cypher_str = multibase.encode('base64', cypher_complet)
     print("Message chiffre : %s" % cypher_str)
+
+    # Valider via dechiffrage
+    chacha = ChaCha20Poly1305(key)
+    message_str = chacha.decrypt(nonce, cypher_complet, None)
+
+    if message_str != message_1:
+        raise Exception("Mismatch")
 
 
 def generer_cle():
