@@ -72,24 +72,27 @@ class MessagesSample(BaseCallback):
     def poster_message(self):
         to = ['@proprietaire/mg-dev5.maple.maceroc.com', '@p/mg-dev5.maple.maceroc.com']
         cc = ['@buzzah/mg-dev5.maple.maceroc.com']
-        attachments = ["zIJKL9012"]
+        attachments = []
+        attachments_inline = [{'content': 'mEFGH5678', 'nom_fichier': 'monfichier.jpg', 'mimetype': 'image/jpeg'}]
         message = {
             'to': to,
             'cc': cc,
             'from': '@mathieu/mg-dev5.maple.maceroc.com',
             'reply_to': '@mathieu/mg-dev5.maple.maceroc.com',
-            'subject': 'Un message de test',
-            'content': 'Du contenu de message test.',
+            'subject': 'Ca commence a faire des messages',
+            'content': 'Pas pire, y''a des messages qui arrivent.',
             'attachments': attachments,
+            'attachments_inline': attachments_inline,
         }
-
         message_signe = self.generateur.preparer_enveloppe(message, version=1)
         logger.debug("Message signe\n%s" % json.dumps(message_signe, indent=2))
 
-        # message_chiffre = {
-        #     'hachage_bytes': 'mABCD1234',
-        #     'contenu': 'mEFGH5678',
-        # }
+        header = {
+            'from': '@mathieu/mg-dev5.maple.maceroc.com',
+            'subject': 'Mon 4e message de test',
+        }
+        header_signe = self.generateur.preparer_enveloppe(header, version=1)
+        logger.debug("Header signe\n%s" % json.dumps(header_signe, indent=2))
 
         dests = to.copy()
         dests.extend(cc)
@@ -98,6 +101,8 @@ class MessagesSample(BaseCallback):
             'certificat': self.cert_maitrecles,
             'certificat_millegrille': self.cacert,
         }
+
+        # Chiffrer message
         chiffreur = ChiffrerChampDict(contexte)
         message_chiffre_info = chiffreur.chiffrer(cert_maitrecles, ConstantesMessagerie.DOMAINE_NOM, {"message": 'true'}, message_signe)
         message_maitredescles = message_chiffre_info['maitrecles']
@@ -115,6 +120,16 @@ class MessagesSample(BaseCallback):
         message_str = chacha.decrypt(iv_bytes, message_chiffre_tag, None)
         logger.debug("Message dechiffre (**TEST**)\n%s" % message_str)
 
+        # Chiffrer en-tete - reutiliser la cle secrete (password)
+        chiffreur_entete = ChiffrerChampDict(contexte, password=message_chiffre_info['cle_secrete'])
+        entete_chiffre_info = chiffreur_entete.chiffrer(cert_maitrecles, ConstantesMessagerie.DOMAINE_NOM, {"header": 'true'}, header_signe)
+        logger.debug("Entete chiffree info : %s" % entete_chiffre_info)
+        entete_maitredescles = message_chiffre_info['maitrecles']
+        entete_iv = entete_maitredescles['iv']
+        entete_tag = entete_maitredescles['tag']
+
+        header = {'iv': entete_iv, 'tag': entete_tag, 'content': multibase.encode('base64', entete_chiffre_info['secret_chiffre']).decode('utf-8')}
+
         self.generateur.transmettre_commande(
             message_maitredescles,
             domaine=Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
@@ -126,6 +141,7 @@ class MessagesSample(BaseCallback):
         )
 
         commande = {
+            # 'header': header,
             'message_chiffre': message_chiffre,
             'hachage_bytes': message_maitredescles['hachage_bytes'],
             'attachments': attachments,

@@ -1,3 +1,4 @@
+import logging
 import secrets
 import json
 import multibase
@@ -303,6 +304,7 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
     """
 
     def __init__(self, public_key: X25519PublicKey, output_stream=None, password: bytes = None, encoding_digest='base58btc'):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self._public_key = public_key
         self._public_peer_x25519: Optional[X25519PublicKey] = None
         self._tag: Optional[bytes] = None
@@ -315,13 +317,14 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
         Generer la cle secrete a partir d'une cle publique
         """
         # Generer cle peer
-        key_x25519 = X25519PrivateKey.generate()
-        self._public_peer_x25519 = key_x25519.public_key()
+        if self._password is None:
+            key_x25519 = X25519PrivateKey.generate()
+            self._public_peer_x25519 = key_x25519.public_key()
 
-        # Extraire la cle secrete avec exchange
-        cle_handshake = key_x25519.exchange(self._public_key)
-        # Hacher avec blake2s-256
-        self._password = hacher_to_digest(cle_handshake, 'blake2s-256')
+            # Extraire la cle secrete avec exchange
+            cle_handshake = key_x25519.exchange(self._public_key)
+            # Hacher avec blake2s-256
+            self._password = hacher_to_digest(cle_handshake, 'blake2s-256')
 
         self._poly1305 = poly1305.Poly1305(self._password)
 
@@ -382,11 +385,15 @@ class CipherMgs3Chiffrer(CipherMsg1Chiffrer):
         return multibase.encode('base64', public_bytes).decode('utf-8')
 
     def get_meta(self):
-        public_peer_str = self.public_peer_str()
-
         meta_info = super().get_meta()
         meta_info[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = multibase.encode('base64', self._tag).decode('utf-8')
-        meta_info['cle_chiffree'] = public_peer_str
+
+        try:
+            public_peer_str = self.public_peer_str()
+            meta_info['cle_chiffree'] = public_peer_str
+        except AttributeError:
+            self.__logger.warning("Password chiffre non disponible (probablement fourni en parametre pour le cipher)")
+
         return meta_info
 
     def chiffrer_motdepasse_enveloppe(self, enveloppe: EnveloppeCertificat):
@@ -494,8 +501,9 @@ class DecipherStream(DigestStream):
 
 class ChiffrerChampDict:
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, password: bytes = None):
         self.__contexte = contexte
+        self.__password = password
 
     def chiffrer(self, cert_maitrecles: dict, domaine: str, identificateurs_document: dict, valeur):
 
@@ -514,7 +522,7 @@ class ChiffrerChampDict:
         cle_x25519_millegrille = env_millegrille.get_public_x25519()
 
         # Cipher3 n'est pas fonctionnel, utiliser pour les cles uniquement
-        cipher = CipherMgs3Chiffrer(cle_x25519_millegrille, encoding_digest='base58btc')
+        cipher = CipherMgs3Chiffrer(cle_x25519_millegrille, password=self.__password, encoding_digest='base58btc')
         valeur_chiffree = cipher.encrypt(valeur_bytes)
 
         # cle_secrete = cipher.password
@@ -534,8 +542,12 @@ class ChiffrerChampDict:
             cles[env.fingerprint] = pwd_chiffre  # multibase.encode('base64', env.chiffrage_asymmetrique(cle_secrete)[0]).decode('utf-8')
 
         meta = cipher.get_meta()
-        cles[env_millegrille.fingerprint] = meta['cle_chiffree']
-        del meta['cle_chiffree']
+        try:
+            cles[env_millegrille.fingerprint] = meta['cle_chiffree']
+            del meta['cle_chiffree']
+        except KeyError:
+            pass  # Cle n'existe pas
+
         del meta['cle_secrete']
 
         msg_maitredescles = {
