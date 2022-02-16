@@ -1111,6 +1111,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'
     DOCUMENT_LISTE_FUUIDS = 'fuuids'
+    DOCUMENT_LISTE_FUUIDS_DOCUMENTS = 'fuuids_documents'
 
     DOCUMENT_COLLECTION_NOMCOLLECTION = 'nom_collection'
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'

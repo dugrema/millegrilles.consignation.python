@@ -14,7 +14,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.domaines.Topologie import ConstantesTopologie
-from millegrilles.util.Chiffrage import ChiffrerChampDict, DechiffrerChampDict
+# from millegrilles.util.Chiffrage import ChiffrerChampDict, DechiffrerChampDict
 from millegrilles.util.BaseTestMessages import DomaineTest
 
 from threading import Thread, Event
@@ -159,92 +159,92 @@ class MessagesSample(DomaineTest):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
-    def transaction_consignation_web(self):
-        noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
-        access_key = 'DADAXXXAAABBBCCCC000DADA'
+    # def transaction_consignation_web(self):
+    #     noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
+    #     access_key = 'DADAXXXAAABBBCCCC000DADA'
+    #
+    #     indicateurs_document = {
+    #         'libelle': ConstantesTopologie.LIBVAL_NOEUD,
+    #         ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
+    #         'champ': ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
+    #     }
+    #
+    #     self.event_recu.clear()
+    #     self.generateur.transmettre_requete(
+    #         dict(),
+    #         Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES,
+    #         reply_to=self.queue_name,
+    #         correlation_id='test',
+    #     )
+    #     self.event_recu.wait(3)
+    #     cert_maitrecles = self.messages.pop()
+    #
+    #     chiffreur = ChiffrerChampDict(self.contexte)
+    #     access_key_chiffre = chiffreur.chiffrer(cert_maitrecles, ConstantesTopologie.DOMAINE_NOM, indicateurs_document, access_key)
+    #
+    #     transaction = {
+    #         ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
+    #
+    #         ConstantesTopologie.CHAMP_CONSIGNATION_WEB_MODE: ConstantesTopologie.VALEUR_AWSS3_CONSIGNATION_WEB_AWSS3,
+    #         # ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_REGION: 'us-east-2',
+    #         # ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSID: 'AKIA2JHYIVE5O2ZXZNA6',
+    #         ConstantesTopologie.CHAMP_AWSS3_BUCKET_REGION: 'us-east-1',
+    #         # ConstantesTopologie.CHAMP_AWSS3_BUCKET_NAME: 'millegrilles-site1',
+    #         # ConstantesTopologie.CHAMP_AWSS3_BUCKET_DIRFICHIER: 'QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST/public',
+    #
+    #         ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY: access_key_chiffre['contenu'],
+    #     }
+    #
+    #     # Emettre transaction deja signee avec les cles asymetriques
+    #     transaction_maitrecles = access_key_chiffre['maitrecles']
+    #     domaine_action = 'transaction.' + transaction_maitrecles['en-tete']['domaine']
+    #     self.generateur.emettre_message(transaction_maitrecles, domaine_action)
+    #
+    #     # Soumettre transaction avec le secret chiffre
+    #     domaine_action = ConstantesTopologie.DOMAINE_NOM + '.' + ConstantesTopologie.TRANSACTION_CONFIGURER_CONSIGNATION_WEB
+    #     self.generateur.soumettre_transaction(
+    #         transaction, domaine_action,
+    #         reply_to=self.queue_name, correlation_id='efgh')
 
-        indicateurs_document = {
-            'libelle': ConstantesTopologie.LIBVAL_NOEUD,
-            ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
-            'champ': ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
-        }
-
-        self.event_recu.clear()
-        self.generateur.transmettre_requete(
-            dict(),
-            Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES,
-            reply_to=self.queue_name,
-            correlation_id='test',
-        )
-        self.event_recu.wait(3)
-        cert_maitrecles = self.messages.pop()
-
-        chiffreur = ChiffrerChampDict(self.contexte)
-        access_key_chiffre = chiffreur.chiffrer(cert_maitrecles, ConstantesTopologie.DOMAINE_NOM, indicateurs_document, access_key)
-
-        transaction = {
-            ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
-
-            ConstantesTopologie.CHAMP_CONSIGNATION_WEB_MODE: ConstantesTopologie.VALEUR_AWSS3_CONSIGNATION_WEB_AWSS3,
-            # ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_REGION: 'us-east-2',
-            # ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSID: 'AKIA2JHYIVE5O2ZXZNA6',
-            ConstantesTopologie.CHAMP_AWSS3_BUCKET_REGION: 'us-east-1',
-            # ConstantesTopologie.CHAMP_AWSS3_BUCKET_NAME: 'millegrilles-site1',
-            # ConstantesTopologie.CHAMP_AWSS3_BUCKET_DIRFICHIER: 'QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST/public',
-
-            ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY: access_key_chiffre['contenu'],
-        }
-
-        # Emettre transaction deja signee avec les cles asymetriques
-        transaction_maitrecles = access_key_chiffre['maitrecles']
-        domaine_action = 'transaction.' + transaction_maitrecles['en-tete']['domaine']
-        self.generateur.emettre_message(transaction_maitrecles, domaine_action)
-
-        # Soumettre transaction avec le secret chiffre
-        domaine_action = ConstantesTopologie.DOMAINE_NOM + '.' + ConstantesTopologie.TRANSACTION_CONFIGURER_CONSIGNATION_WEB
-        self.generateur.soumettre_transaction(
-            transaction, domaine_action,
-            reply_to=self.queue_name, correlation_id='efgh')
-
-    def dechiffrer_secret_consignation_web(self):
-
-        # Demander permission de dechiffrage a topologie - forward a maitre des cles pour reourner reponse
-        # Meme approche que pour dechiffrer un grosfichier
-
-        noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
-        identificateurs_document = {
-            'libelle': ConstantesTopologie.LIBVAL_NOEUD,
-            ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
-            'champ': ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
-        }
-
-        self.event_recu.clear()
-        self.generateur.transmettre_requete(
-            {'identificateurs_document': identificateurs_document},
-            ConstantesTopologie.DOMAINE_NOM + '.' + ConstantesTopologie.REQUETE_PERMISSION,
-            reply_to=self.queue_name,
-            correlation_id='test',
-            ajouter_certificats=True,
-        )
-        self.event_recu.wait(3)
-        permission = self.messages.pop()
-        self.event_recu.clear()
-
-        signateur = self.contexte.signateur_transactions
-        iv_base64 = permission['iv']
-        secret_base64 = permission['cle']
-        password_bytes = signateur.dechiffrage_asymmetrique(secret_base64)
-        # password_bytes = binascii.unhexlify(password_bytes)
-
-        # Dechiffrer secret
-        contenu = {
-            'secret_chiffre': "s8PvG7YfVEdwjoH2LR63wkGfihYGdlomEkdn8echLGhmwNwk8YjlLBSrAogtSFFw"
-        }
-
-        dechiffreur = DechiffrerChampDict(self.contexte)
-        contenu_dechiffre = dechiffreur.dechiffrer(contenu, iv_base64, password_bytes)
-
-        print("Contenu dechiffre : %s" % contenu_dechiffre)
+    # def dechiffrer_secret_consignation_web(self):
+    #
+    #     # Demander permission de dechiffrage a topologie - forward a maitre des cles pour reourner reponse
+    #     # Meme approche que pour dechiffrer un grosfichier
+    #
+    #     noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
+    #     identificateurs_document = {
+    #         'libelle': ConstantesTopologie.LIBVAL_NOEUD,
+    #         ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
+    #         'champ': ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
+    #     }
+    #
+    #     self.event_recu.clear()
+    #     self.generateur.transmettre_requete(
+    #         {'identificateurs_document': identificateurs_document},
+    #         ConstantesTopologie.DOMAINE_NOM + '.' + ConstantesTopologie.REQUETE_PERMISSION,
+    #         reply_to=self.queue_name,
+    #         correlation_id='test',
+    #         ajouter_certificats=True,
+    #     )
+    #     self.event_recu.wait(3)
+    #     permission = self.messages.pop()
+    #     self.event_recu.clear()
+    #
+    #     signateur = self.contexte.signateur_transactions
+    #     iv_base64 = permission['iv']
+    #     secret_base64 = permission['cle']
+    #     password_bytes = signateur.dechiffrage_asymmetrique(secret_base64)
+    #     # password_bytes = binascii.unhexlify(password_bytes)
+    #
+    #     # Dechiffrer secret
+    #     contenu = {
+    #         'secret_chiffre': "s8PvG7YfVEdwjoH2LR63wkGfihYGdlomEkdn8echLGhmwNwk8YjlLBSrAogtSFFw"
+    #     }
+    #
+    #     dechiffreur = DechiffrerChampDict(self.contexte)
+    #     contenu_dechiffre = dechiffreur.dechiffrer(contenu, iv_base64, password_bytes)
+    #
+    #     print("Contenu dechiffre : %s" % contenu_dechiffre)
 
     def resolve_idmg(self):
         requete = {
@@ -262,7 +262,7 @@ class MessagesSample(DomaineTest):
     def executer(self):
         # sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
-        # sample.requete_liste_applications()
+        sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
         # sample.requete_info_noeud()
@@ -271,7 +271,7 @@ class MessagesSample(DomaineTest):
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
-        sample.resolve_idmg()
+        # sample.resolve_idmg()
 
 # --- MAIN ---
 sample = MessagesSample()

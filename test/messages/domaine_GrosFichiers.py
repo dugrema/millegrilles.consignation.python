@@ -31,13 +31,13 @@ class MessagesSample(BaseCallback):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
 
     def queue_open_local(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.executer()
 
     def run_ioloop(self):
@@ -360,6 +360,23 @@ class MessagesSample(BaseCallback):
         print("requete_documents_collection %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_documents_par_fuuid(self):
+        requete = {
+            ConstantesGrosFichiers.DOCUMENT_LISTE_FUUIDS_DOCUMENTS: [
+                'zSEfXUAomaL1MWAzGAFmKAheq3XKpvhExe9pw2cQZ5stRYDL1Rgh525g7JyZkFpEbG5VytwhUZzR8WAY4cJ9vhVRzrXowf',  # b4a3b0c3-515f-4333-a890-27ede3070ad3
+                'zSEfXUAjtmAxP3tvhRg68Vfh74hcx6B3EqUarphCztXPLWUuy2XhwWBgsSABbJYZGwm96f3EtqGckN6DRxEutwGbC2uvu8',  # 2070e9b4-7b15-4a2c-a8c0-038de3d8d546
+            ],
+        }
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete,
+            Constantes.ConstantesGrosFichiers.DOMAINE_NOM,
+            action=Constantes.ConstantesGrosFichiers.REQUETE_DOCUMENT_PAR_FUUID,
+            securite=Constantes.SECURITE_PRIVE,
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("requete_documents_collection %s" % enveloppe_val)
+        return enveloppe_val
+
     def transaction_associer_preview(self):
         transaction = {
             'uuid': 'af6606b0-fac9-11ea-af1c-37323461d64a',
@@ -643,6 +660,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.requete_corbeille()
         # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
+        enveloppe = sample.requete_documents_par_fuuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
         # sample.requete_permission_decryptage_cle_fuuid()
@@ -667,7 +685,7 @@ class MessagesSample(BaseCallback):
         # sample.requete_collection_personnelle()
         # sample.transaction_supprimer_fichier_usager()
         # sample.requete_conversions_en_cours()
-        sample.commande_regenerer_collectionfichiers()
+        # sample.commande_regenerer_collectionfichiers()
         # sample.commande_indexer_fichiers()
         # sample.requete_rechercher_index()
 
