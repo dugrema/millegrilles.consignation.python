@@ -8,7 +8,7 @@ NAME=millegrilles_consignation_python_main
 #BRANCH=`echo $_TAG | sed 's|[a-zA-Z\/\-]||g'`
 BRANCH=`git rev-parse --abbrev-ref HEAD`
 #BRANCH=1.37
-ARCH_SUPPORTEES=( x86_64 armv7l aarch64 )
+ARCH_SUPPORTEES=( x86_64 aarch64 )
 BUILD=`cat build.txt`
 
 VERSION=$BRANCH.$BUILD
