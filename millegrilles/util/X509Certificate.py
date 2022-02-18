@@ -1644,6 +1644,13 @@ class GenererGrosFichiers(GenerateurNoeud):
             critical=False
         )
 
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join([Constantes.ConstantesGrosFichiers.DOMAINE_NOM]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
+            critical=False
+        )
+
         liste_dns = [
             x509.DNSName(u'grosfichiers'),
             x509.DNSName(u'%s' % self._common_name),
@@ -1707,6 +1714,13 @@ class GenererMessagerie(GenerateurNoeud):
         roles = ConstantesGenerateurCertificat.ROLE_MESSAGERIE.encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join(['Messagerie']).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
             critical=False
         )
 
@@ -1779,6 +1793,13 @@ class GenererMedia(GenerateurNoeud):
         roles = ','.join([ConstantesGenerateurCertificat.ROLE_MEDIA, ConstantesGenerateurCertificat.ROLE_FICHIERS]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join([Constantes.ConstantesGrosFichiers.DOMAINE_NOM]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
             critical=False
         )
 
