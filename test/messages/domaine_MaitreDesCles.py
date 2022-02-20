@@ -204,6 +204,22 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_verifier_preuve(self, hachage: list):
+        requete_cert_maitredescles = {
+            "preuve": {
+                "zSEfXUEbDxbPeBxLMRChRmESn4qx26s9dWm4HSoPURfw3JrY76U5QBm4QFVG8fU78wyVX2hFvCjFjbxTu2rv8tTQVsUQfZ": "mcv9Y+kSipXenqFzLbOPGXElreTjLrjPPJwQOB4bQDjPdb7KXHCR5tj0Ob5HPkTQzRS3ItGxLUbZXLN0YZFX/CJJKiuYCwYOmW/xtWErjVas"
+            },
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_VERIFIER_PREUVE,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def requete_cle_document(self):
         fingerprint = self.clecert.fingerprint
 
@@ -721,7 +737,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.event_recu.wait(5)
         # self.event_recu.clear()
 
-        enveloppe = self.requete_cert_maitredescles()
+        # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
         # for i in range(0, 2):
@@ -752,6 +768,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_cle_backup()
         # self.requete_cle_backup_application()
         # self.commande_sauvegarder_cle()
+        self.requete_verifier_preuve()
 
         # self.requete_dechiffrage_cle([
         #     "sha512_b64:aBUX0NsH2scbs+dCqAFsd2FCRO1L6aXsvxMpqVrE94vxam45dN9J1sxhrzTh8xKvy17vZDuHW5DmqnOKAij5DQ==",

@@ -109,7 +109,8 @@ class GenerateurTransaction:
             reply_to=reply_to, correlation_id=correlation_id)
 
     def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None, domaine_direct=False,
-                            idmg_destination: str = None, securite: str = None, ajouter_certificats=False, action: str = None):
+                            idmg_destination: str = None, securite: str = None, ajouter_certificats=False,
+                            action: str = None, partition: str = None):
         """
         Transmet une requete au backend de MilleGrilles. La requete va etre vu par un des workers du domaine. La
         reponse va etre transmise vers la "message_dao.queue_reponse", et le correlation_id permet de savoir a
@@ -132,7 +133,8 @@ class GenerateurTransaction:
 
         enveloppe = message_dict.copy()
         enveloppe = self.preparer_enveloppe(
-            enveloppe, domaine, idmg_destination=idmg_destination, ajouter_certificats=ajouter_certificats, action=action)
+            enveloppe, domaine, idmg_destination=idmg_destination, ajouter_certificats=ajouter_certificats,
+            action=action, partition=partition)
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
@@ -141,6 +143,8 @@ class GenerateurTransaction:
             routing_key = domaine
         else:
             routing_key = 'requete.%s' % domaine
+            if partition is not None:
+                routing_key = routing_key + '.' + partition
             if action is not None:
                 routing_key = routing_key + '.' + action
 

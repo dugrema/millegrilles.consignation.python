@@ -811,6 +811,7 @@ class ConstantesMaitreDesCles:
 
     REQUETE_DECHIFFRAGE = 'dechiffrage'
     REQUETE_PERMISSION = 'permission'  # Permission de dechiffrage (embedded dans requete)
+    REQUETE_VERIFIER_PREUVE = 'verifierPreuve'
 
     # REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     # REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
