@@ -391,6 +391,29 @@ class MessagesSample(BaseCallback):
         print("Envoi metadata: %s" % enveloppe_val)
         return enveloppe_val
 
+    def commande_favoris_creerpath(self):
+        user_id = 'z2i3Xjx5rCkDcJshcThPNHfhWWHzesPKuQYcZa2LEK5T3kZgNg9'
+
+        commande = {
+            'user_id': user_id,  # Optionnel, disponible si certificat 4.secure ou delegation globale
+            'favoris_id': 'messagerie',
+            'path_collections': [
+                'outgoing',
+                '2022-02-18'
+            ]
+        }
+        enveloppe_val = self.generateur.transmettre_commande(
+            commande,
+            ConstantesGrosFichiers.DOMAINE_NOM,
+            action=ConstantesGrosFichiers.TRANSACTION_FAVORIS_CREER_PATH,
+            exchange=Constantes.SECURITE_PRIVE,
+            reply_to=self.queue_name, correlation_id='efgh',
+            ajouter_certificats=True
+        )
+
+        print("Envoi metadata: %s" % enveloppe_val)
+        return enveloppe_val
+
     def requete_decryptage_cle_fuuid(self):
         requete_cert_maitredescles = {
             'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0"
@@ -660,7 +683,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.requete_corbeille()
         # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
-        enveloppe = sample.requete_documents_par_fuuid()
+        # enveloppe = sample.requete_documents_par_fuuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
         # sample.requete_permission_decryptage_cle_fuuid()
@@ -688,6 +711,7 @@ class MessagesSample(BaseCallback):
         # sample.commande_regenerer_collectionfichiers()
         # sample.commande_indexer_fichiers()
         # sample.requete_rechercher_index()
+        sample.commande_favoris_creerpath()
 
         pass
 

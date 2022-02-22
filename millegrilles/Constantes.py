@@ -1175,6 +1175,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_ASSOCIER_CONVERSIONS = '%s.associerConversions' % DOMAINE_NOM
     TRANSACTION_DECRIRE_FICHIER = 'decrireFichier'
     TRANSACTION_DECRIRE_COLLECTION = 'decrireCollection'
+    TRANSACTION_FAVORIS_CREER_PATH = 'favorisCreerPath'
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
