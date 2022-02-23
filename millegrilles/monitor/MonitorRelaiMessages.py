@@ -60,6 +60,16 @@ class TraitementMessagesMiddleware(BaseCallback):
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
             self.traiter_presence_domaine(message_dict)
+        elif routing_key == Constantes.EVENEMENT_ROUTING_TOPOLOGIE_FICHEPUBLIQUE:
+            action = routing_key.split('.')[-1]
+            contenu = {
+                'commande': action,
+                'exchange': exchange,
+                'properties': properties,
+            }
+            contenu.update(message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict)
+            self.__gestionnaire_commandes.ajouter_commande(commande)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT:
@@ -127,6 +137,14 @@ class TraitementMessagesMiddleware(BaseCallback):
                         routing_key=routing_key,
                         callback=None
                     )
+
+            # Evenements publics
+            self.__channel.queue_bind(
+                exchange=Constantes.SECURITE_PUBLIC,
+                queue=self.queue_name,
+                routing_key='evenement.CoreTopologie.fichePublique',
+                callback=None
+            )
 
         routing_keys = [
             'commande.servicemonitor.%s.#' % self._noeud_id,

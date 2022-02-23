@@ -159,6 +159,22 @@ class MessagesSample(DomaineTest):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def emettre_fiche_publique(self):
+        evenement = {
+
+        }
+        enveloppe_val = self.generateur.emettre_message(
+            evenement,
+            'evenement.topologie.fichePublique',
+            version=1,
+            domaine=ConstantesTopologie.DOMAINE_NOM,
+            action=ConstantesTopologie.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE,
+            reply_to=self.queue_name, correlation_id='efgh',
+            exchanges=[Constantes.SECURITE_PUBLIC],
+            ajouter_certificats=True
+        )
+        print("Envoi metadata: %s" % enveloppe_val)
+
     # def transaction_consignation_web(self):
     #     noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
     #     access_key = 'DADAXXXAAABBBCCCC000DADA'
@@ -262,7 +278,7 @@ class MessagesSample(DomaineTest):
     def executer(self):
         # sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
-        sample.requete_liste_applications()
+        # sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
         # sample.requete_info_noeud()
@@ -272,6 +288,7 @@ class MessagesSample(DomaineTest):
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
         # sample.resolve_idmg()
+        sample.emettre_fiche_publique()
 
 # --- MAIN ---
 sample = MessagesSample()

@@ -187,6 +187,9 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE:
                 reponse = self._service_monitor.gestionnaire_certificats.renouveller_intermediaire(commande)
 
+            elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
+                self.sauvegarder_fiche_publique(commande)
+
             else:
                 self.__logger.error("Commande inconnue : %s", nom_commande)
                 return
@@ -206,6 +209,10 @@ class GestionnaireCommandes:
             except Exception:
                 self.__logger.exception("Erreur transmission reponse a commande %s:\n%s\nReponse :\n%s" % (
                     commande.nom_commande, str(commande.contenu), str(reponse)))
+
+    def sauvegarder_fiche_publique(self, commande):
+        self.__logger.debug("Sauvegarder fiche publique : %s" % commande)
+        self._service_monitor.publier_fiche_publique(commande.message)
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']

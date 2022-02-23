@@ -179,6 +179,7 @@ TRANSACTION_ROUTING_UPDATE_DOC = 'updateDoc'
 TRANSACTION_ROUTING_ERREURS = 'erreur'
 
 EVENEMENT_ROUTING_PRESENCE_DOMAINES = 'evenement.presence.domaine'
+EVENEMENT_ROUTING_TOPOLOGIE_FICHEPUBLIQUE = 'evenement.CoreTopologie.fichePublique'
 
 PROCESSUS_DOCUMENT_LIBELLE_MOTEUR = 'moteur'
 PROCESSUS_MESSAGE_LIBELLE_PROCESSUS = 'processus'
@@ -1819,6 +1820,9 @@ class ConstantesServiceMonitor:
     COMMANDE_ACTEUR_GET_INFORMATION_NOEUD = 'acteur.getInformationNoeud'
     COMMANDE_ACTEUR_REPONSE_MDNS = 'acteur.reponseMdns'
 
+    # Evenements recus par MQ
+    EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE = 'fichePublique'
+
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
     CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'
     CORRELATION_CERTIFICAT_SIGNE = 'certificatSigne'
@@ -1860,6 +1864,7 @@ class ConstantesTopologie:
 
     EVENEMENT_PRESENCE_DOMAINE = 'evenement.presence.domaine'
     EVENEMENT_PRESENCE_MONITOR = 'evenement.presence.monitor'
+    EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE = 'fichePublique'
 
     REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM
     REQUETE_LISTE_NOEUDS = '%s.listeNoeuds' % DOMAINE_NOM

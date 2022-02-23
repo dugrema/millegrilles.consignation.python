@@ -1,6 +1,7 @@
 import logging
 import os
 import datetime
+import gzip
 
 from os import path
 from base64 import b64decode
@@ -421,11 +422,22 @@ location /certs {
 }
         """
 
+        fiches = """
+location /fiche.json {
+  root /usr/share/nginx/files;
+  include /etc/nginx/conf.d/component_cors.include;
+  
+  gzip on;
+  gzip_static on;
+  gzip_types application/json;
+}
+        """
         locations_list = list()
 
         locations_list.append(location_redirect_installation)
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
+        locations_list.append(fiches)
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
         locations_list.append(location_certissuer_component)
 
@@ -447,6 +459,15 @@ include /etc/nginx/conf.d/server.include;
             self.redeployer_nginx(nom_service=nom_service)
         except IndexError:
             pass  # OK, nginx n'est juste pas configure (pas de service, probablement en cours d'initialisation)
+
+    def publier_fichier(self, contenu: bytes, path_html: str, gzip_flag: False):
+        path_fichier = path.join(self.__repertoire_html, path_html)
+        if gzip_flag is True:
+            with gzip.open(path_fichier, 'wb') as fichier:
+                fichier.write(contenu)
+        else:
+            with open(path_fichier, 'wb') as fichier:
+                fichier.write(contenu)
 
     def redemarrer_nginx(self):
         """

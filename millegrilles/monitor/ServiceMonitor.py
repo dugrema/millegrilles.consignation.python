@@ -1129,6 +1129,10 @@ class ServiceMonitor:
     def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
         raise NotImplementedError("Non supporte")
 
+    def publier_fiche_publique(self, fiche: dict):
+        fiche_bytes = json.dumps(fiche).encode('utf-8')
+        self._gestionnaire_web.publier_fichier(fiche_bytes, 'fiche.json.gz', True)
+
     
 class ServiceMonitorPrincipal(ServiceMonitor):
     """
