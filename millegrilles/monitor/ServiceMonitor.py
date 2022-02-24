@@ -1145,12 +1145,24 @@ class ServiceMonitor:
 
             params = {
                 'url': contenu['url'],
-                'verify': False,  # Disable https certificat verification
             }
 
+            # Copier parametres optionnels
+            params_optionnels = ['headers', 'data', 'json']
+            for nom_param in params_optionnels:
+                if contenu.get(nom_param) is not None:
+                    params[nom_param] = contenu[nom_param]
+
             method: str = contenu.get('method') or 'GET'
+            flag_erreur_https = False
             if method.lower() == 'get':
-                response = requests.get(**params)
+                try:
+                    response = requests.get(**params)
+                except requests.exceptions.SSLError:
+                    self.__logger.debug("Erreur certificat https, ajouter un flag certificat invalide")
+                    flag_erreur_https = True
+                    params['verify'] = False  # Desactiver verification certificat https
+                    response = requests.get(**params)
             elif method.lower() == 'post':
                 response = requests.post(**params)
             else:
@@ -1159,12 +1171,16 @@ class ServiceMonitor:
             self.__logger.debug("Response : %s" % response)
 
             if 200 <= response.status_code < 300:
+                headers = response.headers
+                header_dict = {}
+                for header_key in headers.keys():
+                    header_dict[header_key] = headers.get(header_key)
                 try:
                     json_response = response.json()
-                    return {'json': json_response, 'code': response.status_code}
+                    return {'headers': header_dict, 'json': json_response, 'code': response.status_code, 'verify_ok': not flag_erreur_https}
                 except:
                     # Encoder reponse en multibase
-                    return {'text': response.text, 'code': response.status_code}
+                    return {'headers': header_dict, 'text': response.text, 'code': response.status_code, 'verify_ok': not flag_erreur_https}
             else:
                 # Erreur
                 return {'ok': False, 'code': response.status_code, 'err': response.text}
