@@ -53,13 +53,13 @@ class MessagesSample(BaseCallback):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.executer()
 
     # def run_ioloop(self):
@@ -193,6 +193,23 @@ BA==
             correlation_id='efgh'
         )
 
+    def commande_relai_web(self):
+        commande = {
+            'url': 'https://mg-dev5.maple.maceroc.com/fiche.json'
+        }
+        enveloppe_requete = self.generateur.transmettre_commande(
+            commande,
+            'servicemonitor',
+            action=Constantes.ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
+            exchange=Constantes.SECURITE_PROTEGE,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            ajouter_certificats=True
+        )
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
@@ -201,7 +218,8 @@ BA==
         # self.commande_activer_hebergement()
         # self.commande_desactiver_hebergement()
         # self.transaction_signer_certificat_navigateur()
-        self.transaction_signer_certificat_noeud()
+        # ertificat_noeud()
+        self.commande_relai_web()
 
 
 # --- MAIN ---

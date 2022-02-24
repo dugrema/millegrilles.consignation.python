@@ -11,6 +11,7 @@ import tarfile
 import io
 import lzma
 import pytz
+import requests
 
 from typing import cast, Optional
 from threading import Event, BrokenBarrierError
@@ -1133,7 +1134,45 @@ class ServiceMonitor:
         fiche_bytes = json.dumps(fiche).encode('utf-8')
         self._gestionnaire_web.publier_fichier(fiche_bytes, 'fiche.json.gz', True)
 
-    
+    def relai_web(self, commande: CommandeMonitor):
+        self.__logger.debug("Commande relai web : %s", commande)
+        certificat = commande.certificat
+        if certificat is None:
+            return {'ok': False, 'code': 400, 'err': 'Certificat absent'}
+        roles = certificat.get_roles
+        if 'core' in roles:
+            contenu = commande.contenu
+
+            params = {
+                'url': contenu['url'],
+                'verify': False,  # Disable https certificat verification
+            }
+
+            method: str = contenu.get('method') or 'GET'
+            if method.lower() == 'get':
+                response = requests.get(**params)
+            elif method.lower() == 'post':
+                response = requests.post(**params)
+            else:
+                return {'ok': False, 'code': 400, 'err': 'Methode inconnue'}
+
+            self.__logger.debug("Response : %s" % response)
+
+            if 200 <= response.status_code < 300:
+                try:
+                    json_response = response.json()
+                    return {'json': json_response, 'code': response.status_code}
+                except:
+                    # Encoder reponse en multibase
+                    return {'text': response.text, 'code': response.status_code}
+            else:
+                # Erreur
+                return {'ok': False, 'code': response.status_code, 'err': response.text}
+
+        else:
+            return {'ok': False, 'code': 403, 'err': 'Not authorized'}
+
+
 class ServiceMonitorPrincipal(ServiceMonitor):
     """
     ServiceMonitor pour noeud protege principal

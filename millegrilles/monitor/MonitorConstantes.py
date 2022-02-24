@@ -1,6 +1,7 @@
 from typing import cast
 
 from millegrilles.Constantes import ConstantesServiceMonitor
+from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
@@ -193,10 +194,11 @@ def trouver_config(config_name: str, docker_client):
 
 class CommandeMonitor:
 
-    def __init__(self, contenu: dict, mq_properties=None, message: dict = None):
+    def __init__(self, contenu: dict, mq_properties=None, message: dict = None, enveloppe: EnveloppeCertificat = None):
         self.__contenu = contenu
         self.__mq_properties = mq_properties
         self.__message = message
+        self.__enveloppe = enveloppe
 
     @property
     def contenu(self):
@@ -213,6 +215,10 @@ class CommandeMonitor:
     @property
     def message(self):
         return self.__message
+
+    @property
+    def certificat(self):
+        return self.__enveloppe
 
     def __str__(self):
         return "%s = %s" % (self.nom_commande, self.__contenu)

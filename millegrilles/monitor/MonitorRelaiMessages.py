@@ -46,17 +46,20 @@ class TraitementMessagesMiddleware(BaseCallback):
         correlation_id = properties.correlation_id
         exchange = method.exchange
 
+        validateur = self.contexte.validateur_message
+        enveloppe_certificat = validateur.verifier(message_dict)
+
         self.__logger_verbose.debug("Message recu : %s" % message_dict)
+        action = routing_key.split('.')[-1]
 
         if routing_key.startswith('commande.'):
-            action = routing_key.split('.')[-1]
             contenu = {
                 'commande': action,
                 'exchange': exchange,
                 'properties': properties,
             }
             contenu.update(message_dict)
-            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict, enveloppe=enveloppe_certificat)
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
             self.traiter_presence_domaine(message_dict)
@@ -68,7 +71,7 @@ class TraitementMessagesMiddleware(BaseCallback):
                 'properties': properties,
             }
             contenu.update(message_dict)
-            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict, enveloppe=enveloppe_certificat)
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
@@ -79,7 +82,16 @@ class TraitementMessagesMiddleware(BaseCallback):
                 'properties': properties,
             }
             contenu.update(message_dict)
-            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict, enveloppe=enveloppe_certificat)
+            self.__gestionnaire_commandes.ajouter_commande(commande)
+        elif action == ConstantesServiceMonitor.COMMANDE_RELAI_WEB:
+            contenu = {
+                'commande': action,
+                'exchange': exchange,
+                'properties': properties,
+            }
+            contenu.update(message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict, enveloppe=enveloppe_certificat)
             self.__gestionnaire_commandes.ajouter_commande(commande)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
@@ -101,6 +113,7 @@ class TraitementMessagesMiddleware(BaseCallback):
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
             ]
 
             # Ajouter les routing keys

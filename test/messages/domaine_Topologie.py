@@ -287,8 +287,8 @@ class MessagesSample(DomaineTest):
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
-        # sample.resolve_idmg()
-        sample.emettre_fiche_publique()
+        sample.resolve_idmg()
+        # sample.emettre_fiche_publique()
 
 # --- MAIN ---
 sample = MessagesSample()

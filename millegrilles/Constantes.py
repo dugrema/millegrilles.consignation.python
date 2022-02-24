@@ -1819,6 +1819,7 @@ class ConstantesServiceMonitor:
     # Commande de l'acteur systeme du noeud
     COMMANDE_ACTEUR_GET_INFORMATION_NOEUD = 'acteur.getInformationNoeud'
     COMMANDE_ACTEUR_REPONSE_MDNS = 'acteur.reponseMdns'
+    COMMANDE_RELAI_WEB = 'relaiWeb'
 
     # Evenements recus par MQ
     EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE = 'fichePublique'

@@ -190,6 +190,9 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
                 self.sauvegarder_fiche_publique(commande)
 
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RELAI_WEB:
+                reponse = self._service_monitor.relai_web(commande)
+
             else:
                 self.__logger.error("Commande inconnue : %s", nom_commande)
                 return
@@ -212,7 +215,7 @@ class GestionnaireCommandes:
 
     def sauvegarder_fiche_publique(self, commande):
         self.__logger.debug("Sauvegarder fiche publique : %s" % commande)
-        self._service_monitor.publier_fiche_publique(commande.message)
+        self._service_monitor.publier_fiche_publique(commande)
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']
