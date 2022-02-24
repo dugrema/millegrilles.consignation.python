@@ -424,7 +424,7 @@ location /certs {
 
         fiches = """
 location /fiche.json {
-  root /usr/share/nginx/files;
+  root /usr/share/nginx/html;
   include /etc/nginx/conf.d/component_cors.include;
   
   gzip on;
