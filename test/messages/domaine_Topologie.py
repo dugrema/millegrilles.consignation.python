@@ -264,7 +264,10 @@ class MessagesSample(DomaineTest):
 
     def resolve_idmg(self):
         requete = {
-            'dns': ['mg-dev5.maple.maceroc.com'],
+            'dns': [
+                'mg-dev5.maple.maceroc.com',
+                'mg-dev4.maple.maceroc.com',
+            ],
         }
         domaine_action = ConstantesTopologie.DOMAINE_NOM
         action = 'resolveIdmg'

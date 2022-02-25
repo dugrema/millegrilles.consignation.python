@@ -195,10 +195,10 @@ BA==
 
     def commande_relai_web(self):
         commande = {
-            'url': 'https://mg-dev5.maple.maceroc.com/fiche.json',
+            'url': 'https://mg-dev4.maple.maceroc.com/fiche.json',
             'headers': {
                 'Cache-Control': 'public, max-age=604800',
-                "If-None-Match": "\"6217c45a-91b\"",
+                "If-None-Match": "\"6218234a-7d7\"",
                 # "If-Modified-Since": "Thu, 24 Feb 2022 17:46:02 GMT",
             }
         }

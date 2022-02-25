@@ -1145,6 +1145,7 @@ class ServiceMonitor:
 
             params = {
                 'url': contenu['url'],
+                'timeout': contenu.get('timeout') or 20,
             }
 
             # Copier parametres optionnels
@@ -1163,6 +1164,9 @@ class ServiceMonitor:
                     flag_erreur_https = True
                     params['verify'] = False  # Desactiver verification certificat https
                     response = requests.get(**params)
+                except requests.exceptions.ReadTimeout:
+                    self.__logger.error("Erreur timeout sur %s", params['url'])
+                    return {'ok': False, 'code': 408, 'err': 'Methode inconnue'}
             elif method.lower() == 'post':
                 response = requests.post(**params)
             else:
