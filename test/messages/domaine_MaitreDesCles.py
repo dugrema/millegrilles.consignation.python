@@ -768,12 +768,11 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_cle_backup()
         # self.requete_cle_backup_application()
         # self.commande_sauvegarder_cle()
-        self.requete_verifier_preuve()
+        # self.requete_verifier_preuve()
 
-        # self.requete_dechiffrage_cle([
-        #     "sha512_b64:aBUX0NsH2scbs+dCqAFsd2FCRO1L6aXsvxMpqVrE94vxam45dN9J1sxhrzTh8xKvy17vZDuHW5DmqnOKAij5DQ==",
-        #     "sha512_b64:ys1vTtaKjCXnqt6i2G1GbHvN9vvMoiDt2IuV6/WatDVrN6pm670KO9iiL4N/tu6U60Jhsad+W3ZJky5iUGI1Hg==",
-        # ])
+        self.requete_dechiffrage_cle([
+            "zSEfXUAkCH41Z2FRVu5Faujutzjeo15XU7V9eH1zBwgBKP3NH6u4RsTBdTuzc8aPHkn8nsUZCeprmRYdGcUSMcBJvEmZP7",
+        ])
 
         # self.requete_dechiffrage_cle_permission([
         #     'z8VtAgm7BYshU7J9ZJRJKg8ZcZF783aAJuGgyR8dLNrvAEFEWhDi8zw8oicBD7NMqYnhNzRYQ8cJTydgWyFhtsjNyWX',

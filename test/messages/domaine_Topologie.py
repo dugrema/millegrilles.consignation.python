@@ -291,6 +291,20 @@ class MessagesSample(DomaineTest):
         )
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def requete_applications_tiers(self):
+        requete = {
+            'idmgs': ['zXbUwE5h2xMJRpUweJd4Fq8gRYujcPfjxCbA3vp1LBvEB1ZMiiE1DhW8'],
+            'application': 'messagerie',
+        }
+        domaine_action = ConstantesTopologie.DOMAINE_NOM
+        action = 'applicationsTiers'
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, domaine_action, action=action, securite=Constantes.SECURITE_PRIVE,
+            reply_to=self.queue_name, correlation_id='efgh',
+            ajouter_certificats=True
+        )
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def executer(self):
         # sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
@@ -303,9 +317,10 @@ class MessagesSample(DomaineTest):
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
-        sample.resolve_idmg()
+        # sample.resolve_idmg()
         # sample.emettre_fiche_publique()
         # sample.get_fiche_millegrille()
+        sample.requete_applications_tiers()
 
 # --- MAIN ---
 sample = MessagesSample()

@@ -28,13 +28,12 @@ class MessagesSample(BaseCallback):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
 
     def queue_open_local(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
-
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.executer()
 
     def run_ioloop(self):
@@ -94,12 +93,18 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def requete_certificat(self):
-        fingerprint = 'zQmTSwmX9UVsEpaeGT2JprmGbSW2S9CYyMXKQShoercJbcg'
+        # fingerprint = 'zQmTSwmX9UVsEpaeGT2JprmGbSW2S9CYyMXKQShoercJbcg'
         requete = {
-            # 'fingerprint': 'sha256_b64:idpQSrDt2h+CE0XSJZZNPEakd3Wha+EhcD9v4VKUXSk='
+            'fingerprint': 'z2i3XjxE6XABbojEjpxaYeznA8Hn8hL4brun8kDDodrc7hxVSEx'
         }
-        domaine_action = 'requete.certificat.' + fingerprint
-        self.generateur.transmettre_requete(requete, domaine_action, correlation_id='abcd', reply_to=self.queue_name)
+        # domaine_action = 'requete.certificat.' + fingerprint
+        self.generateur.transmettre_requete(
+            requete,
+            'CorePki',
+            action='infoCertificat',
+            correlation_id='abcd',
+            reply_to=self.queue_name
+        )
 
     def commande_sauvegarder_certificat(self):
         commande = {
@@ -124,9 +129,9 @@ class MessagesSample(BaseCallback):
 
         # self.requete_cert_backup()
         # self.requete_cert_noeuds()
-        # self.requete_certificat()
+        self.requete_certificat()
         # self.requete_cert_pk()
-        self.commande_sauvegarder_certificat()
+        # self.commande_sauvegarder_certificat()
         # self.transaction_sauvegarder_certificat()
 
 
