@@ -13,21 +13,27 @@ SAMPLE_DATA_1 = {
     "-----BEGIN CERTIFICATE-----\nMIICqTCCAlugAwIBAgIUNazLYqI/8SQbOnIaUXG+MyCiJVUwBQYDK2VwMHIxLTAr\nBgNVBAMTJDI1YTk5YmUxLWJmYmQtNDc3OS1iOTJkLTFhN2RmZTJjNTAwODFBMD8G\nA1UEChM4emVZbmNScUVxWjZlVEVtVVo4d2hKRnVIRzc5NmVTdkNUV0U0TTQzMml6\nWHJwMjJiQXR3R203SmYwHhcNMjIwMjIzMTU0MzAxWhcNMjIwMzE2MTU0NTAxWjCB\nhzFBMD8GA1UECgw4emVZbmNScUVxWjZlVEVtVVo4d2hKRnVIRzc5NmVTdkNUV0U0\nTTQzMml6WHJwMjJiQXR3R203SmYxEzARBgNVBAsMCm1lc3NhZ2VyaWUxLTArBgNV\nBAMMJDI1YTk5YmUxLWJmYmQtNDc3OS1iOTJkLTFhN2RmZTJjNTAwODAqMAUGAytl\ncAMhAPIzCw4wyDcn79ffu5W+519VGKKTH2B2xeA8WrnnjAHfo4HsMIHpMB0GA1Ud\nDgQWBBRoVYav2HOWLwR7X/FG9k4lqARD6jAfBgNVHSMEGDAWgBRkv0ubKhyaFvfm\nkZChsGh5Tm18/TAMBgNVHRMBAf8EAjAAMAsGA1UdDwQEAwIE8DAQBgQqAwQABAg0\nLnNlY3VyZTASBgQqAwQBBAptZXNzYWdlcmllMBIGBCoDBAIECk1lc3NhZ2VyaWUw\nUgYDVR0RBEswSYIkMjVhOTliZTEtYmZiZC00Nzc5LWI5MmQtMWE3ZGZlMmM1MDA4\ngglsb2NhbGhvc3SHBH8AAAGHEAAAAAAAAAAAAAAAAAAAAAEwBQYDK2VwA0EAZheW\nb/mlCqCHhWimOSGaaaQPXl0/V11JEQwiBW1elHGTUk8PH1PuFJ0FVRGsWk/hNp7H\n9E2ra+JugVcI0pztCw==\n-----END CERTIFICATE-----\n",
     "-----BEGIN CERTIFICATE-----\nMIIBozCCAVWgAwIBAgIKEHAXiYV2UgCGGDAFBgMrZXAwFjEUMBIGA1UEAxMLTWls\nbGVHcmlsbGUwHhcNMjIwMjIzMTUzNDU4WhcNMjMwOTA0MTUzNDU4WjByMS0wKwYD\nVQQDEyQyNWE5OWJlMS1iZmJkLTQ3NzktYjkyZC0xYTdkZmUyYzUwMDgxQTA/BgNV\nBAoTOHplWW5jUnFFcVo2ZVRFbVVaOHdoSkZ1SEc3OTZlU3ZDVFdFNE00MzJpelhy\ncDIyYkF0d0dtN0pmMCowBQYDK2VwAyEAMp0+f8uH17qEHVwXqm1CCcCavVUvJ0in\nIb08uoxipY+jYzBhMBIGA1UdEwEB/wQIMAYBAf8CAQAwCwYDVR0PBAQDAgEGMB0G\nA1UdDgQWBBRkv0ubKhyaFvfmkZChsGh5Tm18/TAfBgNVHSMEGDAWgBTTiP/MFw4D\nDwXqQ/J2LLYPRUkkETAFBgMrZXADQQAyfzc4Vb/lzRDFt63jMUMAk4Qr7yipQ0RZ\n2fRiBX7h808eAX5ThKjM1nnnqmFhQuVdIxh6usn4JQI6vTWYALsH\n-----END CERTIFICATE-----\n"
   ],
-  "_signature": "mAmmiUQqf8uMqgVKY9sCMkn6SzLSYUGiU+hisKFkMl5RiKJCFZbEwq+A90y+hFU7dKisjvh/GmjqCfLWqxyv/1gs",
+  "_signature": "mAu0fxjxITiHCazhJaJXqTQmh0VO/Dkfczg1eB/4QabQ54Z2TMQb0etymRsM/8LddZro04B44C1Q2T8EDmHgcPA0",
+  "certificat_message": [
+    "-----BEGIN CERTIFICATE-----\nMIICVzCCAgmgAwIBAgIUQrZjXTAIXBn4dVnfB2kP1UYKZgMwBQYDK2VwMHIxLTAr\nBgNVBAMTJDI1YTk5YmUxLWJmYmQtNDc3OS1iOTJkLTFhN2RmZTJjNTAwODFBMD8G\nA1UEChM4emVZbmNScUVxWjZlVEVtVVo4d2hKRnVIRzc5NmVTdkNUV0U0TTQzMml6\nWHJwMjJiQXR3R203SmYwHhcNMjIwMjI2MTc1NTI4WhcNMjIwMzE5MTc1NzI4WjBm\nMUEwPwYDVQQKDDh6ZVluY1JxRXFaNmVURW1VWjh3aEpGdUhHNzk2ZVN2Q1RXRTRN\nNDMyaXpYcnAyMmJBdHdHbTdKZjEPMA0GA1UECwwGVXNhZ2VyMRAwDgYDVQQDDAdt\nYXRoaWV1MCowBQYDK2VwAyEA/KNDChHzRde0mLqV0rWw15qTWG1V5clsLx2kMNa9\nq2mjgbwwgbkwHQYDVR0OBBYEFH8W/TpHOLqPD6X3WiKclpxYf3KfMB8GA1UdIwQY\nMBaAFGS/S5sqHJoW9+aRkKGwaHlObXz9MAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQD\nAgTwMB8GBCoDBAEEF25hdmlnYXRldXIsY29tcHRlX3ByaXZlMDsGBCoDBAMEM3oy\naTNYanhCZ0NwMW5VN3h3a0tuOUplTWpVOENBd25tb1JZUkpEZ2FNQ2NhZEw1NkhW\ndzAFBgMrZXADQQALJ5yls3GKUWrg5KtyeDODYn4Hk3qA98Gi33I8Ps2cwOBpOYbH\nwiW5B5BBsgFuueBkO1AAWTrgXEbdoyW0ZbMA\n-----END CERTIFICATE-----\n",
+    "-----BEGIN CERTIFICATE-----\nMIIBozCCAVWgAwIBAgIKEHAXiYV2UgCGGDAFBgMrZXAwFjEUMBIGA1UEAxMLTWls\nbGVHcmlsbGUwHhcNMjIwMjIzMTUzNDU4WhcNMjMwOTA0MTUzNDU4WjByMS0wKwYD\nVQQDEyQyNWE5OWJlMS1iZmJkLTQ3NzktYjkyZC0xYTdkZmUyYzUwMDgxQTA/BgNV\nBAoTOHplWW5jUnFFcVo2ZVRFbVVaOHdoSkZ1SEc3OTZlU3ZDVFdFNE00MzJpelhy\ncDIyYkF0d0dtN0pmMCowBQYDK2VwAyEAMp0+f8uH17qEHVwXqm1CCcCavVUvJ0in\nIb08uoxipY+jYzBhMBIGA1UdEwEB/wQIMAYBAf8CAQAwCwYDVR0PBAQDAgEGMB0G\nA1UdDgQWBBRkv0ubKhyaFvfmkZChsGh5Tm18/TAfBgNVHSMEGDAWgBTTiP/MFw4D\nDwXqQ/J2LLYPRUkkETAFBgMrZXADQQAyfzc4Vb/lzRDFt63jMUMAk4Qr7yipQ0RZ\n2fRiBX7h808eAX5ThKjM1nnnqmFhQuVdIxh6usn4JQI6vTWYALsH\n-----END CERTIFICATE-----\n"
+  ],
+  "certificat_millegrille": "-----BEGIN CERTIFICATE-----\r\nMIIBQzCB9qADAgECAgoHBykXJoaCCWAAMAUGAytlcDAWMRQwEgYDVQQDEwtNaWxs\r\nZUdyaWxsZTAeFw0yMjAxMTMyMjQ3NDBaFw00MjAxMTMyMjQ3NDBaMBYxFDASBgNV\r\nBAMTC01pbGxlR3JpbGxlMCowBQYDK2VwAyEAnnixameVCZAzfx4dO+L63DOk/34I\r\n/TC4fIA1Rxn19+KjYDBeMA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgLkMB0G\r\nA1UdDgQWBBTTiP/MFw4DDwXqQ/J2LLYPRUkkETAfBgNVHSMEGDAWgBTTiP/MFw4D\r\nDwXqQ/J2LLYPRUkkETAFBgMrZXADQQBSb0vXhw3pw25qrWoMjqROjawe7/kMlu7p\r\nMJyb/Ppa2C6PraSVPgJGWKl+/5S5tBr58KFNg+0H94CH4d1VCPwI\r\n-----END CERTIFICATE-----",
   "cle_info": {
     "domaine": "Messagerie",
     "format": "mgs3",
-    "hachage_bytes": "zSEfXUD16zhzViiUuZt9PVLDXC6FeXUYnetnu1rVbkJdnqbZWJwHNDUekdqJqusT2D3yvfdDe3cy3bhdoWmKdsYCnYUNLx",
+    "hachage_bytes": "zSEfXUAMzsh3NXfTVWyvVSjTXJZb1sP7KKsXzPj75sFN5sfHxZ8XMFULmaz7efWWBH5ug5bCb8xtNfzBbPtGNZmu2Tsxy2",
     "identificateurs_document": {
       "message": "true"
     },
-    "iv": "msib8pC725LbXnXKj",
-    "tag": "mzdgV+iZVHrxiFlNY/aw+iw"
+    "iv": "mVaCt/BUg/7rt+KOj",
+    "tag": "mU9yIV1lKTIXDRmeHOYe8eQ"
   },
   "destinations": [
     {
       "cles": {
-        "z2i3XjxJgyzgMSwpJ5E3xiy1wmPJF2W1moQxYnuTA1NYMrgg38N": "mqynb5PfQGSGVWy1642c4rTTGxAoye8ieNUKKK8gNIh+2DDW2sdxwLqU5pgmXZY7KC+MwGmLgpOC5mxlCFcetaQVWqJeDufjHol1YG/pqFMo"
+        "z2i3XjxGvXgnU9b9ZbtZY3FQmw9hchsCt4WhWch1un9uRs5fnhe": "mNt7IiOUhqDNVxKqrjtuvZpGXBFwTs/mEvK4g9GYU4E425qW3jdDlv3yo+O7iHAIcnTMuT/H/RJYWospNnGnaxynl+w36SHe42smmNmrQBno",
+        "z2i3XjxJgyzgMSwpJ5E3xiy1wmPJF2W1moQxYnuTA1NYMrgg38N": "mTjOn6eL2wLPdvbtkRmqL7W22KCiqQpM8i9CHaOJ5ikSKmJWH/ISqIUQ3ah1n9dpH1Tu424NLFsMWlQF/k7beewHVHvayc+R1W5oy5yPjQXI"
       },
       "destinataires": [
         "@proprietaire/mg-dev4.maple.maceroc.com"
@@ -64,27 +70,27 @@ SAMPLE_DATA_1 = {
   "en-tete": {
     "action": "poster",
     "domaine": "postmaster",
-    "estampille": 1646176559,
+    "estampille": 1646241377,
     "fingerprint_certificat": "z2i3Xjx88iAKh8bfkm6uyoeM3kUkDhXhqJ2U5vCx79MMZAreiPp",
-    "hachage_contenu": "mEiBwU/i0tS3mGj4dItZC7AqboKFEQn63vgwiPBz7KO/upQ",
+    "hachage_contenu": "mEiBs9c2RUfbHLWTJOTvglmQzKfVC7BF2AktL03vDhLX8xQ",
     "idmg": "zeYncRqEqZ6eTEmUZ8whJFuHG796eSvCTWE4M432izXrp22bAtwGm7Jf",
-    "uuid_transaction": "299d3607-b286-43bc-b9fe-4866a1ac4a3b",
+    "uuid_transaction": "454d869b-d526-4917-a195-41d3edc218ce",
     "version": 1
   },
   "message": {
-    "_signature": "mAm2MLxM9jxoqiJcpdJEzz0hex5p1XwbDVLf9XS6M2A6J1HrCRmMcGfHrHe9UnN2cNeGqJ8ow20nSxMOp+kljRQg",
+    "_signature": "mAknKBcarKvC5aPB8o0VwUmgg1T6GyjSN3nGK0e77VZ7FE32dVkabm6+rN5Iudmo8YMwQgA5If3YM7ruICB6t9gg",
     "en-tete": {
       "domaine": "Messagerie",
-      "estampille": 1646176558,
+      "estampille": 1646241377,
       "fingerprint_certificat": "z2i3Xjx5vJJW4j8gcSwXcxiJPAqM4r9Q9L34C2W2SxeELBPmRmq",
-      "hachage_contenu": "m4OQCIPKGbA31ldY3uxAK9JT5uRQCyPPXW6S8Wz93TqgLln+G",
+      "hachage_contenu": "m4OQCIKFfHkwuY9N23xi+mgEhJqd9Xumq//sZtvwameCJV8Cn",
       "idmg": "zeYncRqEqZ6eTEmUZ8whJFuHG796eSvCTWE4M432izXrp22bAtwGm7Jf",
-      "uuid_transaction": "5947f38e-a0e4-4bee-bcdb-498ee7071888",
+      "uuid_transaction": "5a73eab5-41c1-4524-841a-04e5292c3cdb",
       "version": 1
     },
     "fingerprint_certificat": "z2i3Xjx5vJJW4j8gcSwXcxiJPAqM4r9Q9L34C2W2SxeELBPmRmq",
-    "hachage_bytes": "zSEfXUD16zhzViiUuZt9PVLDXC6FeXUYnetnu1rVbkJdnqbZWJwHNDUekdqJqusT2D3yvfdDe3cy3bhdoWmKdsYCnYUNLx",
-    "message_chiffre": "mJc4cl7luYx747Ij9G8i1wMgRByu2/KpUYuzE4+LAexE6owX0XstD42wZD/2feiEhAcEkCE/PP/q0YJK5/MY5Wnw3kSvReCp05AxI68xHJwbOehvtOQGPzjZGEso6x/YtR1HX2gzM3p97rGgK3ed/ULAcurrrhh9PIgssVbofC7KcJTC4M3ubbbien/nrzHWjOA4TwsWfgUBq5aM0VyWWJ810wBRGp1sivRu/9XTpspfZk7GGBsF7x2X5ZXbdnk5m/Ncf5KSbTchWsaZijv1po/6GeQ0IxVRZHZELSYDCEL4aritzpMGVYjW/Vsj4ntQYcFYZawFJYkIbaw8nIAa3GTgtJhuBrSwijeCjCJEqfSt8RRKKxEBiADNc/aPQuple6fQ4+bo69SiNP01A8wQF6IDb64Y0wEE4lD4kXkuABdQ2lVOvGX2GnyYVtKgSek6K6nNNv3R3ok7klNTjp1ef7o89EDzut+25GCCfgBfh9j3TtJGlKFcYw7QTZqLpt3bGptgS22qgeyQkj0B1N9MsI3lARRjQKxb2w6Cwutz1lnZCnZRJ662ADe+gnS7C7MHpcVTcMvAjxv0MUDoSFRj9xAYiIg/1q2axyC1TDcr5er7f8vS5"
+    "hachage_bytes": "zSEfXUAMzsh3NXfTVWyvVSjTXJZb1sP7KKsXzPj75sFN5sfHxZ8XMFULmaz7efWWBH5ug5bCb8xtNfzBbPtGNZmu2Tsxy2",
+    "message_chiffre": "mIhTw6AG+9nvYgovRWZKUxVMq6hcSVUwfeyttHfTkOcYMDvRpQc2TuGF0+GmekzBrip3dZRU55ZwcyX+cwPH/PgBXaff0Rf9FObl/IwObstShyBY/r1eZ47TM48m6qmQjvPurv1iWUd8UTSIaTyZr4BIARGMqMCJdZrXjsv9I40lt3m+vmHMnKCSuRV4c1lxQkIrcRuaIS/eIIooF/diIud/kYCR5ibpac83tUQRNnkixZ2+7/Fd+UqVbJRhE4bfiHnN5FYgwFJFkLAQcjSGgkYXx1KY+IYPuVJ+cZ2Bq4Fb1Hn5+2mBaS+OeZjlGaWLneyYSJnVa1nclkJ9cUny9uJRN5cpsvprB9/P+1ISyfB3g7Pqac+TOkIdzHID0oVFtSzssDgbRwdu824Jq3oD8/ODhJaDsroBDVfG/5vVieOWzpX/oy4N68ejxJbwLp9r45xzq4o2fHheTE79drZ75Xkp+TxEGpDwU8vvDjhG5E8DtxvbVXEJUPsG04SdCYZG7cyT0hePumGXWqvRYMyZobgbd/8gaESfQj0aCUFPypoTNdR0ojqMMr8gbTptsF33W+bvZ1qSQCZPepqhl+c4l0g8+NJR90naAqx7zNFAIPsyPdGYjQQ"
   }
 }
 
@@ -138,27 +144,29 @@ class PosterTest(DomaineTest):
 
     def poster(self):
         messages = list()
-        for destination in SAMPLE_DATA_1['destinations']:
-            message = SAMPLE_DATA_1['message']
-            cle_info = SAMPLE_DATA_1['cle_info']
 
+        # Injecter _certificat/_millegrille dans le message
+        message = SAMPLE_DATA_1['message'].copy()
+        message['_certificat'] = SAMPLE_DATA_1['certificat_message']
+        message['_millegrille'] = SAMPLE_DATA_1['certificat_millegrille']
+
+        for destination in SAMPLE_DATA_1['destinations']:
+            cle_info = SAMPLE_DATA_1['cle_info']
             cle = cle_info.copy()
             cle['cles'] = destination['cles']
             fiche = destination['fiche']
             applications = fiche['application']
-            idmg = destination['idmg']
 
             contenu = {
                 'message': message,
                 'chiffrage': cle,
-                'destinataires': destination['destinataires']
+                'destinataires': destination['destinataires'],
             }
 
             for app in applications:
                 url = app['url']
                 url_poster = url + '/poster'
                 self.poster_message(url_poster, contenu)
-
 
         return messages
 
@@ -183,4 +191,3 @@ if __name__ == '__main__':
     # FIN TEST
     test.event_recu.wait(120)
     test.deconnecter()
-
