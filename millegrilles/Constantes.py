@@ -1691,6 +1691,7 @@ class ConstantesGenerateurCertificat:
     ROLE_COLLECTIONS = 'collections'
     ROLE_GROS_FICHIERS = 'grosfichiers'
     ROLE_MESSAGERIE = 'messagerie'
+    ROLE_POSTMASTER = 'postmaster'
     ROLE_MESSAGERIE_WEB = 'messagerie_web'
     ROLE_MONGOEXPRESS = 'mongoexpress'
     ROLE_NAVIGATEUR = 'navigateur'

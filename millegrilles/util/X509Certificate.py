@@ -1738,6 +1738,46 @@ class GenererMessagerie(GenerateurNoeud):
         return builder
 
 
+class GenererPostmaster(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_POSTMASTER.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        # custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        # domaines = ','.join(['Messagerie']).encode('utf-8')
+        # builder = builder.add_extension(
+        #     x509.UnrecognizedExtension(custom_oid_domaines, domaines),
+        #     critical=False
+        # )
+
+        liste_dns = [
+            # x509.DNSName(u'messagerie'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'localhost'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
 class GenererMessagerieWeb(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
@@ -2189,6 +2229,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_COLLECTIONS: GenererCollections,
             ConstantesGenerateurCertificat.ROLE_MESSAGERIE: GenererMessagerie,
             ConstantesGenerateurCertificat.ROLE_MESSAGERIE_WEB: GenererMessagerieWeb,
+            ConstantesGenerateurCertificat.ROLE_POSTMASTER: GenererPostmaster,
         }
 
         # S'assurer que le dict contient reference aux CAs
