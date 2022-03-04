@@ -32,13 +32,13 @@ class MessagesSample(BaseCallback):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
 
     def queue_open_local(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.executer()
 
     def run_ioloop(self):
@@ -92,8 +92,8 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # sample.requete_liste_domaines()
         # sample.requete_domaine()
-        # sample.requete_liste_applications()
-        sample.requete_application()
+        sample.requete_liste_applications()
+        # sample.requete_application()
 
 
 # --- MAIN ---
