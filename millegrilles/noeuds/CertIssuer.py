@@ -415,6 +415,7 @@ def set_intermediaire(http_instance: ServeurHttp, request_data: dict, interne=Fa
     if config.idmg is not None:
         if config.idmg != idmg_recu:
             # Mauvais idmg, on refuse la cle
+            logger.warning("Mauvais idmg (config %s, recu %s), on refuse la cle - REFUSE" % (config.idmg, idmg_recu))
             http_instance.send_error(403)
             return
 
