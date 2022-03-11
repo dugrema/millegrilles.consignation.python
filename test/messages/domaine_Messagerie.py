@@ -173,13 +173,30 @@ class MessagesSample(BaseCallback):
             ajouter_certificats=True,
         )
 
+    def get_attachment_requis(self):
+        requete = {"fuuids": [
+            "zSEfXUBuUeffXedrcqvzqNTes8h1wrRUxpWHTd1M8ypZ2SgzX5qT3Dmc5pnR4XmMs4dXepkNbjkmZNuoMjq4ptP9NARPe4",
+            "zSEfXUBuUeffXedrcqvzqNTes8h1wrRUxpWHTd1M8ypZ2SgzX5qT3Dmc5pnR4XmMs4dXepkNbjkmZNuoMjq4ptP9NARPe4a"
+        ]}
+        domaine = ConstantesMessagerie.DOMAINE_NOM
+        action = 'attachmentRequis'
+        self.generateur.transmettre_requete(
+            requete,
+            domaine=domaine, action=action, securite=Constantes.SECURITE_PRIVE,
+            correlation_id='abcd-1234', reply_to=self.queue_name,
+            ajouter_certificats=True,
+        )
+
     def executer(self):
         event = Event()
+        logger.debug("Wait 2 secs")
         event.wait(2)
+        logger.debug("Go")
 
         try:
-            self.poster_message()
+            # self.poster_message()
             # self.get_liste_messages()
+            self.get_attachment_requis()
         except:
             logger.exception("Erreur execution")
 

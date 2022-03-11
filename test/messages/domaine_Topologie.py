@@ -285,7 +285,7 @@ class MessagesSample(DomaineTest):
         domaine_action = ConstantesTopologie.DOMAINE_NOM
         action = 'ficheMillegrille'
         enveloppe_val = self.generateur.transmettre_requete(
-            requete, domaine_action, action=action, securite=Constantes.SECURITE_PRIVE,
+            requete, domaine_action, action=action, securite=Constantes.SECURITE_PUBLIC,
             reply_to=self.queue_name, correlation_id='efgh',
             ajouter_certificats=True
         )
@@ -299,7 +299,7 @@ class MessagesSample(DomaineTest):
         domaine_action = ConstantesTopologie.DOMAINE_NOM
         action = 'applicationsTiers'
         enveloppe_val = self.generateur.transmettre_requete(
-            requete, domaine_action, action=action, securite=Constantes.SECURITE_PRIVE,
+            requete, domaine_action, action=action, securite=Constantes.SECURITE_PUBLIC,
             reply_to=self.queue_name, correlation_id='efgh',
             ajouter_certificats=True
         )

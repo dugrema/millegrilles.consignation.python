@@ -36,16 +36,16 @@ SAMPLE_DATA_1 = {
         "z2i3XjxJgyzgMSwpJ5E3xiy1wmPJF2W1moQxYnuTA1NYMrgg38N": "mTjOn6eL2wLPdvbtkRmqL7W22KCiqQpM8i9CHaOJ5ikSKmJWH/ISqIUQ3ah1n9dpH1Tu424NLFsMWlQF/k7beewHVHvayc+R1W5oy5yPjQXI"
       },
       "destinataires": [
-        "@proprietaire/mg-dev4.maple.maceroc.com"
+        "@proprietaire/mg-dev5.maple.maceroc.com"
       ],
       "fiche": {
         "adresses": [
-          "mg-dev4.maple.maceroc.com"
+          "mg-dev5.maple.maceroc.com"
         ],
         "application": [
           {
             "application": "messagerie",
-            "url": "https://mg-dev4.maple.maceroc.com/messagerie",
+            "url": "https://mg-dev5.maple.maceroc.com/messagerie",
             "version": "2022.1.1"
           }
         ],
@@ -61,7 +61,7 @@ SAMPLE_DATA_1 = {
       "idmg": "zXbUwE5h2xMJRpUweJd4Fq8gRYujcPfjxCbA3vp1LBvEB1ZMiiE1DhW8",
       "mapping": {
         "dns": [
-          "mg-dev4.maple.maceroc.com"
+          "mg-dev5.maple.maceroc.com"
         ],
         "retry": 0
       }
@@ -101,7 +101,7 @@ class PosterTest(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.url_poster = 'https://mg-dev4.maple.maceroc.com/messagerie/poster'
+        self.url_poster = 'https://mg-dev5.maple.maceroc.com/messagerie/poster'
         self.certfile = self.configuration.pki_certfile
         self.keyfile = self.configuration.pki_keyfile
         with open(self.configuration.pki_cafile, 'r') as fichier:
@@ -166,9 +166,45 @@ class PosterTest(DomaineTest):
             for app in applications:
                 url = app['url']
                 url_poster = url + '/poster'
-                self.poster_message(url_poster, contenu)
+                # self.poster_message(url_poster, contenu)
+                self.poster_attachment(url_poster, 'zabcd1234')
 
         return messages
+
+    def poster_attachment(self, url_poster: str, fuuid: str):
+        # Signer data
+        data_bytes = b"abcd1234"
+
+        additional_headers = dict()
+        # additional_headers['content-encoding'] = 'gzip'
+        additional_headers['Content-Type'] = 'application/stream'
+        self.__logger.debug("Attachment data size : brut: %d" % len(data_bytes))
+
+        fichier = open('/var/opt/millegrilles/consignation/grosfichiers/zSEfX/UA/zSEfXUAYsb3HjbUpYSLPgvNQRhUbyXCG9ZHCp7wQKpk2KyQ2WCgbkGCJHuN2oMF64m6VpDPmN8GD3ARHg5zHMKJBeFc42C.mgs3.old', 'rb')
+
+        url_poster_attachment = url_poster + '/zSEfXUAYsb3HjbUpYSLPgvNQRhUbyXCG9ZHCp7wQKpk2KyQ2WCgbkGCJHuN2oMF64m6VpDPmN8GD3ARHg5zHMKJBeFc42C'
+        r = requests.put(
+            url_poster_attachment,
+            data=fichier,
+            # files=files,
+            verify=False,
+            headers=additional_headers,
+            timeout=1,
+        )
+
+        if r.status_code == 429:
+            self.__logger.warning("Erreur poster throttle en cours (429)")
+        elif r.status_code in [200, 201, 202]:
+            self.__logger.debug("Poster attachment status %s \n%s" % (r.status_code, json.dumps(r.json(), indent=2)))
+        else:
+            self.__logger.error("Erreur poster (%d)" % (r.status_code))
+            try:
+                contenu_json = r.json()
+                self.__logger.debug("Data erreur recu\n%s" % json.dumps(contenu_json, indent=2))
+            except json.decoder.JSONDecodeError:
+                pass
+
+        return r
 
     def executer(self):
         self.__logger.debug("Executer")
