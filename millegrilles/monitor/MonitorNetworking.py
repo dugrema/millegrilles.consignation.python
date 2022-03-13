@@ -319,6 +319,8 @@ location /fichiers_transfert {
 
   proxy_headers_hash_bucket_size 64;
 
+  client_max_body_size 5M;
+
   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
 
   # Mapping certificat client pour connexion consignation fichiers
@@ -355,6 +357,8 @@ location /fichiers {
 
   proxy_headers_hash_bucket_size 64;
 
+  client_max_body_size 5M;
+
   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
 
   # Mapping certificat client pour connexion consignation fichiers
@@ -380,6 +384,8 @@ location /fichiers_transfert {
   proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
   proxy_ssl_verify              on;
   proxy_ssl_verify_depth        1;
+
+  client_max_body_size 5M;
 
   include /etc/nginx/conf.d/component_base.include;  # Active validation SSL client nginx, passe resultat dans headers
   include /etc/nginx/conf.d/component_cors.include;
