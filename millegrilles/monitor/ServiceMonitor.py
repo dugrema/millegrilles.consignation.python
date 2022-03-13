@@ -396,6 +396,12 @@ class ServiceMonitor:
         except IndexError:
             pass
 
+        try:
+            hostname_onion = gestionnaire_docker.get_nginx_onionize_hostname()
+            dict_infomillegrille['onion'] = hostname_onion
+        except:
+            pass
+
         # Verifier si on a le certificat de monitor - indique que le noeud est installe
         try:
             monitor_cert = gestionnaire_docker.charger_config_recente('pki.monitor.cert')

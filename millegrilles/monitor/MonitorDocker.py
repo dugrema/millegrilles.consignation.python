@@ -12,7 +12,8 @@ from os import path
 from uuid import uuid4
 from base64 import b64encode, b64decode
 from threading import Event, Thread
-from typing import cast
+from typing import cast, Optional
+from docker.client import DockerClient
 from docker.errors import APIError
 from docker.types import SecretReference, NetworkAttachmentConfig, Resources, RestartPolicy, ServiceMode, \
     ConfigReference, EndpointSpec, Mount
@@ -30,7 +31,7 @@ class GestionnaireModulesDocker:
 
     def __init__(self,
                  idmg: str,
-                 docker_client: docker.DockerClient,
+                 docker_client: DockerClient,
                  fermeture_event: Event,
                  modules_requis: list,
                  service_monitor,
@@ -1418,6 +1419,20 @@ class GestionnaireModulesDocker:
             dict_containers[attrs['Name']] = info_container
 
         return dict_containers
+
+    def get_nginx_onionize_hostname(self) -> Optional[str]:
+        """
+        Retourne le hostname .onion (TOR) du service nginx si disponible
+        """
+        filtre = {'name': 'onionize'}
+        list_containers = self.docker_client.containers.list(filters=filtre)
+        try:
+            container = list_containers[0]
+            resultat = container.exec_run('cat /var/lib/tor/onion_services/nginx/hostname')
+            hostname = resultat.output.decode('utf-8').strip()
+            return hostname
+        except IndexError:
+            pass
 
     @property
     def idmg(self):
