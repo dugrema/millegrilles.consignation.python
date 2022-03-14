@@ -124,16 +124,44 @@ class MessagesSample(BaseCallback):
         domaine_action = 'Pki.nouveauCertificat'
         self.generateur.soumettre_transaction(transaction, domaine_action, correlation_id='abcd', reply_to=self.queue_name, ajouter_certificats=True)
 
+    def commande_signer_csr(self):
+        commande = {
+            'csr': SAMPLE_CSR,
+            'role': Constantes.ConstantesGenerateurCertificat.ROLE_MESSAGERIE_WEB
+        }
+        domaine_action = 'commande.CorePki.' + ConstantesPki.COMMANDE_SIGNER_CSR
+        self.generateur.transmettre_commande(commande, domaine_action, correlation_id='abcd', reply_to=self.queue_name, ajouter_certificats=True)
+
     def executer(self):
         # for i in range(0, 5000):
 
         # self.requete_cert_backup()
         # self.requete_cert_noeuds()
-        self.requete_certificat()
+        # self.requete_certificat()
         # self.requete_cert_pk()
         # self.commande_sauvegarder_certificat()
         # self.transaction_sauvegarder_certificat()
+        self.commande_signer_csr()
 
+
+SAMPLE_CSR = """
+-----BEGIN CERTIFICATE REQUEST-----
+MIICfTCCAWUCAQAwODESMBAGA1UEAxMJbm9tVXNhZ2VyMRMwEQYDVQQLEwpOYXZp
+Z2F0ZXVyMQ0wCwYDVQQKEwRpZG1nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+CgKCAQEAwDlWi2KJsccrDJKHq8xLYjCqndu+Oh4GNsbRypPctuu+oU6PNkwwjSIN
+xNuJret+ZVr2mw2MNbt9JYANriltYwvFWkF63NTIGXstaegNCkj6vqa4KdtXK7uu
+NREtMLEhEu+ZWYcR2hWzVEN9GyIPwEgPNYQwUjjjLADUnaZ73t9Bk+fivgll0JbJ
+reSw8DHqvdcmB28AnXltch6Wh34EGiYPbJqDm+NnCHHZ2EumbPRkN5/bqZTmpUDw
+qqt+6cTcgAtdIuzYm3sPQt/Zf3EJwDT9dBxVrdbBnNFG4js3lauy49hog78zwwNP
+/i3DZU3VDDCDeT4POKfEHXtwxTLF4QIDAQABoAAwDQYJKoZIhvcNAQENBQADggEB
+AKBdiHJamlXfevloSBhehrf5g7lRbISGEsyY5HOXvVMLbip75QcGMcz8jnEJxYFk
+8mDPuxlR3VOkyDiPGpLloN9hOgk50igwtRmFXcGCENbaJX2FZdho0yyx/yS03WXR
+HXkje/v1Z6x1gitAxACbvvywo4qtIQoBSwP08D0JIGtD2GWPvzd1+PSgsdqQsmxz
+EMkpLW0RZ2y1fCZyXbXPfAI4rnCL5Lb3CW7e4sbdH2XkcV4fBPEDGo03TE8648XV
+6PCY9G7vw3iPiAhicMp1nI9bx+N/IapZvWmqR8vOURfFHYB1ilnli7S3MNXpDC9Q
+BMz4ginADdtNs9ARr3DcwG4=
+-----END CERTIFICATE REQUEST-----
+        """
 
 # --- MAIN ---
 sample = MessagesSample()

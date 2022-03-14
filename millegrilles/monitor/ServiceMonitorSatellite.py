@@ -222,7 +222,6 @@ class ServiceMonitorSatellite(ServiceMonitor):
 
         flag_force_renew = os.environ.get('MGDEBUG_FORCE_RENEW') == '1'
         if flag_force_renew or date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
-        # if True:
             # MAJ date pour creation de certificats
             self._gestionnaire_certificats.maj_date()
 

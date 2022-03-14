@@ -126,7 +126,7 @@ class HandlerCertificats:
 
         return clecert
 
-    def signer_csr(self, csr: str, request_data: dict = None) -> EnveloppeCleCert:
+    def signer_csr(self, csr: str, request_data: dict = None, securite = list()) -> EnveloppeCleCert:
         duree_certs = environ.get('CERT_DUREE_CSR') or environ.get('CERT_DUREE') or '21'  # Default 21 jours
         duree_certs = int(duree_certs)
         duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
@@ -138,9 +138,13 @@ class HandlerCertificats:
             role = request_data.get('role')
         except KeyError:
             role = None
-        clecert = self.__renouvelleur.signer_csr(csr.encode('utf-8'), role=role, duree=duree)
-
-        return clecert
+        securite_role = self.__renouvelleur.get_securite_role(role)
+        if securite_role in securite:
+            clecert = self.__renouvelleur.signer_csr(csr.encode('utf-8'), role=role, duree=duree)
+            return clecert
+        else:
+            self.__logger.error("Niveau de securite %s insuffisant pour role %s (securite requis %s)", securite, role, securite_role)
+            return None
 
     @property
     def chaine_certs(self):
@@ -556,21 +560,28 @@ def signer_csr(http_instance: ServeurHttp, request_data: dict, interne=False):
     except ExtensionNotFound:
         roles = None
 
+    securite = None
     if 'proprietaire' == delegation_globale:
+        securite = [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
         pass  # Delegation globale, signature est autorisee
+    elif 'monitor' in roles:
+        securite = enveloppe_certificat.get_exchanges
+        logger.info("Certificat monitor, autorise pour niveaux %s" % securite)
+        pass  # Monitor, signature est autorisee
     else:
         # On doit s'assurer que c'est un renouvellement - e.g. prive peut renouveller prive, public => public, etc.
         role = request_data['role']
         if role not in roles:
-            logger.warning("Erreur - signer_module demande avec certificat autre que core - REFUSE")
+            logger.warning("Erreur - signer_module demande avec certificat autre que '%s' - REFUSE" % roles)
             http_instance.send_error(403)
             return
+        securite = enveloppe_certificat.get_exchanges
 
     csr = request_data['csr']
 
     logger.info("Signer nouveau certificat via CSR")
 
-    clecert_module = handler.signer_csr(csr, request_data)
+    clecert_module = handler.signer_csr(csr, request_data, securite)
     certificat = [clecert_module.cert_bytes.decode('utf-8')]
     certificat.extend(handler.chaine_certs)
     reponse = {

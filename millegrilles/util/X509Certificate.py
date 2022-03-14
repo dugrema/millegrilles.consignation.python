@@ -2198,6 +2198,25 @@ class RenouvelleurCertificat:
         self.__dict_ca = dict_ca
         self.__clecert_intermediaire = clecert_intermediaire
         self.__generer_password = generer_password
+        self.__niveau_securite_par_role = {
+            # Note : le role de securite par defaut est Protege, il n'est pas necessaire de le lister
+
+            # Roles 4.secure
+            ConstantesGenerateurCertificat.ROLE_MONGO: Constantes.SECURITE_SECURE,
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: Constantes.SECURITE_SECURE,
+            ConstantesGenerateurCertificat.ROLE_MEDIA: Constantes.SECURITE_SECURE,
+
+            # Roles 2.prive
+            ConstantesGenerateurCertificat.ROLE_WEB_PRIVE: Constantes.SECURITE_PRIVE,
+            ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: Constantes.SECURITE_PRIVE,
+            ConstantesGenerateurCertificat.ROLE_COLLECTIONS: Constantes.SECURITE_PRIVE,
+            ConstantesGenerateurCertificat.ROLE_MESSAGERIE_WEB: Constantes.SECURITE_PRIVE,
+
+            # Roles 1.public
+            ConstantesGenerateurCertificat.ROLE_POSTMASTER: Constantes.SECURITE_PUBLIC,
+            ConstantesGenerateurCertificat.ROLE_WEB_PUBLIC: Constantes.SECURITE_PUBLIC,
+            ConstantesGenerateurCertificat.ROLE_NGINX: Constantes.SECURITE_PUBLIC,
+        }
         self.__generateurs_par_role = {
             ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
             ConstantesGenerateurCertificat.ROLE_MQ: GenererMQ,
@@ -2377,6 +2396,12 @@ class RenouvelleurCertificat:
         clecert.chaine = chaine
 
         return clecert
+
+    def get_securite_role(self, role: str):
+        try:
+            return self.__niveau_securite_par_role[role]
+        except KeyError:
+            return Constantes.SECURITE_PROTEGE
 
 
 class DecryptionHelper:
