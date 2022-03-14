@@ -1,9 +1,11 @@
 # Script de test pour transmettre message de transaction
 
 import json
+import logging
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.ReplyQ import ReplyQHandler
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Pki import ConstantesPki
@@ -13,58 +15,53 @@ from threading import Event, Thread
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
 
+
 class MessagesSample(BaseCallback):
 
     def __init__(self):
         super().__init__(contexte)
-        self.contexte.message_dao.register_channel_listener(self)
-        self.generateur = GenerateurTransaction(self.contexte)
+        self.__logger = logging.getLogger("__main__")
 
         self.fichier_fuuid = "39c1e1b0-b6ee-11e9-b0cd-d30e8fab842j"
 
         self.channel = None
         self.event_recu = Event()
 
-    def on_channel_open(self, channel):
-        # Enregistrer la reply-to queue
-        self.channel = channel
-        channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
+        generateur = GenerateurTransaction(self.contexte)
+        self.reply_q_handler = ReplyQHandler(contexte, generateur)
 
-    def queue_open_local(self, queue):
-        self.queue_name = queue.method.queue
-        print("Queue: %s" % str(self.queue_name))
-        self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
         self.executer()
 
-    def run_ioloop(self):
-        self.contexte.message_dao.run_ioloop()
+    # def on_channel_open(self, channel):
+    #     # Enregistrer la reply-to queue
+    #     self.channel = channel
+    #     channel.queue_declare('', durable=True, exclusive=True, callback=self.queue_open_local)
+    #
+    # def queue_open_local(self, queue):
+    #     self.queue_name = queue.method.queue
+    #     print("Queue: %s" % str(self.queue_name))
+    #     self.channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
+    #     self.executer()
+    #
+    # def run_ioloop(self):
+    #     self.contexte.message_dao.run_ioloop()
+    #
+    # def deconnecter(self):
+    #     self.contexte.message_dao.deconnecter()
 
-    def deconnecter(self):
-        self.contexte.message_dao.deconnecter()
-
-    def traiter_message(self, ch, method, properties, body):
-        print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(json.dumps(json.loads(body.decode('utf-8')), indent=4))
-        print("Channel : " + str(ch))
-        print("Method : " + str(method))
-        print("Properties : " + str(properties))
-        print("Channel virtual host : " + str(ch.connection.params.virtual_host))
+    # def traiter_message(self, ch, method, properties, body):
+    #     print("Message recu, correlationId: %s" % properties.correlation_id)
+    #     print(json.dumps(json.loads(body.decode('utf-8')), indent=4))
+    #     print("Channel : " + str(ch))
+    #     print("Method : " + str(method))
+    #     print("Properties : " + str(properties))
+    #     print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
     def requete_cert_fingerprint(self):
-        fingerprint = 'idpQSrDt2h+CE0XSJZZNPEakd3Wha+EhcD9v4VKUXSk='
-        # requete_cert = {
-        #     'fingerprint': fingerprint
-        # }
-        enveloppe_requete = self.generateur.transmettre_requete(
-            dict(),
-            ConstantesPki.REQUETE_CERTIFICAT_DEMANDE + '.' + fingerprint,
-            'abcd-1234',
-            self.queue_name,
-            securite=Constantes.SECURITE_PROTEGE,
-        )
-
-        print("Envoi requete: %s" % enveloppe_requete)
-        return enveloppe_requete
+        fingerprint = 'z2i3Xjx8zkqWBdUWY5Gp8XHh9A5BmYFeLV3vuUk4BhP4xAcQbjE'
+        requete_cert = {'fingerprint': fingerprint}
+        reponse, enveloppe = self.reply_q_handler.requete(requete_cert, 'CorePki', action='infoCertificat', exchange=Constantes.SECURITE_PUBLIC)
+        self.__logger.info("Reponse recue : %s" % reponse)
 
     def requete_cert_pk(self):
         fingerprint = 'mEiBvEkcpY4CKAfjhjoR0VVM74JCW7TrOqsY8daSbGNQKGA'
@@ -133,15 +130,22 @@ class MessagesSample(BaseCallback):
         self.generateur.transmettre_commande(commande, domaine_action, correlation_id='abcd', reply_to=self.queue_name, ajouter_certificats=True)
 
     def executer(self):
-        # for i in range(0, 5000):
+        self.reply_q_handler.ready.wait(5)
+        if not self.reply_q_handler.ready.is_set():
+            raise Exception("Erreur ouverture ReplyQ")
 
+        self.__logger.info("ReplyQ ouvert, demarrage test")
+
+        self.requete_cert_fingerprint()
         # self.requete_cert_backup()
         # self.requete_cert_noeuds()
         # self.requete_certificat()
         # self.requete_cert_pk()
         # self.commande_sauvegarder_certificat()
         # self.transaction_sauvegarder_certificat()
-        self.commande_signer_csr()
+        # self.commande_signer_csr()
+
+        # self.reply_q_handler.deconnecter()
 
 
 SAMPLE_CSR = """
@@ -163,10 +167,14 @@ BMz4ginADdtNs9ARr3DcwG4=
 -----END CERTIFICATE REQUEST-----
         """
 
-# --- MAIN ---
-sample = MessagesSample()
+if __name__ == '__main__':
+    logging.basicConfig()
+    logging.getLogger('__main__').setLevel(logging.DEBUG)
+    logging.getLogger('millegrilles').setLevel(logging.DEBUG)
+    # --- MAIN ---
+    sample = MessagesSample()
 
-# TEST
-# FIN TEST
-sample.event_recu.wait(20)
-sample.deconnecter()
+    # TEST
+    # FIN TEST
+    # sample.event_recu.wait(20)
+    # sample.deconnecter()
