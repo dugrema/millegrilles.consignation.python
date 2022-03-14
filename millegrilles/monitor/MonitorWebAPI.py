@@ -151,16 +151,6 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
         self.repondre_json({'ok': True}, status_code=200)
 
-    # def post_renouveller_intermediaire(self, request_data):
-    #     logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-    #     logger.debug("post_renouveller_intermediaire : recu\n%s", json.dumps(request_data, indent=2))
-    #
-    #     request_data['commande'] = ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE
-    #     commande = CommandeMonitor(request_data)
-    #     self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
-    #
-    #     self.repondre_json(dict(), status_code=200)
-
     def post_configurer_domaine(self, request_data):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         logger.debug("POST recu configuration domaine\n%s", json.dumps(request_data, indent=2))

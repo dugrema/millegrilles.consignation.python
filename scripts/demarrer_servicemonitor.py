@@ -3,7 +3,8 @@
 import logging
 import sys
 
-from millegrilles.monitor.ServiceMonitor import InitialiserServiceMonitor, ServiceMonitor, SERVICEMONITOR_LOGGING_FORMAT
+from millegrilles.monitor.ServiceMonitor import ServiceMonitor, SERVICEMONITOR_LOGGING_FORMAT
+from millegrilles.monitor.ServiceMonitorRunner import InitialiserServiceMonitor
 
 logging.basicConfig(stream=sys.stdout, format=SERVICEMONITOR_LOGGING_FORMAT)
 logging.getLogger(ServiceMonitor.__name__).setLevel(logging.INFO)
