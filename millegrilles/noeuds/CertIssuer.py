@@ -564,7 +564,7 @@ def signer_csr(http_instance: ServeurHttp, request_data: dict, interne=False):
     if 'proprietaire' == delegation_globale:
         securite = [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
         pass  # Delegation globale, signature est autorisee
-    elif 'monitor' in roles:
+    elif 'monitor' in roles or 'prive' in roles or 'public' in roles:
         securite = enveloppe_certificat.get_exchanges
         logger.info("Certificat monitor, autorise pour niveaux %s" % securite)
         pass  # Monitor, signature est autorisee
