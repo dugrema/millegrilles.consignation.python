@@ -285,7 +285,7 @@ class GestionnaireCertificats:
     def generer_nouveau_idmg(self):
         raise NotImplementedError()
 
-    def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None, liste_dns: list = None, combiner_keycert=False) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None, combiner_keycert=False) -> EnveloppeCleCert:
         raise GenerationCertificatNonSupporteeException()
 
     def verifier_eligibilite_renouvellement(self, clecert: EnveloppeCleCert):
@@ -306,8 +306,10 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
 
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         super().__init__(docker_client, service_monitor, **kwargs)
+        self._service_monitor = service_monitor
         self._passwd_mq: str = cast(str, None)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._renouvelleur = RenouvelleurCertificat(service_monitor.idmg, dict(), None)
         
         # CSR pour le prochain certificat de cette instance satellite
         self.__csr_monitor: Optional[EnveloppeCleCert] = None
@@ -398,6 +400,48 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
 
         except Exception:
             self.__logger.exception("Erreur entretien certificat monitor")
+
+    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None,
+                               combiner_keycert=False) -> EnveloppeCleCert:
+        clecert = self._renouvelleur.preparer_csr_par_role(role, common_name, liste_dns)
+
+        # Post vers certissuer pour signer avec l'autorite, obtenir le certificat
+        requete = {'csr': clecert.csr_bytes.decode('utf-8'), 'role': role, 'liste_dns': liste_dns}
+        # Signer avec certificat de monitor pour autoriser le certissuer
+        # formatteur_message = self._service_monitor.get_formatteur_message(self.clecert_monitor)
+        # requete_signee, uuid_transaction = formatteur_message.signer_message(requete, 'certissuer', action="signer",
+        #                                                                      ajouter_chaine_certs=True)
+
+        # url_certissuer = self.get_url_certissuer()
+        # url_certissuer = url_certissuer + '/certissuerInterne/signerModule'
+        # reponse = requests.post(url_certissuer, json=requete_signee, timeout=10)
+        # reponse.raise_for_status()
+        # reponse_json = reponse.json()
+
+        connexion = self._service_monitor.connexion_middleware
+        reponse_json, enveloppe = connexion.commande(requete, 'CorePki', action='signerCsr')
+
+        chaine = reponse_json['certificat']
+
+        if nomcle is None:
+            nomcle = role
+
+        chaine_certs = '\n'.join(chaine)
+        secret = clecert.private_key_bytes
+
+        # Verifier si on doit combiner le cert et la cle (requis pour Mongo)
+        if combiner_keycert or role in [ConstantesGenerateurCertificat.ROLE_MONGO,
+                                        ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS]:
+            secret_str = [str(secret, 'utf-8')]
+            secret_str.extend(chaine)
+            secret = '\n'.join(secret_str).encode('utf-8')
+
+        labels = {'mg_type': 'pki', 'role': role, 'common_name': common_name}
+
+        self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
+        self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
+
+        return clecert
 
 
 class GestionnaireCertificatsNoeudPublic(GestionnaireCertificatsSatellite):
@@ -518,7 +562,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         super().__init__(docker_client, service_monitor, **kwargs)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        self.__renouvelleur = RenouvelleurCertificat(service_monitor.idmg, dict(), None)
+        # self.__renouvelleur = RenouvelleurCertificat(service_monitor.idmg, dict(), None)
 
     def get_url_certissuer(self):
         url_issuer = os.environ.get('MG_CERTISSUER_URL') or 'http://certissuer:8380'
@@ -597,7 +641,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         return clecert_monitor
 
     def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None, combiner_keycert=False) -> EnveloppeCleCert:
-        clecert = self.__renouvelleur.preparer_csr_par_role(role, common_name, liste_dns)
+        clecert = self._renouvelleur.preparer_csr_par_role(role, common_name, liste_dns)
 
         # Post vers certissuer pour signer avec l'autorite, obtenir le certificat
         requete = {'csr': clecert.csr_bytes.decode('utf-8'), 'role': role, 'liste_dns': liste_dns}
@@ -614,15 +658,6 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         if nomcle is None:
             nomcle = role
-
-        # duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
-        # duree_certs = int(duree_certs)
-        #
-        # duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
-        # duree_certs_heures = int(duree_certs_heures)
-        #
-        # clecert = self.__renouvelleur.renouveller_par_role(role, common_name, liste_dns, duree_certs, duree_certs_heures)
-        # chaine = list(clecert.chaine)
 
         chaine_certs = '\n'.join(chaine)
         secret = clecert.private_key_bytes
@@ -644,38 +679,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         secret_path = path.abspath(self.secret_path)
         os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
 
-        # # Charger information certificat intermediaire
-        # config_cert = self._service_monitor.gestionnaire_docker.trouver_config('pki.intermediaire.cert')
-        # cert_pem = self._charger_certificat_docker('pki.intermediaire.cert')
-        #
-        # if self._service_monitor.is_dev_mode:
-        #     path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.%s' % config_cert['date'])
-        #     path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.%s' % config_cert['date'])
-        # else:
-        #     path_key = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.key.pem')
-        #     path_passwd = os.path.join(self._service_monitor.path_secrets, 'pki.intermediaire.passwd.txt')
-        #
-        # with open(path_key, 'rb') as fichier:
-        #     key_pem = fichier.read()
-        # with open(path_passwd, 'rb') as fichier:
-        #     passwd_bytes = fichier.read()
-        #
-        # clecert_intermediaire = EnveloppeCleCert()
-        # clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
-        # clecert_intermediaire.password = None  # Effacer mot de passe
-        #
-        # if not clecert_intermediaire.cle_correspondent():
-        #     self.__logger.fatal("Certificat et cle intermediaire ne correspondent pas")
-        #     self._service_monitor.gestionnaire_docker.configurer_monitor()  #  reconfigurer_clecert('pki.intermediaire.cert', True)
-        #     raise ForcerRedemarrage("Certificat et cle intermediaire mismatch")
-        #
-        # self._clecert_intermediaire = clecert_intermediaire
-
         # Valider existence des certificats/chaines de base
         self._charger_certificat_docker('pki.millegrille.cert')
-        # self._charger_certificat_docker('pki.intermediaire.cert')
-
-        # self.__charger_renouvelleur()
 
         try:
             # Charger information certificat monitor
@@ -696,20 +701,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
             self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
 
-            # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
-            #     self._passwd_mongo = fichiers.read()
-            # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
-            #     self._passwd_mq = fichiers.read()
         except Exception:
             self.__logger.exception("Erreur chargement certificat monitor, il va etre regenere")
-
-    # def __charger_renouvelleur(self):
-    #     dict_ca = {
-    #         self._clecert_intermediaire.skid: self._clecert_intermediaire.cert,
-    #         self._clecert_millegrille.skid: self._clecert_millegrille.cert,
-    #     }
-    #
-    #     self.__renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self._clecert_intermediaire, generer_password=False)
 
     def preparer_repertoires(self):
         mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
@@ -717,226 +710,12 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
     def commande_signer_navigateur(self, commande):
         raise NotImplementedError("TODO")
-    #     """
-    #     Signe la demande de certificat d'un navigateur
-    #     :param commande:
-    #     :return:
-    #     """
-    #     self.__logger.debug("Commande signature certificat : %s" % str(commande))
-    #
-    #     # Verifier signature du message - doit venir d'un service secure
-    #     message = commande.message
-    #     compte = message['compte']
-    #     enveloppe_certificat = self._service_monitor.validateur_message.verifier(message)
-    #     securite_commande = enveloppe_certificat.get_exchanges
-    #     if Constantes.SECURITE_SECURE not in securite_commande:
-    #         return {'err': 'Permission refusee', 'code': 5}
-    #
-    #     duree_certs = environ.get('CERT_DUREE') or '3'  # Defaut 3 jours
-    #     duree_certs = int(duree_certs)
-    #     duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
-    #     duree_certs_heures = int(duree_certs_heures)
-    #     duree_delta = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
-    #
-    #     # Valider la signature, s'assurer que le certificat permet de faire une demande de signature de certificat
-    #     contenu = commande.contenu
-    #     message_commande = commande.message
-    #     # enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
-    #     enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
-    #     idmg = self._service_monitor.idmg
-    #     # roles_cert = enveloppe_cert.get_roles
-    #
-    #     # roles_permis = [
-    #     #     ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-    #     #     ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    #     # ]
-    #     # est_protege = enveloppe_cert.est_acces_protege(roles_permis)
-    #
-    #     try:
-    #         exchanges = enveloppe_cert.get_exchanges
-    #     except ExtensionNotFound:
-    #         exchanges = None
-    #
-    #     if enveloppe_cert.subject_organization_name != idmg or Constantes.SECURITE_SECURE not in exchanges:
-    #         return {
-    #             'autorise': False,
-    #             'ok': False,
-    #             'description': "La signature de la commande de certificat n'est pas faite avec un niveau d'acces approprie"
-    #         }
-    #
-    #     # if enveloppe_cert.subject_organization_name == idmg and est_protege:
-    #     #     pass
-    #     # else:
-    #     #     return {
-    #     #         'autorise': False,
-    #     #         'description': 'demandeur non autorise a demander la signateur de ce certificat',
-    #     #         'roles_demandeur': roles_cert
-    #     #     }
-    #
-    #     csr = contenu['csr'].encode('utf-8')
-    #     # est_proprietaire = contenu.get('estProprietaire')
-    #     nom_usager = compte['nomUsager']
-    #     user_id = compte['userId']
-    #
-    #     delegation_globale = compte.get('delegation_globale')
-    #     delegations_domaines = compte.get('delegations_domaines')
-    #     if delegations_domaines is not None:
-    #         delegations_domaines = ','.join(delegations_domaines)
-    #     delegations_sousdomaines = compte.get('delegations_sousdomaines')
-    #     if delegations_sousdomaines is not None:
-    #         delegations_sousdomaines = ','.join(delegations_sousdomaines)
-    #
-    #     compte_prive = compte.get(Constantes.ConstantesMaitreDesComptes.CHAMP_COMPTE_PRIVE) or False
-    #
-    #     if compte_prive is True:
-    #         securite = Constantes.SECURITE_PRIVE
-    #     else:
-    #         securite = Constantes.SECURITE_PUBLIC
-    #
-    #     clecert = self.__renouvelleur.signer_navigateur(
-    #         csr,
-    #         securite,
-    #         duree=duree_delta,
-    #         nom_usager=nom_usager,
-    #         user_id=user_id,
-    #         compte_prive=compte_prive,
-    #         delegation_globale=delegation_globale,
-    #         delegations_domaines=delegations_domaines,
-    #         delegations_sousdomaines=delegations_sousdomaines
-    #     )
-    #
-    #     # Emettre le nouveau certificat pour conserver sous PKI
-    #     self._service_monitor.generateur_transactions.emettre_certificat(clecert.chaine)
-    #
-    #     # Emettre commande activation_tierce si parametre present
-    #     if contenu.get('activationTierce') is True:
-    #         # Calculer le fingerprint_pk du certificat
-    #         fingerprint_pk = clecert.fingerprint_cle_publique
-    #         # domaine_activation = 'commande.MaitreDesComptes.activationTierce'
-    #         domaine = 'CoreMaitreDesComptes'
-    #         action = 'activationTierce'
-    #         commande_activation = {
-    #             'nomUsager': nom_usager,
-    #             'userId': user_id,
-    #             'fingerprint_pk': fingerprint_pk,
-    #             'certificat_pem': clecert.chaine
-    #         }
-    #         self._service_monitor.generateur_transactions.transmettre_commande(commande_activation, domaine, action=action)
-    #
-    #     return {
-    #         'cert': clecert.cert_bytes.decode('utf-8'),
-    #         'fullchain': clecert.chaine,
-    #     }
 
     def commande_signer_noeud(self, commande):
         raise NotImplementedError("TODO")
-    #     """
-    #     Signe la demande de certificat d'un noeud 2.prive ou 1.public
-    #     :param commande:
-    #     :return:
-    #     """
-    #     self.__logger.debug("Commande signature certificat : %s" % str(commande))
-    #
-    #     duree_certs = environ.get('CERT_DUREE') or '3'  # Default 3 jours
-    #     duree_certs = int(duree_certs)
-    #     duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
-    #     duree_certs_heures = int(duree_certs_heures)
-    #     duree_delta = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
-    #
-    #     # Valider la signature, s'assurer que le certificat permet de faire une demande de signature de certificat
-    #     contenu = commande.contenu
-    #     message_commande = commande.message
-    #     # enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
-    #
-    #     try:
-    #         enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
-    #     except PathValidationError as pve:
-    #         self.__logger.error("Refuser signature certificat noeud, erreur de validation de la commande : %s" % pve)
-    #         raise pve  # Va transmettre un message d'erreur comme reponse
-    #     except CertificatInconnu as ce:
-    #         self.__logger.error("commande_signer_noeud Certificat inconnu : %s" % str(ce))
-    #         return {
-    #             'autorise': False,
-    #             'description': 'certificat du demande inconnu'
-    #         }
-    #
-    #     idmg = self._service_monitor.idmg
-    #     roles_cert = enveloppe_cert.get_roles
-    #
-    #     roles_permis = [
-    #         ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-    #         ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    #         ConstantesGenerateurCertificat.ROLE_CORE,
-    #     ]
-    #     est_protege = enveloppe_cert.est_acces_protege(roles_permis)
-    #
-    #     csr_bytes = contenu['csr'].encode('utf-8')
-    #     # csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
-    #
-    #     if enveloppe_cert.subject_organization_name == idmg and est_protege:
-    #         # On utilise le niveau de securite demande
-    #         role_noeud = contenu['securite'].split('.')[1]
-    #     elif ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE in roles_cert:
-    #         # On utilise le niveau de securite dans le certificat signateur (prive)
-    #         role_noeud = ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE
-    #     elif ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC in roles_cert:
-    #         # On utilise le niveau de securite dans le certificat signateur (public)
-    #         role_noeud = ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC
-    #     else:
-    #         return {
-    #             'autorise': False,
-    #             'description': 'demandeur non autorise a demander la signateur de ce certificat',
-    #             'roles_demandeur': roles_cert
-    #         }
-    #
-    #     try:
-    #         clecert = self.__renouvelleur.signer_noeud(csr_bytes, role_in=role_noeud, duree=duree_delta)
-    #     except ValueError as ve:
-    #         self.__logger.error("Erreur renouvellement noeud, contenu commande : %s" % str(contenu))
-    #         raise ve
-    #     else:
-    #         return {
-    #             'cert': clecert.cert_bytes.decode('utf-8'),
-    #             'fullchain': clecert.chaine,
-    #         }
 
     def renouveller_intermediaire(self, commande):
         raise NotImplementedError("TODO")
-    #     # Valider certificat intermediaire
-    #     contenu = commande.contenu
-    #     pem_intermediaire = contenu['pem']
-    #
-    #     # Concatener cert millegrille local et nouveau cert intermediaire
-    #     chaine = self.clecert_monitor.chaine
-    #     pems = '\n'.join([pem_intermediaire, chaine[-1]]).encode('utf-8')
-    #
-    #     # Valider le certificat
-    #     clecert = EnveloppeCleCert()
-    #     clecert.cert_from_pem_bytes(pems)
-    #     validateur_pki = self._service_monitor.validateur_pki
-    #     try:
-    #         validateur_pki.valider(pems, usages=set())
-    #     except Exception as e:
-    #         self.__logger.exception("Erreur validation nouveau certificat intermediaire")
-    #         raise e
-    #
-    #     # Trouver cle correspondante (date)
-    #     label_role_cert = 'pki.intermediaire.cert'
-    #     label_role_key = 'pki.intermediaire.key'
-    #     info_role_key = self._service_monitor.gestionnaire_docker.trouver_secret(label_role_key)
-    #     date_key = str(info_role_key['date'])
-    #
-    #     # Inserer la chaine de certificat
-    #     self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, pem_intermediaire.encode('utf-8'), date_key)
-    #
-    #     # Supprimer le csr precedent
-    #     try:
-    #         self._service_monitor.gestionnaire_docker.supprimer_config('pki.intermediaire.csr.%s' % date_key)
-    #     except Exception:
-    #         self.__logger.exception("Erreur suppression CSR du certificat intermediaire")
-    #
-    #     # Reconfigurer monitor avec le nouveau certificat intermediaire
-    #     self._service_monitor.gestionnaire_docker.configurer_monitor()
 
 
 class GestionnaireCertificatsInstallation(GestionnaireCertificats):

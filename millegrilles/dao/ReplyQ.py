@@ -9,10 +9,12 @@ from millegrilles.dao.MessageDAO import BaseCallback
 
 
 class ReplyQHandler(BaseCallback):
+    """
+    Genere une Q pour attendre des reponses blocking pour commandes et requetes.
+    """
 
-    def __init__(self, contexte, generateur):
+    def __init__(self, contexte):
         super().__init__(contexte)
-        self.__generateur = generateur
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -50,7 +52,7 @@ class ReplyQHandler(BaseCallback):
 
     def requete(self, requete: dict, domaine: str, exchange=None, action: str = None, partition=None, blocking=True):
 
-        uuid_transaction = self.__generateur.transmettre_requete(
+        uuid_transaction = self._contexte.generateur_transactions.transmettre_requete(
             requete, domaine,
             action=action,
             partition=partition,
@@ -66,7 +68,7 @@ class ReplyQHandler(BaseCallback):
             return uuid_transaction
 
     def commande(self, commande: dict, domaine: str, channel=None, exchange=None, action: str = None, version=1, partition=None, blocking=True):
-        uuid_transaction = self.__generateur.transmettre_commande(
+        uuid_transaction = self._contexte.generateur_transactions.transmettre_commande(
             commande, domaine,
             action=action,
             partition=partition,
@@ -80,7 +82,7 @@ class ReplyQHandler(BaseCallback):
         if blocking:
             return self._attendre_reponse(uuid_transaction)
         else:
-            return uuid_transaction
+            return uuid_transaction, None
 
     def _attendre_reponse(self, uuid_transaction: str):
         try:
@@ -102,11 +104,11 @@ class ReplyQHandler(BaseCallback):
                 enveloppe = validateur.verifier(message_dict)
                 if enveloppe is None:
                     # Reponse signature ou hachage invalide
-                    return None
+                    return None, None
 
                 return message_dict, enveloppe
             else:
-                return None
+                return None, None
         finally:
             # Cleanup
             del self.__correlation_messages[uuid_transaction]

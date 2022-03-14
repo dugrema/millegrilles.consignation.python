@@ -108,7 +108,7 @@ class GenerateurTransaction:
             transaction, idmg_destination, encoding=self.encodeur_json,
             reply_to=reply_to, correlation_id=correlation_id)
 
-    def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None, domaine_direct=False,
+    def transmettre_requete(self, message_dict, domaine, correlation_id=None, reply_to=None, domaine_direct=False,
                             idmg_destination: str = None, securite: str = None, ajouter_certificats=False,
                             action: str = None, partition: str = None):
         """
@@ -138,6 +138,9 @@ class GenerateurTransaction:
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+
+        if correlation_id is None:
+            correlation_id = uuid_transaction
 
         if domaine_direct or domaine.startswith('requete.'):
             routing_key = domaine
@@ -204,6 +207,9 @@ class GenerateurTransaction:
 
         if ajouter_certificats:
             enveloppe['_certificat'] = self.__formatteur_message.chaine_certificat
+
+        if correlation_id is None:
+            correlation_id = uuid_transaction
 
         routing_key: str = domaine
         if not routing_key.startswith('commande'):

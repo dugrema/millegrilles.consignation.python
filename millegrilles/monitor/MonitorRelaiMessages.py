@@ -6,7 +6,7 @@ import tempfile
 from base64 import b64decode
 from os import path
 from threading import Thread, Event
-from typing import cast
+from typing import cast, Optional
 
 import docker
 from pymongo.errors import ServerSelectionTimeoutError, DuplicateKeyError
@@ -18,6 +18,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles, Trans
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.ReplyQ import ReplyQHandler
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
 # from millegrilles.monitor.ServiceMonitor import ServiceMonitorDependant, GestionnaireModulesDocker
@@ -466,9 +467,10 @@ class ConnexionMiddleware:
 
         self._connexion_relai: ConnexionPrincipal = cast(ConnexionPrincipal, None)
 
-        self._contexte: ContexteRessourcesDocumentsMilleGrilles = cast(ContexteRessourcesDocumentsMilleGrilles, None)
+        self._contexte: Optional[ContexteRessourcesDocumentsMilleGrilles] = None
         self._thread: Thread = cast(Thread, None)
         self._channel = None
+        self._reply_queue_handler: Optional[ReplyQHandler] = None
 
         self._fermeture_event = Event()
 
@@ -527,6 +529,8 @@ class ConnexionMiddleware:
 
         self._contexte.message_dao.register_channel_listener(self)
         self._contexte.message_dao.register_channel_listener(self.__commandes_handler)
+
+        self._reply_queue_handler = ReplyQHandler(self._contexte)
 
     def _contexte_additionnals(self) -> list:
         ca_certs_file = self._certificats['pki.millegrille.cert']
@@ -766,6 +770,12 @@ class ConnexionMiddleware:
     @property
     def reply_q(self) -> str:
         return self.__commandes_handler.queue_name
+
+    def commande(self, *args, **argv):
+        return self._reply_queue_handler.commande(*args, **argv)
+
+    def requete(self, *args, **argv):
+        return self._reply_queue_handler.requete(*args, **argv)
 
 
 class ConnexionMiddlewarePublic(ConnexionMiddleware):

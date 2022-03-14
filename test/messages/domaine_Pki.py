@@ -27,8 +27,7 @@ class MessagesSample(BaseCallback):
         self.channel = None
         self.event_recu = Event()
 
-        generateur = GenerateurTransaction(self.contexte)
-        self.reply_q_handler = ReplyQHandler(contexte, generateur)
+        self.reply_q_handler = ReplyQHandler(contexte)
 
         self.executer()
 
