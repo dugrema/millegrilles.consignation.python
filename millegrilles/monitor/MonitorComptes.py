@@ -1,7 +1,7 @@
 import logging
 from os import path, environ
 from threading import Event
-from typing import cast
+from typing import cast, Union
 
 from cryptography import x509
 from pymongo.errors import OperationFailure
@@ -13,6 +13,7 @@ from millegrilles.Constantes import ConstantesServiceMonitor
 # from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddleware
 from millegrilles.util.RabbitMQManagement import RabbitMQAPI
 from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class GestionnaireComptesMQ:
@@ -282,8 +283,16 @@ class GestionnaireComptesMongo:
         except OperationFailure:
             self.__rs_init_ok = True
 
-    def creer_compte(self, cert: EnveloppeCleCert):
-        issuer = cert.formatter_issuer()
+    def creer_compte(self, cert: Union[EnveloppeCertificat, EnveloppeCleCert]):
+        try:
+            issuer = cert.formatter_issuer()
+        except AttributeError:
+            pem = cert.certificat_pem
+            certificat_clecert = EnveloppeCleCert()
+            certificat_clecert.cert_from_pem_bytes(pem)
+            cert = certificat_clecert
+            issuer = certificat_clecert.formatter_issuer()
+
         idmg = issuer['organizationName']
         nom_compte = cert.subject_rfc4514_string_mq()
         commande = {

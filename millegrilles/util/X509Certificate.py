@@ -139,9 +139,14 @@ class EnveloppeCleCert:
 
         self.cert_from_pem_bytes(cert_bytes)
 
-    def cert_from_pem_bytes(self, cert_bytes: bytes):
+    def cert_from_pem_bytes(self, cert_bytes: Union[str, bytes]):
+        if isinstance(cert_bytes, str):
+            pem_string = cert_bytes
+            cert_bytes = cert_bytes.encode('utf-8')
+        else:
+            pem_string = cert_bytes.decode('utf-8')
+
         self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
-        pem_string = cert_bytes.decode('utf-8')
 
         self.set_chaine_str(pem_string)
         if len(self.chaine) < 2:

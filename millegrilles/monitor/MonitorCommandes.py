@@ -234,6 +234,8 @@ class GestionnaireCommandes:
 
         validateur = self._service_monitor.validateur_certificat
         certificat = validateur.valider(cert_pem)
+        certificat_clecert = EnveloppeCleCert()
+        certificat_clecert.cert_from_pem_bytes(cert_pem)
 
         securite = certificat.get_exchanges
 
@@ -249,7 +251,7 @@ class GestionnaireCommandes:
                 self.__logger.debug("Certificat ignore " + str(kerr))
 
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
-        gestionnaire_comptes_mq.ajouter_compte(certificat)
+        gestionnaire_comptes_mq.ajouter_compte(certificat_clecert)
         # Transmettre reponse d'ajout de compte, au besoin
         properties = commande.get('properties')
         if properties:

@@ -1,4 +1,4 @@
-location /fichiers {
+location /fichiers {{
   slice 5m;
   proxy_cache       cache_fichiers;
   proxy_cache_lock  on;
@@ -13,7 +13,7 @@ location /fichiers {
 
   proxy_headers_hash_bucket_size 64;
 
-  client_max_body_size 5M;
+  # client_max_body_size 5M;
 
   include /etc/nginx/conf.d/modules/fichiers.proxypass;
 
@@ -29,10 +29,10 @@ location /fichiers {
 
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_fichiers.include;
-}
+}}
 
 # Configuration de transfert de fichiers entre systemes (verif client SSL seulement)
-location /fichiers_transfert {
+location /fichiers_transfert {{
   include /etc/nginx/conf.d/modules/fichiers.proxypass;
 
   # Mapping certificat client pour connexion consignation fichiers
@@ -42,11 +42,11 @@ location /fichiers_transfert {
   proxy_ssl_verify              on;
   proxy_ssl_verify_depth        1;
 
-  client_max_body_size 5M;
+  # client_max_body_size 5M;
 
   # include /etc/nginx/conf.d/component_base.include;  # Active validation SSL client nginx, passe resultat dans headers
   # include /etc/nginx/conf.d/component_cors.include;
 
   # Active validation SSL client nginx, passe resultat dans headers
   include /etc/nginx/conf.d/component_fichiers.include;
-}
+}}

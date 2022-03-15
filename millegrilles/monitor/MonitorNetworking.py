@@ -28,6 +28,15 @@ class GestionnaireWeb:
         self.__repertoire_html = path.join('/var/opt/millegrilles/nginx/html')
         self.__repertoire_ext = path.join('/var/opt/millegrilles/nginx/ext')
 
+        try:
+            self.__repertoire_src_nginx = path.join(os.environ['MG_CONFIG_NGINX'])
+        except KeyError:
+            if self.__mode_dev:
+                self.__repertoire_src_nginx = path.abspath('../../config')
+            else:
+                self.__repertoire_src_nginx = path.join('/opt/millegrilles/dist/build/config')
+        self.__logger.info("Path configurations nginx pour deploiement : %s" % self.__repertoire_src_nginx)
+
         self.__intervalle_entretien = datetime.timedelta(minutes=15)
         self.__prochain_entretien = datetime.datetime.utcnow()
 
@@ -161,79 +170,21 @@ proxy_pass $upstream_fichiers;
         """
         nodename = self.__service_monitor.nodename
         hostname = self.__docker_client.hostname
+        # certissuer_url = 'http://certissuer:8380'
+
+        if self.__mode_dev:
+            monitor_url = 'http://%s:8280' % hostname
+            certissuer_url = 'http://%s:8380' % hostname
+        else:
+            monitor_url = 'http://monitor:8280'
+            certissuer_url = 'http://certissuer:8380'
 
         params = {
             'nodename': nodename,
             'hostname': hostname,
+            'monitor_url': monitor_url,
+            'certissuer_url': certissuer_url,
         }
-
-        # server_content = """
-        #     resolver 127.0.0.11 valid=30s;
-        #     server_name {nodename}.local {nodename};
-        # """.format(**params)
-        # with open(path.join(self.__repertoire_modules, 'server_name.include'), 'w') as fichier:
-        #     fichier.write(server_content)
-
-        error_pages = """
-error_page 401 = @error401;
-
-# If the user is not logged in, redirect them to the login URL
-location @error401 {
-  return 307 https://{hostname}/millegrilles;
-}
-        """
-        error_pages = error_pages.replace('{hostname}', params['hostname'])
-        with open(path.join(self.__repertoire_modules, 'error_page.location'), 'w') as fichier:
-            fichier.write(error_pages)
-
-        proxypass = """
-set $upstream_protege https://web_protege:443; 
-proxy_pass $upstream_protege;
-        """
-        with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
-            fichier.write(proxypass)
-
-        proxypass_fichiers = """
-set $upstream_fichiers https://fichiers:443; 
-proxy_pass $upstream_fichiers;
-"""
-        with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'w') as fichier:
-            fichier.write(proxypass_fichiers)
-
-        app_coupdoeil = """
-location /coupdoeil {
-    set $upstream_coupdoeil https://coupdoeil:443;
-    proxy_pass $upstream_coupdoeil;
-
-    include /etc/nginx/conf.d/component_base_auth.include;
-}
-"""
-        with open(path.join(self.__repertoire_modules, 'coupdoeil.app.location'), 'w') as fichier:
-            fichier.write(app_coupdoeil)
-
-        domaine_installeur = 'monitor'
-        domaine_certissuer = 'certissuer'
-        if self.__mode_dev:
-            domaine_installeur = self.__service_monitor.nodename
-            # domaine_certissuer = self.__service_monitor.nodename
-
-        proxypass_installation = """
-set $upstream_installation http://%s:8280;
-proxy_pass $upstream_installation;
-        """ % domaine_installeur
-        with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
-            fichier.write(proxypass_installation)
-
-        proxypass_certissuer = """
-set $upstream_certissuer http://%s:8380;
-proxy_pass $upstream_certissuer;
-        """ % domaine_certissuer
-        with open(path.join(self.__repertoire_modules, 'proxypass_certissuer.include'), 'w') as fichier:
-            fichier.write(proxypass_certissuer)
-
-        resolver = """
-resolver 127.0.0.11 valid=30s;
-        """
 
         try:
             securite = self.__service_monitor.securite
@@ -241,223 +192,318 @@ resolver 127.0.0.11 valid=30s;
             # En cours d'installation
             securite = None
 
-        if securite is not None and securite not in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]:
-            # Mode prive ou protege - on ajoute les certs SSL client en option
-            ssl_certs_content = """
-ssl_certificate       /run/secrets/webcert.pem;
-ssl_certificate_key   /run/secrets/webkey.pem;
-ssl_stapling          on;
-ssl_stapling_verify   on;
-
-ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
-ssl_verify_client      optional;
-ssl_verify_depth       1;
-            """
+        if securite is None:
+            path_config = path.join(self.__repertoire_src_nginx, 'nginx_installation')
+        elif securite == Constantes.SECURITE_PROTEGE:
+            path_config = path.join(self.__repertoire_src_nginx, 'nginx_protege')
+        elif securite == Constantes.SECURITE_PRIVE:
+            path_config = path.join(self.__repertoire_src_nginx, 'nginx_prive')
+        elif securite == Constantes.SECURITE_PUBLIC:
+            path_config = path.join(self.__repertoire_src_nginx, 'nginx_public')
         else:
-            # Pas de certificat client SSL pour noeud public ou prive
-            ssl_certs_content = """
-ssl_certificate       /run/secrets/webcert.pem;
-ssl_certificate_key   /run/secrets/webkey.pem;
-ssl_stapling          on;
-ssl_stapling_verify   on;
-            """
+            raise Exception("Type de securite non gere : %s" % securite)
 
-        cache_content = """
-# Configuration du cache NGINX pour les fichiers
-proxy_cache_path /cache 
-                 levels=1:2 
-                 keys_zone=cache_fichiers:2m 
-                 max_size=2g
-                 inactive=4320m
-                 use_temp_path=off;
-        """
+        # Parser et copier tous les fichiers du repertoire src vers .../nginx/modules
+        for file in os.listdir(path_config):
+            self.__logger.debug("Fichier config nginx : %s" % file)
+            if not mode_installe:
+                # Verifier si fichier destination existe (override optionnel)
+                pass
 
-        if securite == Constantes.SECURITE_PUBLIC:
-            # Noeud public, rediriger vers vitrine
-            redirect_defaut = 'vitrine'
-        elif self.__service_monitor.idmg or mode_installe:
-            # Noeud prive ou protege, rediriger vers portail local millegrilles
-            redirect_defaut = 'millegrilles'
-        else:
-            # Nouvelle installation, defaut vers installeur
-            redirect_defaut = 'installation'
+            with open(path.join(path_config, file), 'r') as fichier:
+                contenu = fichier.read()
 
-        # Sauvegarder les fichiers de configuration prets
-        with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
-            fichier.write(ssl_certs_content)
-        with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
-            fichier.write(resolver)
-        with open(path.join(self.__repertoire_modules, 'cache.conf'), 'w') as fichier:
-            fichier.write(cache_content)
+            # Inserer variables
+            contenu = contenu.format(**params)
 
-        # Redirection temporaire (307) vers le site approprie
-        location_redirect_installation = """
-location = / {
-  return 307 https://$http_host/%s;
-}
-        """ % redirect_defaut
+            # Conserver fichier (overwrite)
+            with open(path.join(self.__repertoire_modules, file), 'w') as fichier:
+                fichier.write(contenu)
 
-        location_fichiers_public = """
-# Agit comme reverse-proxy pour distribuer les fichiers
-location /fichiers {
-  rewrite ^/fichiers/(.*)$ /fichiers_transfert/$1 last;
-}
-
-# Cache/proxy vers le noeud protege.
-location /fichiers_transfert {
-  slice 5m;
-  proxy_cache       cache_fichiers;
-  proxy_cache_lock  on;
-  proxy_cache_background_update on;
-  proxy_cache_use_stale error timeout updating
-                        http_500 http_502 http_503 http_504;
-
-  proxy_cache_key   $uri$is_args$args$slice_range;
-  proxy_set_header  Range $slice_range;
-  proxy_cache_valid 200 201 206 30d;
-  proxy_cache_valid 401 403 404 500 502 503 504 1m;
-
-  proxy_headers_hash_bucket_size 64;
-
-  client_max_body_size 5M;
-
-  include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
-
-  # Mapping certificat client pour connexion consignation fichiers
-  proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
-  proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
-  proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
-
-  # NGINX protege utilise un certificat web (Let's Encrypt) - il faudrait mettre le cert SSL racine LE ici...
-  #proxy_ssl_verify       on;
-  #proxy_ssl_verify_depth 1;
-
-  # include /etc/nginx/conf.d/auth_public.include;
-  include /etc/nginx/conf.d/component_base.include;
-  include /etc/nginx/conf.d/component_cors.include;
-}
-        """
-
-        with open(path.join(self.__repertoire_modules, 'fichiers_public.include'), 'w') as fichier:
-            fichier.write(location_fichiers_public)
-
-        location_fichiers_protege = """
-location /fichiers {
-  slice 5m;
-  proxy_cache       cache_fichiers;
-  proxy_cache_lock  on;
-  proxy_cache_background_update on;
-  proxy_cache_use_stale error timeout updating
-                        http_500 http_502 http_503 http_504;
-
-  proxy_cache_key   $uri$is_args$args$slice_range;
-  proxy_set_header  Range $slice_range;
-  proxy_cache_valid 200 201 206 30d;
-  proxy_cache_valid 401 403 404 500 502 503 504 1m;
-
-  proxy_headers_hash_bucket_size 64;
-
-  client_max_body_size 5M;
-
-  include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
-
-  # Mapping certificat client pour connexion consignation fichiers
-  proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
-  proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
-  proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
-
-  proxy_ssl_verify       on;
-  proxy_ssl_verify_depth 1;
-
-  include /etc/nginx/conf.d/auth_public.include;
-  include /etc/nginx/conf.d/component_base.include;
-  include /etc/nginx/conf.d/component_cors.include;
-}
-
-# Configuration de transfert de fichiers entre systemes (verif client SSL seulement)
-location /fichiers_transfert {
-  include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
-
-  # Mapping certificat client pour connexion consignation fichiers
-  proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
-  proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
-  proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
-  proxy_ssl_verify              on;
-  proxy_ssl_verify_depth        1;
-
-  client_max_body_size 5M;
-
-  include /etc/nginx/conf.d/component_base.include;  # Active validation SSL client nginx, passe resultat dans headers
-  include /etc/nginx/conf.d/component_cors.include;
-}
-        """
-        with open(path.join(self.__repertoire_modules, 'fichiers_protege.include'), 'w') as fichier:
-            fichier.write(location_fichiers_protege)
-
-        # On a plusieurs options - une configuration par type de noeud (exclusif) et une qui permet
-        # de rediriger les requetes sous /public vers un serveur tiers (e.g. AWS CloudFront)
-        location_fichiers = "# include /etc/nginx/conf.d/modules/fichiers_rediriges.include;\n"
-        if securite in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]:
-            location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_public.include;"
-        elif securite is not None:
-            location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
-
-        location_installation_component = """
-location %s {
-    include /etc/nginx/conf.d/modules/proxypass_installation.include;
-    include /etc/nginx/conf.d/component_base.include;
-}
-        """
-
-        location_installation_paths = [
-            "/installation",
-            "/administration",
-        ]
-
-        location_certissuer_component = """
-location /certissuer {
-  include /etc/nginx/conf.d/modules/proxypass_certissuer.include;
-  include /etc/nginx/conf.d/component_base.include;
-}
-        """
-
-        certificats = """
-location /certs {
-  root /usr/share/nginx/files;
-  include /etc/nginx/conf.d/component_cors.include;
-}
-        """
-
-        fiches = """
-location /fiche.json {
-  root /usr/share/nginx/html;
-  include /etc/nginx/conf.d/component_cors.include;
-  
-  gzip on;
-  gzip_static on;
-  gzip_types application/json;
-}
-        """
-        locations_list = list()
-
-        locations_list.append(location_redirect_installation)
-        locations_list.append(location_fichiers)
-        locations_list.append(certificats)
-        locations_list.append(fiches)
-        locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
-        locations_list.append(location_certissuer_component)
-
-        locations_content = '\n'.join(locations_list)
-        with open(path.join(self.__repertoire_modules, 'global.location'), 'w') as fichier:
-            fichier.write(locations_content)
-
-        # Fichier qui relie la configuration de tous les modules
-        modules_includes_content = """
-include /etc/nginx/conf.d/modules/cache.conf;
-include /etc/nginx/conf.d/server.include;
-        """
-        with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
-            fichier.write(modules_includes_content)
+#         error_pages = """
+# error_page 401 = @error401;
+#
+# # If the user is not logged in, redirect them to the login URL
+# location @error401 {
+#   return 307 https://{hostname}/millegrilles;
+# }
+#         """
+#         error_pages = error_pages.replace('{hostname}', params['hostname'])
+#         with open(path.join(self.__repertoire_modules, 'error_page.location'), 'w') as fichier:
+#             fichier.write(error_pages)
+#
+#         proxypass = """
+# set $upstream_protege https://web_protege:443;
+# proxy_pass $upstream_protege;
+#         """
+#         with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
+#             fichier.write(proxypass)
+#
+#         proxypass_fichiers = """
+# set $upstream_fichiers https://fichiers:443;
+# proxy_pass $upstream_fichiers;
+# """
+#         with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'w') as fichier:
+#             fichier.write(proxypass_fichiers)
+#
+#         app_coupdoeil = """
+# location /coupdoeil {
+#     set $upstream_coupdoeil https://coupdoeil:443;
+#     proxy_pass $upstream_coupdoeil;
+#
+#     include /etc/nginx/conf.d/component_base_auth.include;
+# }
+# """
+#         with open(path.join(self.__repertoire_modules, 'coupdoeil.app.location'), 'w') as fichier:
+#             fichier.write(app_coupdoeil)
+#
+#         domaine_installeur = 'monitor'
+#         domaine_certissuer = 'certissuer'
+#         if self.__mode_dev:
+#             domaine_installeur = self.__service_monitor.nodename
+#             # domaine_certissuer = self.__service_monitor.nodename
+#
+#         proxypass_installation = """
+# set $upstream_installation http://%s:8280;
+# proxy_pass $upstream_installation;
+#         """ % domaine_installeur
+#         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
+#             fichier.write(proxypass_installation)
+#
+#         proxypass_certissuer = """
+# set $upstream_certissuer http://%s:8380;
+# proxy_pass $upstream_certissuer;
+#         """ % domaine_certissuer
+#         with open(path.join(self.__repertoire_modules, 'proxypass_certissuer.include'), 'w') as fichier:
+#             fichier.write(proxypass_certissuer)
+#
+#         resolver = """
+# resolver 127.0.0.11 valid=30s;
+#         """
+#
+#         try:
+#             securite = self.__service_monitor.securite
+#         except NotImplementedError:
+#             # En cours d'installation
+#             securite = None
+#
+#         if securite is not None and securite not in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]:
+#             # Mode prive ou protege - on ajoute les certs SSL client en option
+#             ssl_certs_content = """
+# ssl_certificate       /run/secrets/webcert.pem;
+# ssl_certificate_key   /run/secrets/webkey.pem;
+# ssl_stapling          on;
+# ssl_stapling_verify   on;
+#
+# ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+# ssl_verify_client      optional;
+# ssl_verify_depth       1;
+#             """
+#         else:
+#             # Pas de certificat client SSL pour noeud public ou prive
+#             ssl_certs_content = """
+# ssl_certificate       /run/secrets/webcert.pem;
+# ssl_certificate_key   /run/secrets/webkey.pem;
+# ssl_stapling          on;
+# ssl_stapling_verify   on;
+#             """
+#
+#         cache_content = """
+# # Configuration du cache NGINX pour les fichiers
+# proxy_cache_path /cache
+#                  levels=1:2
+#                  keys_zone=cache_fichiers:2m
+#                  max_size=2g
+#                  inactive=4320m
+#                  use_temp_path=off;
+#         """
+#
+#         if securite == Constantes.SECURITE_PUBLIC:
+#             # Noeud public, rediriger vers vitrine
+#             redirect_defaut = 'vitrine'
+#         elif self.__service_monitor.idmg or mode_installe:
+#             # Noeud prive ou protege, rediriger vers portail local millegrilles
+#             redirect_defaut = 'millegrilles'
+#         else:
+#             # Nouvelle installation, defaut vers installeur
+#             redirect_defaut = 'installation'
+#
+#         # Sauvegarder les fichiers de configuration prets
+#         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
+#             fichier.write(ssl_certs_content)
+#         with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
+#             fichier.write(resolver)
+#         with open(path.join(self.__repertoire_modules, 'cache.conf'), 'w') as fichier:
+#             fichier.write(cache_content)
+#
+#         # Redirection temporaire (307) vers le site approprie
+#         location_redirect_installation = """
+# location = / {
+#   return 307 https://$http_host/%s;
+# }
+#         """ % redirect_defaut
+#
+#         location_fichiers_public = """
+# # Agit comme reverse-proxy pour distribuer les fichiers
+# location /fichiers {
+#   rewrite ^/fichiers/(.*)$ /fichiers_transfert/$1 last;
+# }
+#
+# # Cache/proxy vers le noeud protege.
+# location /fichiers_transfert {
+#   slice 5m;
+#   proxy_cache       cache_fichiers;
+#   proxy_cache_lock  on;
+#   proxy_cache_background_update on;
+#   proxy_cache_use_stale error timeout updating
+#                         http_500 http_502 http_503 http_504;
+#
+#   proxy_cache_key   $uri$is_args$args$slice_range;
+#   proxy_set_header  Range $slice_range;
+#   proxy_cache_valid 200 201 206 30d;
+#   proxy_cache_valid 401 403 404 500 502 503 504 1m;
+#
+#   proxy_headers_hash_bucket_size 64;
+#
+#   client_max_body_size 5M;
+#
+#   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
+#
+#   # Mapping certificat client pour connexion consignation fichiers
+#   proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+#   proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+#   proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+#
+#   # NGINX protege utilise un certificat web (Let's Encrypt) - il faudrait mettre le cert SSL racine LE ici...
+#   #proxy_ssl_verify       on;
+#   #proxy_ssl_verify_depth 1;
+#
+#   # include /etc/nginx/conf.d/auth_public.include;
+#   include /etc/nginx/conf.d/component_base.include;
+#   include /etc/nginx/conf.d/component_cors.include;
+# }
+#         """
+#
+#         with open(path.join(self.__repertoire_modules, 'fichiers_public.include'), 'w') as fichier:
+#             fichier.write(location_fichiers_public)
+#
+#         location_fichiers_protege = """
+# location /fichiers {
+#   slice 5m;
+#   proxy_cache       cache_fichiers;
+#   proxy_cache_lock  on;
+#   proxy_cache_background_update on;
+#   proxy_cache_use_stale error timeout updating
+#                         http_500 http_502 http_503 http_504;
+#
+#   proxy_cache_key   $uri$is_args$args$slice_range;
+#   proxy_set_header  Range $slice_range;
+#   proxy_cache_valid 200 201 206 30d;
+#   proxy_cache_valid 401 403 404 500 502 503 504 1m;
+#
+#   proxy_headers_hash_bucket_size 64;
+#
+#   client_max_body_size 5M;
+#
+#   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
+#
+#   # Mapping certificat client pour connexion consignation fichiers
+#   proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+#   proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+#   proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+#
+#   proxy_ssl_verify       on;
+#   proxy_ssl_verify_depth 1;
+#
+#   include /etc/nginx/conf.d/auth_public.include;
+#   include /etc/nginx/conf.d/component_base.include;
+#   include /etc/nginx/conf.d/component_cors.include;
+# }
+#
+# # Configuration de transfert de fichiers entre systemes (verif client SSL seulement)
+# location /fichiers_transfert {
+#   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
+#
+#   # Mapping certificat client pour connexion consignation fichiers
+#   proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+#   proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+#   proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+#   proxy_ssl_verify              on;
+#   proxy_ssl_verify_depth        1;
+#
+#   client_max_body_size 5M;
+#
+#   include /etc/nginx/conf.d/component_base.include;  # Active validation SSL client nginx, passe resultat dans headers
+#   include /etc/nginx/conf.d/component_cors.include;
+# }
+#         """
+#         with open(path.join(self.__repertoire_modules, 'fichiers_protege.include'), 'w') as fichier:
+#             fichier.write(location_fichiers_protege)
+#
+#         # On a plusieurs options - une configuration par type de noeud (exclusif) et une qui permet
+#         # de rediriger les requetes sous /public vers un serveur tiers (e.g. AWS CloudFront)
+#         location_fichiers = "# include /etc/nginx/conf.d/modules/fichiers_rediriges.include;\n"
+#         if securite in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]:
+#             location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_public.include;"
+#         elif securite is not None:
+#             location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
+#
+#         location_installation_component = """
+# location %s {
+#     include /etc/nginx/conf.d/modules/proxypass_installation.include;
+#     include /etc/nginx/conf.d/component_base.include;
+# }
+#         """
+#
+#         location_installation_paths = [
+#             "/installation",
+#             "/administration",
+#         ]
+#
+#         location_certissuer_component = """
+# location /certissuer {
+#   include /etc/nginx/conf.d/modules/proxypass_certissuer.include;
+#   include /etc/nginx/conf.d/component_base.include;
+# }
+#         """
+#
+#         certificats = """
+# location /certs {
+#   root /usr/share/nginx/files;
+#   include /etc/nginx/conf.d/component_cors.include;
+# }
+#         """
+#
+#         fiches = """
+# location /fiche.json {
+#   root /usr/share/nginx/html;
+#   include /etc/nginx/conf.d/component_cors.include;
+#
+#   gzip on;
+#   gzip_static on;
+#   gzip_types application/json;
+# }
+#         """
+#         locations_list = list()
+#
+#         locations_list.append(location_redirect_installation)
+#         locations_list.append(location_fichiers)
+#         locations_list.append(certificats)
+#         locations_list.append(fiches)
+#         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
+#         locations_list.append(location_certissuer_component)
+#
+#         locations_content = '\n'.join(locations_list)
+#         with open(path.join(self.__repertoire_modules, 'global.location'), 'w') as fichier:
+#             fichier.write(locations_content)
+#
+#         # Fichier qui relie la configuration de tous les modules
+#         modules_includes_content = """
+# include /etc/nginx/conf.d/modules/cache.conf;
+# include /etc/nginx/conf.d/server.include;
+#         """
+#         with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
+#             fichier.write(modules_includes_content)
 
         try:
             # Supprimer nginx - docker va recreer les certs/cles pki.nginx et redeployer nginx automatiquement
