@@ -149,8 +149,11 @@ class GestionnaireWeb:
         :param port:
         :return:
         """
-        with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'r') as fichier:
-            contenu_courant = fichier.read()
+        try:
+            with open(path.join(self.__repertoire_modules, 'fichiers.proxypass'), 'r') as fichier:
+                contenu_courant = fichier.read()
+        except FileNotFoundError:
+            contenu_courant = ''
 
         config_proxypass = 'https://%s:%s' % (hostname, port)
         if config_proxypass not in contenu_courant:
@@ -159,7 +162,7 @@ class GestionnaireWeb:
 set $upstream_fichiers %s; 
 proxy_pass $upstream_fichiers;
             """ % config_proxypass
-            with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'w') as fichier:
+            with open(path.join(self.__repertoire_modules, 'fichiers.proxypass'), 'w') as fichier:
                 fichier.write(configuration)
             self.redemarrer_nginx()
 
