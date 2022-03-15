@@ -110,8 +110,21 @@ class TraitementMessagesMiddleware(BaseCallback):
         self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
 
         if self.__securite == Constantes.SECURITE_PROTEGE:
+            for sec in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
+                routing_keys = [
+                    'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+                ]
+
+                # Ajouter les routing keys
+                for routing_key in routing_keys:
+                    self.__channel.queue_bind(
+                        exchange=sec,
+                        queue=self.queue_name,
+                        routing_key=routing_key,
+                        callback=None
+                    )
+
             routing_keys = [
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
                 'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,

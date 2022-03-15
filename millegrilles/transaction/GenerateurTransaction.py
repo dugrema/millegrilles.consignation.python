@@ -171,7 +171,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def transmettre_reponse(self, message_dict, replying_to, correlation_id, idmg_destination: str = None, ajouter_certificats=False, no_format=False):
+    def transmettre_reponse(self, message_dict, replying_to, correlation_id, idmg_destination: str = None, ajouter_certificats=True, no_format=False):
         """
         Transmet une reponse a une requete. La reponse va directement sur la queue replying_to (pas de topic).
         :param message_dict: Message de reponse

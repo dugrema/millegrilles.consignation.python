@@ -218,7 +218,10 @@ class GestionnaireCommandes:
         self._service_monitor.publier_fiche_publique(commande)
 
     def ajouter_comptes(self, commande: dict):
-        contenu = commande['contenu']
+        try:
+            contenu = commande['contenu']
+        except KeyError:
+            contenu = commande
         cert_pem = contenu[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
         # chaine_pem = contenu['chaine']
 
