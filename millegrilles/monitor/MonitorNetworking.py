@@ -183,7 +183,7 @@ location @error401 {
 }
         """
         error_pages = error_pages.replace('{hostname}', params['hostname'])
-        with open(path.join(self.__repertoire_modules, 'error_page.conf.include'), 'w') as fichier:
+        with open(path.join(self.__repertoire_modules, 'error_page.location'), 'w') as fichier:
             fichier.write(error_pages)
 
         proxypass = """
@@ -287,7 +287,7 @@ proxy_cache_path /cache
             fichier.write(ssl_certs_content)
         with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
             fichier.write(resolver)
-        with open(path.join(self.__repertoire_modules, 'cache.conf.include'), 'w') as fichier:
+        with open(path.join(self.__repertoire_modules, 'cache.conf'), 'w') as fichier:
             fichier.write(cache_content)
 
         # Redirection temporaire (307) vers le site approprie
@@ -448,12 +448,12 @@ location /fiche.json {
         locations_list.append(location_certissuer_component)
 
         locations_content = '\n'.join(locations_list)
-        with open(path.join(self.__repertoire_modules, 'locations.include'), 'w') as fichier:
+        with open(path.join(self.__repertoire_modules, 'global.location'), 'w') as fichier:
             fichier.write(locations_content)
 
         # Fichier qui relie la configuration de tous les modules
         modules_includes_content = """
-include /etc/nginx/conf.d/modules/cache.conf.include;
+include /etc/nginx/conf.d/modules/cache.conf;
 include /etc/nginx/conf.d/server.include;
         """
         with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:

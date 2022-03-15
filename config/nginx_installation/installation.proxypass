@@ -1,0 +1,3 @@
+# set $upstream_installation {{monitor_url}};
+set $upstream_installation http://monitor:8280;
+proxy_pass $upstream_installation;

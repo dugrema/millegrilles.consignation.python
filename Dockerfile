@@ -6,6 +6,7 @@ FROM docker.maceroc.com/millegrilles_python_base:2022.0.0
 ENV SRC_FOLDER=/opt/millegrilles/build/src
 
 COPY scripts/ $BUILD_FOLDER/scripts
+COPY config/ $BUILD_FOLDER/config
 COPY ./ $SRC_FOLDER/millegrilles.consignation.python/
 
 RUN $BUILD_FOLDER/scripts/setup.sh
