@@ -652,6 +652,8 @@ class ServiceMonitor:
         try:
             info_mq['MQ_HOST'] = self._connexion_middleware.configuration.mq_host
             info_mq['MQ_PORT'] = self._connexion_middleware.configuration.mq_port
+            info_mq['MG_MQ_HOST'] = self._connexion_middleware.configuration.mq_host
+            info_mq['MG_MQ_PORT'] = self._connexion_middleware.configuration.mq_port
         except:
             # Connexion middleware pas chargee, on tente d'utiliser mdns
             pass

@@ -1076,20 +1076,34 @@ class GestionnaireModulesDocker:
                 nom_elem_environment = 'environment'
 
             config_env = config_service.get(nom_elem_environment)
+            config_env_dict = dict()
             if config_env:
-                # Mapping des variables
-                config_env = [self.__mapping(valeur) for valeur in config_env]
-            else:
-                config_env = list()
+                # Convertir liste en dict, mapping des variables
+                for items in config_env:
+                    elems = items.split('=')
+                    valeur = self.__mapping("=".join(elems[1:]))
+                    config_env_dict[elems[0]] = valeur
 
-            # Toujours ajouter l'id du noeud, le IDMG, MQ connexion params
-            config_env.append("MG_NOEUD_ID=" + self.__service_monitor.noeud_id)
-            config_env.append("MG_IDMG=" + self.__service_monitor.idmg)
+            # config_env = [self.__mapping(valeur) for valeur in config_env]
+
             connexion_mq = self.__service_monitor.get_info_connexion_mq(nowait=True)
             for key, value in connexion_mq.items():
-                config_env.append(key + "=" + str(value))
+                # config_env.append(key + "=" + str(value))
+                config_env_dict[key] = str(value)
 
-            dict_config_docker[nom_elem_environment] = config_env
+            # Toujours ajouter l'id du noeud, le IDMG, MQ connexion params
+            # config_env.append("MG_NOEUD_ID=" + self.__service_monitor.noeud_id)
+            # config_env.append("MG_IDMG=" + self.__service_monitor.idmg)
+            config_env_dict["MG_NOEUD_ID"] = self.__service_monitor.noeud_id
+            config_env_dict["MG_IDMG"] = self.__service_monitor.idmg
+
+            # Reconvertir env en liste
+            # config_env_list = list()
+            # for items in config_env_dict.items():
+            #     config_env_list.append(items[0] + '=' + items[1])
+            config_env_list = ['='.join(i) for i in config_env_dict.items()]
+
+            dict_config_docker[nom_elem_environment] = config_env_list
 
             # Constraints
             config_constraints = config_service.get('constraints')
