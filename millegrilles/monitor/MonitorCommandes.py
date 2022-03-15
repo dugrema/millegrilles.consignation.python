@@ -178,17 +178,17 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DEMARRER_APPLICATION:
                 reponse = self._service_monitor.gestionnaire_applications.commande_demarrer_application(commande)
 
-            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR:
-                reponse = self._service_monitor.gestionnaire_certificats.commande_signer_navigateur(commande)
+            # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR:
+            #     reponse = self._service_monitor.gestionnaire_certificats.commande_signer_navigateur(commande)
 
-            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD:
-                reponse = self._service_monitor.gestionnaire_certificats.commande_signer_noeud(commande)
+            # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD:
+            #     reponse = self._service_monitor.gestionnaire_certificats.commande_signer_noeud(commande)
 
-            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE:
-                reponse = self._service_monitor.gestionnaire_certificats.renouveller_intermediaire(commande)
+            # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE:
+            #     reponse = self._service_monitor.gestionnaire_certificats.renouveller_intermediaire(commande)
 
-            elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
-                self.sauvegarder_fiche_publique(commande)
+            # elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
+            #     self.sauvegarder_fiche_publique(commande)
 
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RELAI_WEB:
                 reponse = self._service_monitor.relai_web(commande)
@@ -226,16 +226,25 @@ class GestionnaireCommandes:
 
     def _ajouter_compte_pem(self, cert_pem, commande):
         # Charger pem
-        certificat = EnveloppeCleCert()
-        certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
-        try:
-            gestionnaire_mongo: GestionnaireComptesMongo = self._service_monitor.gestionnaire_mongo
-            if gestionnaire_mongo:
-                gestionnaire_mongo.creer_compte(certificat)
-        except DuplicateKeyError:
-            self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
-        except KeyError as kerr:
-            self.__logger.debug("Certificat ignore " + str(kerr))
+        # certificat = EnveloppeCleCert()
+        # certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
+
+        validateur = self._service_monitor.validateur_certificat
+        certificat = validateur.valider(cert_pem)
+
+        securite = certificat.get_exchanges
+
+        if Constantes.SECURITE_SECURE in securite:
+            # Ajouter compte dans mongo
+            try:
+                gestionnaire_mongo: GestionnaireComptesMongo = self._service_monitor.gestionnaire_mongo
+                if gestionnaire_mongo:
+                    gestionnaire_mongo.creer_compte(certificat)
+            except DuplicateKeyError:
+                self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
+            except KeyError as kerr:
+                self.__logger.debug("Certificat ignore " + str(kerr))
+
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
         gestionnaire_comptes_mq.ajouter_compte(certificat)
         # Transmettre reponse d'ajout de compte, au besoin

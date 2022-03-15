@@ -254,6 +254,16 @@ class ServiceMonitorSatellite(ServiceMonitor):
         # Nettoyer certificats monitor
         self._supprimer_certificats_expires(['monitor'])
 
+    def ajouter_compte(self, certificat: str):
+        """
+        Emettre demande de creation de compte
+        """
+        commande = {'certificat_pem': certificat}
+        self._connexion_middleware.commande(
+            commande, 'servicemonitor',
+            action=Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE
+        )
+
     def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
         """
         Initialise un noeud prive/public avec un certificat

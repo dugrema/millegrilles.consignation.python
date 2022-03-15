@@ -26,6 +26,7 @@ from millegrilles.monitor.MonitorCommandes import CommandeMonitor, GestionnaireC
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat, PemHelpers, EnveloppeCleCert
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.util.ValidateursMessages import ValidateurMessage
+from millegrilles.util.ValidateursPki import ValidateurCertificat
 
 
 class TraitementMessagesMiddleware(BaseCallback):
@@ -766,6 +767,10 @@ class ConnexionMiddleware:
     @property
     def validateur_message(self) -> ValidateurMessage:
         return self._contexte.validateur_message
+
+    @property
+    def validateur_certificat(self) -> ValidateurCertificat:
+        return self._contexte.validateur_message.validateur_pki
 
     @property
     def reply_q(self) -> str:

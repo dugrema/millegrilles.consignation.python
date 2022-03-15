@@ -47,9 +47,6 @@ class ServiceMonitorPrive(ServiceMonitorSatellite):
         params = commande.contenu
         self._renouveller_certificat_monitor(commande)
 
-    def ajouter_compte(self, certificat: str):
-        raise Exception("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
-
     @property
     def securite(self):
         return Constantes.SECURITE_PRIVE

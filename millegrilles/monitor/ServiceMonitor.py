@@ -740,6 +740,24 @@ class ServiceMonitor:
 
         return self.__validateur_message
 
+
+    @property
+    def validateur_certificat(self) -> ValidateurCertificat:
+        try:
+            if self._connexion_middleware is not None:
+                validateur = self._connexion_middleware.validateur_certificat
+                if validateur is not None:
+                    return validateur
+        except Exception:
+            self.__logger.exception("Erreur chargement validateur messages, on utilise une version offline")
+        else:
+            self.__logger.warning("Erreur chargement validateur messages, on utilise une version offline")
+
+        if self.__validateur_message is None:
+            self.__validateur_message = ValidateurMessage(idmg=self.idmg)
+
+        return self.__validateur_message
+
     # def generer_csr_intermediaire(self):
     #     csr_info = self.gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
     #     self.csr_intermediaire = csr_info['request']

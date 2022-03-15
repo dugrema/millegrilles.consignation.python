@@ -41,7 +41,7 @@ class MessagesSample(BaseCallback):
         self.noeud_id = 'd495a462-e138-4112-9099-1e655458e14d'
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
-        with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
+        with open('/home/mathieu/mgdev/certs/pki.postmaster.cert', 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
             cert = x509.load_pem_x509_certificate(
                 certificat_courant_pem,
@@ -85,22 +85,16 @@ class MessagesSample(BaseCallback):
 
     def commande_ajouter_compte(self):
         certificat = self.certificat_courant_pem
-
-        header = '-----BEGIN CERTIFICATE-----\n'
-
-        certificats = certificat.split(header)[1:]
-        certificats = [header + cert for cert in certificats]
-
-        print("Transmettre certificat :\n" + certificats[0])
-        for cert in certificats[1:]:
-            print(cert)
+        print('Transmettre certificat %s' % certificat)
+        # header = '-----BEGIN CERTIFICATE-----\n'
 
         enveloppe_requete = self.generateur.transmettre_commande(
-            {'certificat': certificats[0], 'chaine': certificats[1:]},
-            'commande.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+            {'certificat_pem': certificat},
+            "servicemonitor",
+            action=Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
             correlation_id='abcd-1234',
             reply_to=self.queue_name,
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+            exchange=Constantes.SECURITE_PRIVE
         )
 
         print("Envoi commande: %s" % enveloppe_requete)
@@ -219,12 +213,12 @@ BA==
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
         # self.transaction_activer_millegrille_hebergee()
-        # self.commande_ajouter_compte()
+        self.commande_ajouter_compte()
         # self.commande_activer_hebergement()
         # self.commande_desactiver_hebergement()
         # self.transaction_signer_certificat_navigateur()
         # ertificat_noeud()
-        self.commande_relai_web()
+        # self.commande_relai_web()
 
 
 # --- MAIN ---
