@@ -9,6 +9,7 @@ from json.decoder import JSONDecodeError
 
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ForcerRedemarrage
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 hostName = "0.0.0.0"
@@ -338,8 +339,15 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                     cert_pem = self.headers.get('X-Client-Cert')
                     cert_pem = cert_pem.replace('\t', '')
 
-                self.service_monitor.ajouter_compte(cert_pem)
-                self.send_response(200)
+                # Valider le certificat, s'assurer qu'il a au moins un exchange
+                certificat = EnveloppeCertificat(certificat_pem=cert_pem)
+                exchanges = certificat.get_exchanges
+                if len(exchanges) > 0:
+                    self.service_monitor.ajouter_compte(cert_pem)
+                    self.send_response(200)
+                else:
+                    self.__logger.info("Certificat ajouterCompte : aucuns exchange presents sur le certificat - REFUSE")
+                    self.send_response(403)
             else:
                 self.send_response(403)
         except:
