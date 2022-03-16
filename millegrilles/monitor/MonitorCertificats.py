@@ -403,6 +403,7 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
 
     def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None,
                                combiner_keycert=False) -> EnveloppeCleCert:
+
         clecert = self._renouvelleur.preparer_csr_par_role(role, common_name, liste_dns)
 
         # Post vers certissuer pour signer avec l'autorite, obtenir le certificat

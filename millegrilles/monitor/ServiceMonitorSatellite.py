@@ -11,9 +11,10 @@ from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificatsNoeudPrive
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
-from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor, \
+    ConnexionMiddlewarePasPreteException
 from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddlewarePrive
-from millegrilles.monitor.ServiceMonitor import ServiceMonitor, ConnexionMiddlewarePasPreteException
+from millegrilles.monitor.ServiceMonitor import ServiceMonitor
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 

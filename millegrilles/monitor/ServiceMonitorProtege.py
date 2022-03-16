@@ -12,7 +12,7 @@ from millegrilles.SecuritePKI import CertificatExpire
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificatsNoeudProtegePrincipal
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
-from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor, DICT_MODULES_PROTEGES
 from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddleware, ConnexionMiddlewareProtege
 from millegrilles.monitor.ServiceMonitor import ServiceMonitor
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
@@ -204,3 +204,6 @@ class ServiceMonitorProtege(ServiceMonitor):
     @property
     def fermeture_event(self):
         return self._fermeture_event
+
+    def _get_dict_modules(self) -> dict:
+        return DICT_MODULES_PROTEGES

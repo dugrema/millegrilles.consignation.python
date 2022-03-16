@@ -23,6 +23,7 @@ from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
 # from millegrilles.monitor.ServiceMonitor import ServiceMonitorDependant, GestionnaireModulesDocker
 from millegrilles.monitor.MonitorCommandes import CommandeMonitor, GestionnaireCommandes
+from millegrilles.monitor.MonitorConstantes import ConnexionMiddlewarePasPreteException
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat, PemHelpers, EnveloppeCleCert
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.util.ValidateursMessages import ValidateurMessage
@@ -757,6 +758,8 @@ class ConnexionMiddleware:
 
     @property
     def generateur_transactions(self):
+        if self._contexte is None:
+            raise ConnexionMiddlewarePasPreteException()
         return self._contexte.generateur_transactions
 
     @property

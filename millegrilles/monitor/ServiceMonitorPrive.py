@@ -5,7 +5,7 @@ import docker
 
 from millegrilles import Constantes
 from millegrilles.monitor import MonitorConstantes
-from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor, DICT_MODULES_PRIVES
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.monitor.ServiceMonitorSatellite import ServiceMonitorSatellite
@@ -58,3 +58,7 @@ class ServiceMonitorPrive(ServiceMonitorSatellite):
     @property
     def nom_service_nginx(self):
         return 'nginx'
+
+    def _get_dict_modules(self) -> dict:
+        return DICT_MODULES_PRIVES
+

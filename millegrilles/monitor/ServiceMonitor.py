@@ -21,15 +21,15 @@ from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
-from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
+from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, ConnexionMiddlewarePasPreteException
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker
 from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddleware
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.util.X509Certificate import EnveloppeCleCert
-from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorCertificats import ErreurSignatureCertificatException
 from millegrilles.util.IpUtils import get_ip
 from millegrilles.util.ValidateursMessages import ValidateurMessage
@@ -298,6 +298,10 @@ class ServiceMonitor:
         """
         raise NotImplementedError()
 
+    def _get_dict_modules(self) -> dict:
+        raise NotImplementedError()
+        # return MonitorConstantes.DICT_MODULES_PROTEGES
+
     def _entretien_certificats(self):
         """
         Effectue l'entretien des certificats : genere certificats manquants ou expires avec leur cle
@@ -314,7 +318,9 @@ class ServiceMonitor:
             domaine_noeud = fqdn_noeud
 
         # S'assurer que tous les certificats sont generes (initialement ou sur suppression forcee)
-        roles = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
+        # roles = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
+        dict_modules = self._get_dict_modules()  # MonitorConstantes.DICT_MODULES_PROTEGES
+        roles = [info['role'] for info in dict_modules.values() if info.get('role')]
         resultat_entretien_certificats = self._supprimer_certificats_expires(roles)
 
         # Generer certificats expires et manquants pour modules proteges
@@ -1002,6 +1008,26 @@ class ServiceMonitor:
             self.gestionnaire_docker.sauvegarder_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG, idmg)
             self._idmg = idmg
 
+        # Supprimer les configurations (docker.cfg.*) qui ne sont pas requis pour ce niveau de securite
+        if securite == Constantes.SECURITE_PRIVE:
+            modules_requis = MonitorConstantes.DICT_MODULES_PRIVES
+        elif securite == Constantes.SECURITE_PUBLIC:
+            modules_requis = MonitorConstantes.DICT_MODULES_PUBLICS
+        else:
+            raise Exception("Role %s non supporte" % securite)
+
+        for config in self._docker.configs.list(filters={"name": "docker.cfg"}):
+            role_nom = config.name.split('.')[-1]
+            if role_nom not in modules_requis.keys():
+                self.__logger.debug("Retirer configuration %s" % config.name)
+                config.remove()
+
+                services_trouves = self._docker.services.list(filters={"name": role_nom})
+                for service in services_trouves:
+                    self.__logger.info("Desinstaller service %s", service.name)
+                    service.remove()
+
+
     def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
         raise NotImplementedError("Non supporte")
 
@@ -1069,5 +1095,3 @@ class ServiceMonitor:
             return {'ok': False, 'code': 403, 'err': 'Not authorized'}
 
 
-class ConnexionMiddlewarePasPreteException(Exception):
-    pass

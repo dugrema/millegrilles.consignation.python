@@ -13,7 +13,7 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificatsNoeudPublic
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
-from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor, DICT_MODULES_PUBLICS
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddlewarePublic
@@ -244,3 +244,6 @@ class ServiceMonitorPublic(ServiceMonitor):
     @property
     def nom_service_nginx(self):
         return 'nginx_public'
+
+    def _get_dict_modules(self) -> dict:
+        return DICT_MODULES_PUBLICS

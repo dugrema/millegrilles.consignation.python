@@ -20,6 +20,10 @@ DICT_MODULES_PUBLICS = {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
     },
+    ConstantesServiceMonitor.MODULE_REDIS: {
+        'nom': ConstantesServiceMonitor.MODULE_REDIS,
+        'nom_image': ConstantesServiceMonitor.MODULE_REDIS
+    },
 }
 
 DICT_MODULES_PRIVES = {
@@ -29,6 +33,10 @@ DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_NGINX: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
+    },
+    ConstantesServiceMonitor.MODULE_REDIS: {
+        'nom': ConstantesServiceMonitor.MODULE_REDIS,
+        'nom_image': ConstantesServiceMonitor.MODULE_REDIS
     },
 }
 
@@ -250,4 +258,8 @@ class GenerationCertificatNonSupporteeException(Exception):
     """
     Indique qu'il n'est pas possible de generer un certificat sur ce noeud
     """
+    pass
+
+
+class ConnexionMiddlewarePasPreteException(Exception):
     pass
