@@ -74,7 +74,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             else:
                 self.error_404()
         elif path_fichier[1] == 'administration':
-            self._traiter_administration_POST()
+            self._traiter_administration_POST(request_data)
 
     def error_404(self):
         self.send_error(404)
@@ -305,7 +305,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"GET ADMINISTRATION, pas implemente")
 
-    def _traiter_administration_POST(self):
+    def _traiter_administration_POST(self, request_data):
         if not self.headers.get('VERIFIED') == 'SUCCESS':
             self.__logger.debug("/administration Access refuse, SSL invalide")
             self.send_error(401)
@@ -316,12 +316,13 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
         # S'assurer que la verification du certificat client est OK
         if path_split[2] == 'ajouterCompte':
-            self.ajouter_compte()
+            self.ajouter_compte(request_data)
         else:
             self.send_error(404)
 
-    def ajouter_compte(self):
+    def ajouter_compte(self, request_data):
         issuer_dn = self.headers.get('X-Client-Issuer-DN')
+
         issuer_info = dict()
         for elem in issuer_dn.split(','):
             key, value = elem.split('=')
@@ -330,10 +331,13 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         headers = self.headers
         try:
             if idmg_issuer == self.service_monitor.idmg:
-                cert_pem = self.headers.get('X-Client-Cert')
-                cert_pem = cert_pem.replace('\t', '')
-                # cert_payload = self.headers.get_payload()
-                # cert_pem = cert_pem + '\n' + cert_payload
+                try:
+                    cert_pem = request_data['certificat']
+                except KeyError:
+                    # Fallback sur cert recu
+                    cert_pem = self.headers.get('X-Client-Cert')
+                    cert_pem = cert_pem.replace('\t', '')
+
                 self.service_monitor.ajouter_compte(cert_pem)
                 self.send_response(200)
             else:
