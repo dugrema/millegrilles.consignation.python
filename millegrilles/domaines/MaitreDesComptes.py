@@ -618,7 +618,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if Constantes.SECURITE_PRIVE not in exchanges and Constantes.SECURITE_PROTEGE not in exchanges:
             return {'err': 'Permission refusee', 'code': 1}
 
-        if ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE not in roles and ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE not in roles:
+        if ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES not in roles:
             return {'err': 'Permission refusee', 'code': 2}
 
         # Charger l'usager de la base de donnees

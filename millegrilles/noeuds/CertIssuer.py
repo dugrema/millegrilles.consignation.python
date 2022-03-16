@@ -752,7 +752,7 @@ PROFIL_PAR_ROLE = {
     ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS: {},
     ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: {},
     ConstantesGenerateurCertificat.ROLE_NAVIGATEUR: {},
-    ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE: {},
+    ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES: {},
     ConstantesGenerateurCertificat.ROLE_AGENT_BACKUP: {},
     ConstantesGenerateurCertificat.ROLE_NGINX: {},
     ConstantesGenerateurCertificat.ROLE_VITRINE: {},

@@ -76,15 +76,15 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
         'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
     },
-    ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
-        'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
+    ConstantesServiceMonitor.MODULE_MAITRECOMPTES: {
+        'nom': ConstantesServiceMonitor.MODULE_MAITRECOMPTES,
         'nom_image': ConstantesServiceMonitor.MODULE_WEB,
-        'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+        'role': ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES,
     },
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL: {
         'nom': ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
         'nom_image': ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
-        'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+        'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
     },
     ConstantesServiceMonitor.MODULE_CORE: {
         'nom': ConstantesServiceMonitor.MODULE_CORE_RUST,
@@ -154,7 +154,7 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
     ConstantesServiceMonitor.MODULE_CORE,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-    ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
+    ConstantesServiceMonitor.MODULE_MAITRECOMPTES,
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
     ConstantesServiceMonitor.MODULE_MEDIA,
     ConstantesServiceMonitor.MODULE_AGENT_BACKUP,

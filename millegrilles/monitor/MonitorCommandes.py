@@ -187,8 +187,8 @@ class GestionnaireCommandes:
             # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE:
             #     reponse = self._service_monitor.gestionnaire_certificats.renouveller_intermediaire(commande)
 
-            # elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
-            #     self.sauvegarder_fiche_publique(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
+                self.sauvegarder_fiche_publique(commande)
 
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RELAI_WEB:
                 reponse = self._service_monitor.relai_web(commande)

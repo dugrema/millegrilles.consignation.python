@@ -1430,7 +1430,7 @@ class GenererMongo(GenerateurNoeud):
         return builder
 
 
-class GenererWebProtege(GenerateurNoeud):
+class GenererMaitreComptes(GenerateurNoeud):
 
     def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
                  domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
@@ -1442,7 +1442,7 @@ class GenererWebProtege(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, Constantes.DEFAUT_MQ_EXCHANGE_PRIVE, Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC]).encode('utf-8')
+        exchanges = ','.join([Constantes.DEFAUT_MQ_EXCHANGE_PRIVE, Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1451,7 +1451,7 @@ class GenererWebProtege(GenerateurNoeud):
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
 
         liste_roles = [
-            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+            ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES,
             Constantes.ConstantesMaitreDesComptes.DOMAINE_NOM,
         ]
 
@@ -1462,7 +1462,7 @@ class GenererWebProtege(GenerateurNoeud):
         )
 
         liste_dns = [
-            x509.DNSName(u'web_protege'),
+            x509.DNSName(u'maitrecomptes'),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'localhost'),
             x509.IPAddress(IPv4Address('127.0.0.1')),
@@ -1495,7 +1495,7 @@ class GenererWebPrive(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1517,20 +1517,20 @@ class GenererWebPrive(GenerateurNoeud):
         return builder
 
 
-class GenererWebPublic(GenerateurNoeud):
+class GenererCoupdoeil(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC.encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PROTEGE, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ConstantesGenerateurCertificat.ROLE_WEB_PUBLIC.encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_COUPDOEIL).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1539,6 +1539,7 @@ class GenererWebPublic(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'www'),
             x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'coupdoeil'),
         ]
 
         if self._domaines_publics is not None:
@@ -2212,14 +2213,13 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MEDIA: Constantes.SECURITE_SECURE,
 
             # Roles 2.prive
-            ConstantesGenerateurCertificat.ROLE_WEB_PRIVE: Constantes.SECURITE_PRIVE,
+            ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_COLLECTIONS: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_MESSAGERIE_WEB: Constantes.SECURITE_PRIVE,
 
             # Roles 1.public
             ConstantesGenerateurCertificat.ROLE_POSTMASTER: Constantes.SECURITE_PUBLIC,
-            ConstantesGenerateurCertificat.ROLE_WEB_PUBLIC: Constantes.SECURITE_PUBLIC,
             ConstantesGenerateurCertificat.ROLE_NGINX: Constantes.SECURITE_PUBLIC,
         }
         self.__generateurs_par_role = {
@@ -2230,9 +2230,8 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_CORE: GenererCore,
             ConstantesGenerateurCertificat.ROLE_TRANSACTIONS: GenererTransactions,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: GenererMaitredescles,
-            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE: GenererWebProtege,
-            ConstantesGenerateurCertificat.ROLE_WEB_PRIVE: GenererWebPrive,
-            ConstantesGenerateurCertificat.ROLE_WEB_PUBLIC: GenererWebPublic,
+            ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES: GenererMaitreComptes,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL: GenererCoupdoeil,
             ConstantesGenerateurCertificat.ROLE_DEPLOYEUR: GenererDeployeur,
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
