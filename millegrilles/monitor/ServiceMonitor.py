@@ -1009,7 +1009,9 @@ class ServiceMonitor:
             self._idmg = idmg
 
         # Supprimer les configurations (docker.cfg.*) qui ne sont pas requis pour ce niveau de securite
-        if securite == Constantes.SECURITE_PRIVE:
+        if securite == Constantes.SECURITE_PROTEGE:
+            modules_requis = MonitorConstantes.DICT_MODULES_PROTEGES
+        elif securite == Constantes.SECURITE_PRIVE:
             modules_requis = MonitorConstantes.DICT_MODULES_PRIVES
         elif securite == Constantes.SECURITE_PUBLIC:
             modules_requis = MonitorConstantes.DICT_MODULES_PUBLICS
