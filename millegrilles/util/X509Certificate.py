@@ -29,7 +29,7 @@ from millegrilles.util.Ed25519 import chiffrer_cle_ed25519, dechiffrer_cle_ed255
 
 class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
 
-    DELTA_INITIAL = datetime.timedelta(minutes=2)  # Initialiser a 2 minutes avant temps courant
+    DELTA_INITIAL = datetime.timedelta(seconds=20)  # Initialiser a 2 minutes avant temps courant
     ONE_DAY = datetime.timedelta(hours=2)
 
     DUREE_CERT_ROOT = datetime.timedelta(days=3655)
@@ -540,10 +540,12 @@ class GenerateurCertificat:
             x509.NameAttribute(x509.name.NameOID.COMMON_NAME, cn)
         ])
 
+        now = datetime.datetime.utcnow()
+
         builder = builder.subject_name(subject)
         builder = builder.issuer_name(autorite_cert.subject)
-        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.DELTA_INITIAL)
-        builder = builder.not_valid_after(datetime.datetime.today() + duree_cert)
+        builder = builder.not_valid_before(now - ConstantesGenerateurCertificat.DELTA_INITIAL)
+        builder = builder.not_valid_after(now + duree_cert)
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(csr_request.public_key())
 
@@ -662,8 +664,8 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         builder = builder.subject_name(name)
 
         builder = builder.issuer_name(self._autorite.cert.subject)
-        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.DELTA_INITIAL)
-        builder = builder.not_valid_after(datetime.datetime.today() + duree_cert)
+        builder = builder.not_valid_before(datetime.datetime.utcnow() - ConstantesGenerateurCertificat.DELTA_INITIAL)
+        builder = builder.not_valid_after(datetime.datetime.utcnow() + duree_cert)
         builder = builder.serial_number(x509.random_serial_number())
 
         pem_bytes = cle_publique_pem.encode('utf-8')
@@ -884,8 +886,8 @@ class GenerateurCertificatNginxSelfsigned:
 
         public_key = clecert.private_key.public_key()
         builder = x509.CertificateBuilder()
-        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.DELTA_INITIAL)
-        builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_INSTALLATION)
+        builder = builder.not_valid_before(datetime.datetime.utcnow() - ConstantesGenerateurCertificat.DELTA_INITIAL)
+        builder = builder.not_valid_after(datetime.datetime.utcnow() + ConstantesGenerateurCertificat.DUREE_CERT_INSTALLATION)
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(public_key)
 
@@ -1019,8 +1021,8 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
     def __preparer_builder(self, private_key, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD) -> x509.CertificateBuilder:
         public_key = private_key.public_key()
         builder = x509.CertificateBuilder()
-        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.DELTA_INITIAL)
-        builder = builder.not_valid_after(datetime.datetime.today() + duree_cert)
+        builder = builder.not_valid_before(datetime.datetime.utcnow() - ConstantesGenerateurCertificat.DELTA_INITIAL)
+        builder = builder.not_valid_after(datetime.datetime.utcnow() + duree_cert)
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(public_key)
 
