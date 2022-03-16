@@ -19,6 +19,7 @@ DICT_MODULES_PUBLICS = {
     ConstantesServiceMonitor.MODULE_NGINX: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
+        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
     },
     ConstantesServiceMonitor.MODULE_REDIS: {
         'nom': ConstantesServiceMonitor.MODULE_REDIS,
@@ -33,6 +34,7 @@ DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_NGINX: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
+        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
     },
     ConstantesServiceMonitor.MODULE_REDIS: {
         'nom': ConstantesServiceMonitor.MODULE_REDIS,
@@ -106,6 +108,25 @@ DICT_MODULES_PROTEGES = {
         'nom': ConstantesServiceMonitor.MODULE_MEDIA,
         'nom_image': ConstantesServiceMonitor.MODULE_MEDIA,
         'role': ConstantesGenerateurCertificat.ROLE_MEDIA,
+    },
+}
+
+DICT_MODULES_INSTALLATION = {
+    ConstantesServiceMonitor.MODULE_ACME: {
+        'nom': ConstantesServiceMonitor.MODULE_ACME,
+        'nom_image': ConstantesServiceMonitor.MODULE_ACME
+    },
+    ConstantesServiceMonitor.MODULE_CERTISSUER: {
+        'nom': ConstantesServiceMonitor.MODULE_CERTISSUER,
+        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON
+    },
+    ConstantesServiceMonitor.MODULE_NGINX: {
+        'nom': ConstantesServiceMonitor.MODULE_NGINX,
+        'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
+    },
+    ConstantesServiceMonitor.MODULE_REDIS: {
+        'nom': ConstantesServiceMonitor.MODULE_REDIS,
+        'nom_image': ConstantesServiceMonitor.MODULE_REDIS
     },
 }
 

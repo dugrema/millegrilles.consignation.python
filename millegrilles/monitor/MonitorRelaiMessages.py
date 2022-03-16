@@ -205,7 +205,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         domaine = message_dict['domaine']
         exchanges_routing = message_dict['exchanges_routing']
         self.__logger_verbose.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
-        self.__gestionnaire_commandes.inscrire_domaine(domaine, exchanges_routing)
+        # self.__gestionnaire_commandes.inscrire_domaine(domaine, exchanges_routing)
 
 
 class TransfertMessages(BaseCallback):

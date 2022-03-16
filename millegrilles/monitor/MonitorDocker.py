@@ -336,7 +336,8 @@ class GestionnaireModulesDocker:
         if not configuration_service:
             configuration_service = MonitorConstantes.DICT_MODULES_PROTEGES.get(service_name) or \
                                     MonitorConstantes.DICT_MODULES_PRIVES.get(service_name) or \
-                                    MonitorConstantes.DICT_MODULES_PUBLICS.get(service_name)
+                                    MonitorConstantes.DICT_MODULES_PUBLICS.get(service_name) or \
+                                    MonitorConstantes.DICT_MODULES_INSTALLATION.get(service_name)
 
         gestionnaire_images = kwargs.get('images')
         if not gestionnaire_images:

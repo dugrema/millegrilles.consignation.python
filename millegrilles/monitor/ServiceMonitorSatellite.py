@@ -13,7 +13,7 @@ from millegrilles.monitor.MonitorCertificats import GestionnaireCertificatsNoeud
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor, \
     ConnexionMiddlewarePasPreteException
-from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddlewarePrive
+from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddlewarePrive, ConnexionMiddlewarePublic
 from millegrilles.monitor.ServiceMonitor import ServiceMonitor
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 
@@ -57,6 +57,8 @@ class ServiceMonitorSatellite(ServiceMonitor):
                     # Mettre a jour les certificats utilises par les modules prives
                     try:
                         self.preparer_secrets()
+                    except ConnexionMiddlewarePasPreteException:
+                        self.__logger.info("Erreur traitement preparer_secrets pour monitor satellite - connexion middleware n'est pas prete")
                     except:
                         self.__logger.exception("Erreur traitement preparer_secrets pour monitor satellite")
 
@@ -73,9 +75,16 @@ class ServiceMonitorSatellite(ServiceMonitor):
         Lance une thread distincte pour s'occuper des messages.
         :return:
         """
-        self._connexion_middleware = ConnexionMiddlewarePrive(
-            self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
-            secrets=self._args.secrets)
+        if self.securite == Constantes.SECURITE_PRIVE:
+            self._connexion_middleware = ConnexionMiddlewarePrive(
+                self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+                secrets=self._args.secrets)
+        elif self.securite == Constantes.SECURITE_PUBLIC:
+            self._connexion_middleware = ConnexionMiddlewarePublic(
+                self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+                secrets=self._args.secrets)
+        else:
+            raise Exception("Niveau de securite satellite non supporte : %s" % self.securite)
 
         try:
             self._connexion_middleware.initialiser()
