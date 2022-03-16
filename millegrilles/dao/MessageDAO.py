@@ -378,6 +378,9 @@ class ConnexionWrapper:
         port = 443
         path = 'administration/ajouterCompte'
 
+        with open(self.configuration.mq_certfile, 'r') as fichier:
+            chaine_cert = {'certificat': fichier.read()}
+
         cle_cert = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
         self._logger.debug("Creation compte MQ avec fichiers %s" % str(cle_cert))
         try:
@@ -386,7 +389,7 @@ class ConnexionWrapper:
                 try:
                     path_complet = 'https://%s:%d/%s' % (host, port, path)
                     self._logger.debug("Creation compte avec path %s" % path_complet)
-                    reponse = requests.post(path_complet, cert=cle_cert, verify=False)
+                    reponse = requests.post(path_complet, json=chaine_cert, cert=cle_cert, verify=False)
                     if reponse.status_code == 200:
                         return True
                     if reponse.status_code != 200:

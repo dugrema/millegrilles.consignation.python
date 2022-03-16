@@ -399,7 +399,7 @@ class GestionnaireModulesDocker:
             self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
-        except AttributeError as ae:
+        except (AttributeError, ValueError) as ae:
             self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail erreur configuration service " + service_name)

@@ -57,4 +57,4 @@ class ServiceMonitorPrive(ServiceMonitorSatellite):
 
     @property
     def nom_service_nginx(self):
-        return 'nginx_public'
+        return 'nginx'

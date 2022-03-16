@@ -17,7 +17,7 @@ from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles, TransactionConfiguration
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import BaseCallback, ExceptionConnectionFermee
 from millegrilles.dao.ReplyQ import ReplyQHandler
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
@@ -717,20 +717,11 @@ class ConnexionMiddleware:
             self._comptes_mq_ok = comptes_mq_ok
 
     def _entretien(self):
-        ts_courant = datetime.datetime.utcnow().timestamp()
-
-        exchange = self.exchange
-
         # Emettre message de presence du monitor
-        self.emettre_presence()
-
-        # Transmettre requete pour avoir l'etat de l'hebergement
-        self.generateur_transactions.transmettre_requete(
-            dict(), Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
-            reply_to=self.__commandes_handler.queue_name,
-            correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE,
-            securite=exchange
-        )
+        try:
+            self.emettre_presence()
+        except ExceptionConnectionFermee:
+            self.__logger.warning("Connexion MQ fermee, skip emettre presence")
 
     def emettre_presence(self):
         info_monitor = dict(self._service_monitor.get_info_monitor(inclure_services=True))

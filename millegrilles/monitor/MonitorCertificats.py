@@ -421,7 +421,10 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
         connexion = self._service_monitor.connexion_middleware
         reponse_json, enveloppe = connexion.commande(requete, 'CorePki', action='signerCsr')
 
-        chaine = reponse_json['certificat']
+        try:
+            chaine = reponse_json['certificat']
+        except KeyError:
+            raise ErreurSignatureCertificatException("Erreur signature certificat pour role %s, reponse\n%s" % (role, json.dumps(reponse_json, indent=2)))
 
         if nomcle is None:
             nomcle = role
@@ -788,3 +791,5 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
 
         return clecert_ed25519
 
+class ErreurSignatureCertificatException(Exception):
+    pass

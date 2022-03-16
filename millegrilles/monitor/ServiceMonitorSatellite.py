@@ -13,7 +13,7 @@ from millegrilles.monitor.MonitorCertificats import GestionnaireCertificatsNoeud
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage, CommandeMonitor
 from millegrilles.monitor.MonitorRelaiMessages import ConnexionMiddlewarePrive
-from millegrilles.monitor.ServiceMonitor import ServiceMonitor
+from millegrilles.monitor.ServiceMonitor import ServiceMonitor, ConnexionMiddlewarePasPreteException
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 
@@ -45,23 +45,26 @@ class ServiceMonitorSatellite(ServiceMonitor):
                 self._gestionnaire_web.entretien()
 
             # Entretien des certificats du monitor, services
-            if self._certificats_entretien_date is None or \
-                    self._certificats_entretien_date + self._certificats_entretien_frequence < datetime.datetime.utcnow():
+            try:
+                if self._certificats_entretien_date is None or \
+                        self._certificats_entretien_date + self._certificats_entretien_frequence < datetime.datetime.utcnow():
 
-                self._certificats_entretien_date = datetime.datetime.utcnow()
-                self._entretien_certificats()
-                self._entretien_secrets_pki()
+                    self._certificats_entretien_date = datetime.datetime.utcnow()
+                    self._entretien_certificats()
+                    self._entretien_secrets_pki()
 
-                # Mettre a jour les certificats utilises par les modules prives
-                try:
-                    self.preparer_secrets()
-                except:
-                    self.__logger.exception("Erreur traitement preparer_secrets pour monitor satellite")
+                    # Mettre a jour les certificats utilises par les modules prives
+                    try:
+                        self.preparer_secrets()
+                    except:
+                        self.__logger.exception("Erreur traitement preparer_secrets pour monitor satellite")
 
-                if self.__containers_redemarres_rotation is False:
-                    self.__logger.info("Redemarrer containers en mode application suite au redemarrage du monitor (1 fois)")
-                    self.__containers_redemarres_rotation = True
-                    self.gestionnaire_docker.stop_applications_modecontainer()
+                    if self.__containers_redemarres_rotation is False:
+                        self.__logger.info("Redemarrer containers en mode application suite au redemarrage du monitor (1 fois)")
+                        self.__containers_redemarres_rotation = True
+                        self.gestionnaire_docker.stop_applications_modecontainer()
+            except ConnexionMiddlewarePasPreteException:
+                self.__logger.warning("La connexion middleware n'est pas prete - skip entretien certificat")
 
     def connecter_middleware(self):
         """
@@ -160,7 +163,11 @@ class ServiceMonitorSatellite(ServiceMonitor):
         :return:
         """
 
-        volume_secrets = '/var/opt/millegrilles_secrets'
+        volume_secrets = os.path.join(self.path_secrets, 'shared')  # '/var/opt/millegrilles_secrets'
+        try:
+            os.makedirs(volume_secrets)
+        except FileExistsError:
+            pass  # OK
 
         try:
             configuration = self.connexion_middleware.configuration
@@ -168,26 +175,13 @@ class ServiceMonitorSatellite(ServiceMonitor):
             self.__logger.error("Connexion middleware n'est pas prete, configuration secret abandonnee")
             return
 
-        # Le monitor est deploye sous forme de service, on copie les secrets vers le repertoire partage
-        # path_secret_prives = '/var/opt/millegrilles_secrets'
-        # self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
-
         if os.path.exists(volume_secrets):
             self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
             fichiers = [
-                (os.path.join(volume_secrets, 'key.pem'), configuration.mq_keyfile),
-                (os.path.join(volume_secrets, 'cert.pem'), configuration.mq_certfile),
+                # (os.path.join(volume_secrets, 'key.pem'), configuration.mq_keyfile),
+                # (os.path.join(volume_secrets, 'cert.pem'), configuration.mq_certfile),
                 (os.path.join(volume_secrets, 'millegrille.cert.pem'), configuration.mq_cafile)
             ]
-
-            # volume_secrets = '/var/opt/millegrilles_secrets'
-            # self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
-            # fichiers = [
-            #     # (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-            #     (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-            #     (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
-            #     (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
-            # ]
 
             for fichier in fichiers:
                 try:
@@ -252,7 +246,8 @@ class ServiceMonitorSatellite(ServiceMonitor):
                     self.__logger.exception("Connexion MQ pas prete")
 
         # Nettoyer certificats monitor
-        self._supprimer_certificats_expires(['monitor'])
+        # self._supprimer_certificats_expires(['monitor'])
+        super()._entretien_certificats()
 
     def ajouter_compte(self, certificat: str):
         """
@@ -292,6 +287,7 @@ class ServiceMonitorSatellite(ServiceMonitor):
             certificat_millegrille_present = True
         except IndexError:
             certificat_millegrille = chaine_pem[-1]
+            chaine_pem = chaine_pem[:-1]
 
         try:
             monitor_key_pem = self._gestionnaire_certificats.get_infocle()['cle_pem']

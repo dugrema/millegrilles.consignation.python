@@ -206,6 +206,17 @@ proxy_pass $upstream_fichiers;
         else:
             raise Exception("Type de securite non gere : %s" % securite)
 
+        if securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
+            supprimer_fichiers = ['millegrilles.server', 'certissuer.location', 'certissuer.proxypass']
+        else:
+            supprimer_fichiers = []
+
+        for file in supprimer_fichiers:
+            try:
+                os.remove(path.join(self.__repertoire_modules, file))
+            except FileNotFoundError:
+                pass  # OK
+
         # Parser et copier tous les fichiers du repertoire src vers .../nginx/modules
         for file in os.listdir(path_config):
             self.__logger.debug("Fichier config nginx : %s" % file)
@@ -222,6 +233,7 @@ proxy_pass $upstream_fichiers;
             # Conserver fichier (overwrite)
             with open(path.join(self.__repertoire_modules, file), 'w') as fichier:
                 fichier.write(contenu)
+
 
 #         error_pages = """
 # error_page 401 = @error401;

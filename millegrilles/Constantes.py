@@ -1751,7 +1751,6 @@ class ConstantesServiceMonitor:
     MODULE_CORE = 'core'
     # MODULE_DOMAINES_DYNAMIQUES = 'domaines_dynamiques'
     MODULE_NGINX = 'nginx'
-    MODULE_NGINX_PUBLIC = 'nginx_public'
     MODULE_WEB_PROTEGE = 'web_protege'
     MODULE_WEB = 'web'
     MODULE_WEB_COUPDOEIL = 'web_coupdoeil'

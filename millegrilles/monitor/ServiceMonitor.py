@@ -30,6 +30,7 @@ from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+from millegrilles.monitor.MonitorCertificats import ErreurSignatureCertificatException
 from millegrilles.util.IpUtils import get_ip
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
@@ -320,11 +321,14 @@ class ServiceMonitor:
         for nom_role, info_role in resultat_entretien_certificats.items():
             if not info_role.get('expiration') or info_role.get('est_expire'):
                 self.__logger.debug("Generer nouveau certificat role %s", nom_role)
-                self._gestionnaire_certificats.generer_clecert_module(
-                    nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
+                try:
+                    self._gestionnaire_certificats.generer_clecert_module(
+                        nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
 
-                # Reconfigurer tous les services qui utilisent le nouveau certificat
-                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+                    # Reconfigurer tous les services qui utilisent le nouveau certificat
+                    self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+                except ErreurSignatureCertificatException as e:
+                    self.__logger.warning("Erreur creation certificat : %s", e)
 
             elif nom_role == 'nginx':
                 clecert = info_role['clecert']
@@ -332,9 +336,12 @@ class ServiceMonitor:
                 organization = subject_dict['organizationName']
                 if organization != self.idmg:
                     # Le certificat nginx est encore celui d'installation, on en genere un nouveau
-                    self._gestionnaire_certificats.generer_clecert_module(
-                        nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
-                    self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+                    try:
+                        self._gestionnaire_certificats.generer_clecert_module(
+                            nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
+                        self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+                    except ErreurSignatureCertificatException as e:
+                        self.__logger.warning("Erreur creation certificat : %s", e)
 
         # Entretien des certificats services
         self._entretien_certificats_pki()
@@ -724,6 +731,8 @@ class ServiceMonitor:
 
     @property
     def connexion_middleware(self) -> ConnexionMiddleware:
+        if self._connexion_middleware is None:
+            raise ConnexionMiddlewarePasPreteException("Connexion middleware n'est pas prete")
         return self._connexion_middleware
 
     @property
@@ -1058,3 +1067,7 @@ class ServiceMonitor:
 
         else:
             return {'ok': False, 'code': 403, 'err': 'Not authorized'}
+
+
+class ConnexionMiddlewarePasPreteException(Exception):
+    pass

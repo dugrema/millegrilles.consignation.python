@@ -16,8 +16,8 @@ DICT_MODULES_PUBLICS = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME
     },
-    ConstantesServiceMonitor.MODULE_NGINX_PUBLIC: {
-        'nom': ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+    ConstantesServiceMonitor.MODULE_NGINX: {
+        'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
     },
 }
@@ -26,14 +26,10 @@ DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME
     },
-    ConstantesServiceMonitor.MODULE_NGINX_PUBLIC: {
-        'nom': ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+    ConstantesServiceMonitor.MODULE_NGINX: {
+        'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
     },
-    # ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
-    #     'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
-    #     # 'nom_image': ConstantesServiceMonitor.MODULE_WEB,
-    # },
 }
 
 DICT_MODULES_PROTEGES = {
@@ -115,7 +111,7 @@ MODULES_REQUIS_INSTALLATION = [
 
 MODULES_REQUIS_PRIVE_PUBLIC = [
     ConstantesServiceMonitor.MODULE_ACME,
-    ConstantesServiceMonitor.MODULE_NGINX_PUBLIC,
+    ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_REDIS,
 ]
 
