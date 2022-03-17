@@ -1287,9 +1287,10 @@ class GenererMonitor(GenerateurNoeud):
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
 
         exchanges = ','.join([
-            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            # Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
             Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC
         ]).encode('utf-8')
 
         builder = builder.add_extension(
