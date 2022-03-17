@@ -167,11 +167,16 @@ class TraitementMessagesMiddleware(BaseCallback):
                         callback=None
                     )
 
-            # Evenements publics
+        # Evenements publics
+        rk_public = [
+            'evenement.CoreTopologie.fichePublique',
+            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
+        ]
+        for rk in rk_public:
             self.__channel.queue_bind(
                 exchange=Constantes.SECURITE_PUBLIC,
                 queue=self.queue_name,
-                routing_key='evenement.CoreTopologie.fichePublique',
+                routing_key=rk,
                 callback=None
             )
 
