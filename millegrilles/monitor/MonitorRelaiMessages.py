@@ -737,9 +737,11 @@ class ConnexionMiddleware:
         info_monitor = dict(self._service_monitor.get_info_monitor(inclure_services=True))
         info_monitor['noeud_id'] = self._service_monitor.noeud_id
         info_monitor['securite'] = self._service_monitor.securite
-        domaine_action = Constantes.ConstantesTopologie.EVENEMENT_PRESENCE_MONITOR
 
-        self.generateur_transactions.emettre_message(info_monitor, domaine_action, ajouter_certificats=True)
+        domaine = '.'.join(['evenement', 'monitor', Constantes.ConstantesTopologie.EVENEMENT_PRESENCE_MONITOR])
+        action = Constantes.ConstantesTopologie.EVENEMENT_PRESENCE_MONITOR
+
+        self.generateur_transactions.emettre_message(info_monitor, domaine, action=action, ajouter_certificats=True)
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self._service_monitor.gestionnaire_commandes
