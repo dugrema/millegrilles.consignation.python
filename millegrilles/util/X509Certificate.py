@@ -1143,7 +1143,12 @@ class GenererMaitredescles(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
+        exchanges = ','.join([
+            Constantes.SECURITE_SECURE,
+            Constantes.SECURITE_PROTEGE,
+            Constantes.SECURITE_PRIVE,
+            Constantes.SECURITE_PUBLIC,
+        ]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1153,6 +1158,15 @@ class GenererMaitredescles(GenerateurNoeud):
         roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MAITREDESCLES).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join([
+            Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+        ]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
             critical=False
         )
 
