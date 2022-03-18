@@ -111,9 +111,9 @@ class TraitementMessagesMiddleware(BaseCallback):
         self.__channel.basic_consume(self.queue_name, self.callbackAvecAck, auto_ack=False)
 
         if self.__securite == Constantes.SECURITE_PROTEGE:
-            for sec in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
+            for sec in [Constantes.SECURITE_PUBLIC]:  # , Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
                 routing_keys = [
-                    'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+                    'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
                 ]
 
                 # Ajouter les routing keys
@@ -126,40 +126,41 @@ class TraitementMessagesMiddleware(BaseCallback):
                     )
 
             routing_keys = [
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
+                'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
+                # 'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
+                # 'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
             ]
 
             # Ajouter les routing keys
             for routing_key in routing_keys:
                 self.__channel.queue_bind(
-                    exchange=self.__securite,
+                    exchange=Constantes.SECURITE_PROTEGE,
                     queue=self.queue_name,
                     routing_key=routing_key,
-                    callback=None
+                    callback=self.__on_rk_bind
                 )
 
-            routing_keys_prive = [
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
-            ]
-            # Ajouter les routing keys
-            for routing_key in routing_keys_prive:
-                self.__channel.queue_bind(
-                    exchange=Constantes.SECURITE_PRIVE,
-                    queue=self.queue_name,
-                    routing_key=routing_key,
-                    callback=None
-                )
+            # routing_keys_prive = [
+            #     'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
+            # ]
+            # # Ajouter les routing keys
+            # for routing_key in routing_keys_prive:
+            #     self.__channel.queue_bind(
+            #         exchange=Constantes.SECURITE_PRIVE,
+            #         queue=self.queue_name,
+            #         routing_key=routing_key,
+            #         callback=None
+            #     )
 
-            routing_keys_privepublic = [
-                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+            routing_keys_public = [
+                'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                'evenement.CoreTopologie.fichePublique',
             ]
 
             # Ajouter les routing keys
-            for exchange in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
-                for routing_key in routing_keys_privepublic:
+            for exchange in [Constantes.SECURITE_PUBLIC]:
+                for routing_key in routing_keys_public:
                     self.__channel.queue_bind(
                         exchange=exchange,
                         queue=self.queue_name,
@@ -170,24 +171,24 @@ class TraitementMessagesMiddleware(BaseCallback):
         # Evenements publics
         rk_public = [
             'evenement.CoreTopologie.fichePublique',
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
+            'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
         ]
         for rk in rk_public:
             self.__channel.queue_bind(
                 exchange=Constantes.SECURITE_PUBLIC,
                 queue=self.queue_name,
                 routing_key=rk,
-                callback=None
+                callback=self.__on_rk_bind
             )
 
         routing_keys = [
-            'commande.servicemonitor.%s.#' % self._noeud_id,
-            'evenement.presence.domaine',
+            'commande.monitor.%s.#' % self._noeud_id,
+            # 'evenement.presence.domaine',
 
             # Backup
             Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_', 'global'),
             Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
+            'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
         ]
 
         # Ajouter les routing keys
@@ -196,8 +197,11 @@ class TraitementMessagesMiddleware(BaseCallback):
                 exchange=self.__securite,
                 queue=self.queue_name,
                 routing_key=routing_key,
-                callback=None
+                callback=self.__on_rk_bind
             )
+
+    def __on_rk_bind(self, a=None, b=None, c=None):
+        self.__logger.debug("Routing key bind %s, %s, %s" % (a, b, c))
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -427,10 +431,10 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         # Ajouter les routing keys
         routing_keys = [
             Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES,
-            'commande.servicemonitordependant.#',
-            'commande.servicemonitor.activerHebergement',
-            'commande.servicemonitor.desactiverHebergement',
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
+            'commande.monitordependant.#',
+            'commande.monitor.activerHebergement',
+            'commande.monitor.desactiverHebergement',
+            'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
         ]
 
         for key in routing_keys:

@@ -1235,16 +1235,34 @@ class GenererCore(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
+        exchanges = ','.join([
+            Constantes.SECURITE_SECURE,
+            Constantes.SECURITE_PROTEGE,
+            Constantes.SECURITE_PRIVE,
+            Constantes.SECURITE_PUBLIC,
+        ]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_CORE).encode('utf-8')
+        roles = ','.join([ConstantesGenerateurCertificat.ROLE_CORE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join([
+            Constantes.ConstantesBackup.DOMAINE_NOM,
+            Constantes.ConstantesCatalogueApplications.DOMAINE_NOM,
+            Constantes.ConstantesMaitreDesComptes.DOMAINE_NOM,
+            Constantes.ConstantesPki.DOMAINE_NOM,
+            Constantes.ConstantesTopologie.DOMAINE_NOM,
+        ]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
             critical=False
         )
 

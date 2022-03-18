@@ -727,7 +727,7 @@ class ServiceMonitor:
         Emet un evenement de monitor. Insere le noeudId dans le routing
         :return:
         """
-        routing = 'evenement.servicemonitor.%s.%s' % (self.noeud_id, action)
+        routing = 'evenement.monitor.%s.%s' % (self.noeud_id, action)
         if info is None:
             info = dict()
         try:

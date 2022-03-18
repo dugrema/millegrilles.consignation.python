@@ -7,6 +7,7 @@ from json.decoder import JSONDecodeError
 from threading import Event, Thread
 from typing import Optional
 
+import pymongo.errors
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
@@ -249,6 +250,11 @@ class GestionnaireCommandes:
                 self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
             except KeyError as kerr:
                 self.__logger.debug("Certificat ignore " + str(kerr))
+            except pymongo.errors.OperationFailure as oe:
+                if oe.code == 51003:
+                    self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
+                else:
+                    raise oe
 
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
         gestionnaire_comptes_mq.ajouter_compte(certificat_clecert)

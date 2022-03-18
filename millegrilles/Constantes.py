@@ -532,7 +532,7 @@ class ConstantesSecurityPki:
 
 
 class ConstantesPki:
-    DOMAINE_NOM = 'Pki'
+    DOMAINE_NOM = 'CorePki'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
@@ -1375,7 +1375,7 @@ class SenseursPassifsConstantes:
 # Constantes pour le domaine Backup
 class ConstantesBackup:
 
-    DOMAINE_NOM = 'Backup'
+    DOMAINE_NOM = 'CoreBackup'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_RAPPORTS_NOM = '%s/rapports' % COLLECTION_TRANSACTIONS_NOM
@@ -1528,7 +1528,7 @@ class ConstantesHebergement:
 
 class ConstantesMaitreDesComptes:
 
-    DOMAINE_NOM = 'MaitreDesComptes'
+    DOMAINE_NOM = 'CoreMaitreDesComptes'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_USAGERS_NOM = '%s/usagers' % COLLECTION_TRANSACTIONS_NOM
@@ -1866,8 +1866,8 @@ class ConstantesTopologie:
     TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE = '%s.supprimerDomaineDynamique' % DOMAINE_NOM
     TRANSACTION_CONFIGURER_CONSIGNATION_WEB = 'configurerConsignationWeb'
 
-    EVENEMENT_PRESENCE_DOMAINE = 'evenement.presence.domaine'
-    EVENEMENT_PRESENCE_MONITOR = 'evenement.presence.monitor'
+    EVENEMENT_PRESENCE_DOMAINE = 'evenement.monitor.domaine'
+    EVENEMENT_PRESENCE_MONITOR = 'evenement.monitor.presence'
     EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE = 'fichePublique'
 
     REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM

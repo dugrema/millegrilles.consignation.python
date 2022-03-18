@@ -387,7 +387,7 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
                     try:
                         self._service_monitor.connexion_middleware.generateur_transactions.transmettre_commande(
                             commande,
-                            'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                            'commande.monitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
                             exchange=Constantes.SECURITE_PUBLIC,
                             correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
                             reply_to=self._service_monitor.connexion_middleware.reply_q,

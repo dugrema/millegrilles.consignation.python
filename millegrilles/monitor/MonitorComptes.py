@@ -4,6 +4,7 @@ from threading import Event
 from typing import cast, Union
 
 from cryptography import x509
+from cryptography.x509.extensions import ExtensionNotFound
 from pymongo.errors import OperationFailure
 from requests.exceptions import ConnectionError, HTTPError, SSLError
 from urllib3.exceptions import MaxRetryError
@@ -116,36 +117,73 @@ class GestionnaireComptesMQ:
         write_permissions = ''
         configure_permissions = ''
 
-        if Constantes.SECURITE_SECURE in enveloppe.get_exchanges:
-            # Permission secure, on donne tous les acces
-            read_permissions = '.*'
-            write_permissions = '.*'
-            configure_permissions = '.*'
-        else:
-            exchanges = '|'.join([e.replace('.', '\\.') for e in enveloppe.get_exchanges])
+        exchanges = '|'.join([e.replace('.', '\\.') for e in enveloppe.get_exchanges])
 
-            roles = enveloppe.get_roles
-            if 'media' in roles or 'fichiers' in roles:
-                role_configs = '|'.join([r + '/.*' for r in roles])
-                configure_permissions = '|'.join([role_configs, 'amq.*'])
-                read_permissions = '|'.join([role_configs, exchanges, 'amq.*'])
-                write_permissions = '|'.join([role_configs, exchanges, 'amq.*'])
-            else:
-                # TODO Corriger, permissions pour tous les roles
-                read_permissions = '.*'
-                write_permissions = '.*'
-                configure_permissions = '.*'
+        # Donner permission de creer/lire/ecrire sur Qs commencant par nom de roles du certificat
+        roles = enveloppe.get_roles
+        try:
+            domaines = enveloppe.get_domaines
+            roles.extend(domaines)
+        except ExtensionNotFound:
+            pass
+
+        role_configs = '|'.join([r + '/.*' for r in roles])
+        configure_permissions = '|'.join([role_configs, 'amq.*'])
+        read_permissions = '|'.join([role_configs, exchanges, 'amq.*'])
+        write_permissions = '|'.join([role_configs, exchanges, 'amq.*'])
 
         return configure_permissions, read_permissions, write_permissions
 
-    def get_topic_permissions(self):
-        raise NotImplementedError()
+    def get_topic_permissions(self, enveloppe: EnveloppeCleCert, exchange: str):
         # Exemple pour media
         # TOPICS (1.public, 2.prive, 3.protege)
         # write, exchanges 2.prive, 3.protege:
         # requete\..*|evenement\.fichiers.*|evenement\.media.*|\..*|commande\..*|transaction\.GrosFichiers\..*|amq\..*
         # read
         # requete\.certificat\..*|evenement\.certificat\..*|requete\.media\..*|evenement\.media\..*|commande\.media\..*|commande\.fichiers\..*|amq.*
+
+        roles = enveloppe.get_roles.copy()
+        roles.append('global')
+        try:
+            domaines = enveloppe.get_domaines
+            roles.extend(domaines)
+        except ExtensionNotFound:
+            pass
+
+        topics_read_roles = [
+            'requete\\.%s\\..*',
+            'commande\\.%s\\..*',
+        ]
+        if exchange == Constantes.SECURITE_SECURE:
+            topics_read_roles.append('transaction\\.%s\\..*')
+
+        topics_read = [
+            'requete\\.certificat\\..*',
+            'evenement\\..*',
+        ]
+        for topic in topics_read_roles:
+            for role in roles:
+                topics_read.append(topic % role)
+
+        topics_write_roles = [
+            'evenement\\.%s\\..*',
+        ]
+        if exchange == Constantes.SECURITE_SECURE:
+            topics_write_roles.append('transaction\\.%s\\..*')
+        topics_write = [
+            'evenement\\.certificat\\.infoCertificat',
+            'requete\\..*',
+            'commande\\..*',
+        ]
+        for topic in topics_write_roles:
+            for role in roles:
+                topics_write.append(topic % role)
+
+        topics_read = '|'.join(topics_read)
+        topics_write = '|'.join(topics_write)
+
+        return topics_read, topics_write
+
 
     def ajouter_compte(self, enveloppe: EnveloppeCleCert):
         issuer = enveloppe.formatter_issuer()
@@ -187,7 +225,10 @@ class GestionnaireComptesMQ:
 
             for exchange in liste_inclure:
                 liste_exchanges_exclure.remove(exchange)  # Retire de la liste d'exchanges a exclure
-                responses.append(self._admin_api.create_user_topic(subject, idmg, exchange))
+                topic_read_permissions, topic_write_permissions = self.get_topic_permissions(enveloppe, exchange)
+                responses.append(
+                    self._admin_api.create_user_topic(
+                        subject, idmg, exchange, write=topic_write_permissions, read=topic_read_permissions))
 
             # Bloquer les exchanges a exclure
             for exchange in liste_exchanges_exclure:
