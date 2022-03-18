@@ -112,12 +112,12 @@ class TraitementMessagesMiddleware(BaseCallback):
 
         if self.__securite == Constantes.SECURITE_PROTEGE:
             for sec in [Constantes.SECURITE_PUBLIC]:  # , Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
-                routing_keys = [
+                routing_keys_protege = [
                     'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
                 ]
 
                 # Ajouter les routing keys
-                for routing_key in routing_keys:
+                for routing_key in routing_keys_protege:
                     self.__channel.queue_bind(
                         exchange=sec,
                         queue=self.queue_name,
@@ -125,15 +125,14 @@ class TraitementMessagesMiddleware(BaseCallback):
                         callback=None
                     )
 
-            routing_keys = [
+            routing_keys_protege = [
                 'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
                 # 'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
                 # 'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
-                'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
             ]
 
             # Ajouter les routing keys
-            for routing_key in routing_keys:
+            for routing_key in routing_keys_protege:
                 self.__channel.queue_bind(
                     exchange=Constantes.SECURITE_PROTEGE,
                     queue=self.queue_name,
@@ -155,7 +154,6 @@ class TraitementMessagesMiddleware(BaseCallback):
 
             routing_keys_public = [
                 'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
-                'evenement.CoreTopologie.fichePublique',
             ]
 
             # Ajouter les routing keys
@@ -181,7 +179,7 @@ class TraitementMessagesMiddleware(BaseCallback):
                 callback=self.__on_rk_bind
             )
 
-        routing_keys = [
+        routing_keys_protege = [
             'commande.monitor.%s.#' % self._noeud_id,
             # 'evenement.presence.domaine',
 
@@ -192,7 +190,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         ]
 
         # Ajouter les routing keys
-        for routing_key in routing_keys:
+        for routing_key in routing_keys_protege:
             self.__channel.queue_bind(
                 exchange=self.__securite,
                 queue=self.queue_name,
@@ -420,9 +418,10 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
 
-        queue_name = 'dependant.' + self._service_monitor.nodename + '.monitor'
+        # queue_name = 'dependant.' + self._service_monitor.nodename + '.monitor'
+        # channel.queue_declare(queue=queue_name, durable=True, exclusive=True, callback=self.queue_open)
 
-        channel.queue_declare(queue=queue_name, durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare(queue='', durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
@@ -431,7 +430,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         # Ajouter les routing keys
         routing_keys = [
             Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES,
-            'commande.monitordependant.#',
+            # 'commande.monitordependant.#',
             'commande.monitor.activerHebergement',
             'commande.monitor.desactiverHebergement',
             'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
@@ -439,7 +438,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
 
         for key in routing_keys:
             self.__channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
+                exchange=self.configuration.exchange_defaut,
                 queue=self.queue_name,
                 routing_key=key,
                 callback=None
