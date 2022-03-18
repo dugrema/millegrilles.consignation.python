@@ -1867,7 +1867,7 @@ class ConstantesTopologie:
     TRANSACTION_CONFIGURER_CONSIGNATION_WEB = 'configurerConsignationWeb'
 
     EVENEMENT_PRESENCE_DOMAINE = 'evenement.monitor.domaine'
-    EVENEMENT_PRESENCE_MONITOR = 'presenceMonitor'
+    EVENEMENT_PRESENCE_MONITOR = 'presence'
     EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE = 'fichePublique'
 
     REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM
