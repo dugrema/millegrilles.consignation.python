@@ -1554,7 +1554,7 @@ class GenererFichiers(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([('%s' % e) for e in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]]).encode('utf-8')
+        exchanges = ','.join([('%s' % e) for e in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
