@@ -51,14 +51,13 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
     # DUREE_CERT_INSTALLATION = datetime.timedelta(days=1)
     # ONE_DAY = datetime.timedelta(1, 0, 0)
 
-    ROLES_ACCES_MONGO = [
-        Constantes.ConstantesGenerateurCertificat.ROLE_MONGO,
-        Constantes.ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-        Constantes.ConstantesGenerateurCertificat.ROLE_DOMAINES,
-        Constantes.ConstantesGenerateurCertificat.ROLE_CORE,
-        Constantes.ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
-        Constantes.ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-    ]
+    # ROLES_ACCES_MONGO = [
+    #     Constantes.ConstantesGenerateurCertificat.ROLE_MONGO,
+    #     Constantes.ConstantesGenerateurCertificat.ROLE_DOMAINES,
+    #     Constantes.ConstantesGenerateurCertificat.ROLE_CORE,
+    #     Constantes.ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
+    #     Constantes.ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+    # ]
 
     # Custom OIDs
 
@@ -1199,50 +1198,6 @@ class GenererMaitredesclesCryptage(GenerateurNoeud):
         return True
 
 
-class GenererTransactions(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_TRANSACTIONS).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
-class GenererDomaines(GenerateurNoeud):
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_DOMAINES).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
 class GenererCore(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
@@ -1712,7 +1667,7 @@ class GenererGrosFichiers(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]).encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1752,7 +1707,7 @@ class GenererCollections(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.SECURITE_PRIVE]).encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1785,7 +1740,7 @@ class GenererMessagerie(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.SECURITE_SECURE]).encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1904,7 +1859,7 @@ class GenererMedia(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]).encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -2302,9 +2257,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
             ConstantesGenerateurCertificat.ROLE_MQ: GenererMQ,
             ConstantesGenerateurCertificat.ROLE_MONGO: GenererMongo,
-            ConstantesGenerateurCertificat.ROLE_DOMAINES: GenererDomaines,
             ConstantesGenerateurCertificat.ROLE_CORE: GenererCore,
-            ConstantesGenerateurCertificat.ROLE_TRANSACTIONS: GenererTransactions,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: GenererMaitredescles,
             ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES: GenererMaitreComptes,
             ConstantesGenerateurCertificat.ROLE_COUPDOEIL: GenererCoupdoeil,
