@@ -1639,7 +1639,7 @@ class GenererSenseursPassifs(GenerateurNoeud):
         builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ','.join([Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]).encode('utf-8')
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1649,6 +1649,46 @@ class GenererSenseursPassifs(GenerateurNoeud):
         roles = ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS.encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join([
+            'SenseursPassifs',
+        ]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
+            critical=False
+        )
+
+        return builder
+
+
+class GenererSenseursPassifsWeb(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_domaines = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        domaines = ','.join([
+            'SenseursPassifs',
+        ]).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_domaines, domaines),
             critical=False
         )
 
@@ -2246,10 +2286,11 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONGO: Constantes.SECURITE_SECURE,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: Constantes.SECURITE_SECURE,
             ConstantesGenerateurCertificat.ROLE_MEDIA: Constantes.SECURITE_SECURE,
+            ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: Constantes.SECURITE_SECURE,
 
             # Roles 2.prive
             ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES: Constantes.SECURITE_PRIVE,
-            ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: Constantes.SECURITE_PRIVE,
+            ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS_WEB: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_COLLECTIONS: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_MESSAGERIE_WEB: Constantes.SECURITE_PRIVE,
 
@@ -2282,6 +2323,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE: GenererApplicationPrivee,
 
             ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: GenererSenseursPassifs,
+            ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS_WEB: GenererSenseursPassifsWeb,
             ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS: GenererGrosFichiers,
             ConstantesGenerateurCertificat.ROLE_MEDIA: GenererMedia,
             ConstantesGenerateurCertificat.ROLE_COLLECTIONS: GenererCollections,

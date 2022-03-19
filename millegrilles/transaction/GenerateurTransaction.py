@@ -197,7 +197,7 @@ class GenerateurTransaction:
 
     def transmettre_commande(self, commande_dict, domaine, channel=None, encoding=DateFormatEncoder,
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None,
-                             reply_to=None, correlation_id=None, ajouter_certificats=False, action: str = None, version=1, partition=None):
+                             reply_to=None, correlation_id=None, ajouter_certificats=False, action: str = None, version=1, partition=None, retourner_enveloppe=False):
 
         enveloppe = self.preparer_enveloppe(commande_dict, domaine=domaine, idmg_destination=idmg_destination, action=action, version=version, partition=None)
 
@@ -224,7 +224,10 @@ class GenerateurTransaction:
             reply_to=reply_to, correlation_id=correlation_id
         )
 
-        return uuid_transaction
+        if retourner_enveloppe is True:
+            return enveloppe
+        else:
+            return uuid_transaction
 
     def emettre_commande_noeuds(self, message_dict, routing_key, idmg_destination: str = None):
         """

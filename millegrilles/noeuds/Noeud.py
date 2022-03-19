@@ -188,6 +188,7 @@ class DemarreurNoeud(Daemon):
                 {'noeud_id': self.noeud_id},
                 'SenseursPassifs',
                 action='getNoeud',
+                securite=Constantes.SECURITE_PRIVE,
                 correlation_id='informationNoeudSenseurs',
                 reply_to=self._message_handler.queue_reponse,
                 ajouter_certificats=True
@@ -577,11 +578,12 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                 partition = None
 
             # Transmettre les transactions
-            transaction = self.soumettre_transaction(
+            transaction = self.transmettre_commande(  #  soumettre_transaction(
                 app,
-                domaine_action=SenseursPassifsConstantes.DOMAINE_NOM,
+                domaine=SenseursPassifsConstantes.DOMAINE_NOM,
                 action=SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
                 partition=partition,
+                exchange=Constantes.SECURITE_PRIVE,
                 retourner_enveloppe=True
             )
 
@@ -671,6 +673,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
             domaine=SenseursPassifsConstantes.DOMAINE_NOM,
             action=SenseursPassifsConstantes.TRANSACTION_LECTURE,
             partition=partition,
+            exchanges=[Constantes.SECURITE_PRIVE],
             retourner_enveloppe=True
         )
 
@@ -760,7 +763,7 @@ class GestionnaireMessages(BaseCallback):
         fingerprint = enveloppe.fingerprint
         routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
 
-        exchange_defaut = self.configuration.exchange_defaut
+        exchange_defaut = Constantes.SECURITE_PRIVE  # self.configuration.exchange_defaut
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key, callback=None)
         self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
         self.__routing_cert = routing_key
@@ -769,7 +772,7 @@ class GestionnaireMessages(BaseCallback):
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_cedule, callback=None)
         self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
 
-        routing_key_commandes = 'commande.senseurpassif.%s.*' % self.__noeud.noeud_id
+        routing_key_commandes = 'commande.senseurspassifs.%s.*' % self.__noeud.noeud_id
         self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key_commandes, callback=None)
         self.__channel.basic_consume(nom_queue, self.callbackAvecAck, auto_ack=False)
 
