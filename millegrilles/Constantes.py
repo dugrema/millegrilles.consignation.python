@@ -1680,6 +1680,7 @@ class CommandesSurRelai:
 
 class ConstantesGenerateurCertificat:
 
+    ROLE_REDIS = 'redis'
     ROLE_MQ = 'mq'
     ROLE_MONGO = 'mongo'
     ROLE_DEPLOYEUR = 'deployeur'

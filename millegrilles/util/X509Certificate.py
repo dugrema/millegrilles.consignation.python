@@ -1335,6 +1335,44 @@ class GenererMonitorDependant(GenerateurNoeud):
         return builder
 
 
+class GenererRedis(GenerateurNoeud):
+
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False, duree=0, duree_heures=3):
+        super().__init__(idmg, organization_nom, common_name, dict_ca, autorite, domaines_publics, generer_password, duree, duree_heures)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_REDIS).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'redis'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        # Ajouter la liste des domaines publics recus du CSR
+        if self._domaines_publics is not None:
+            liste_dns.extend([x509.DNSName(d) for d in self._domaines_publics])
+
+        # Ajouter noms DNS valides
+        try:
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+        except ValueError:
+            self.__logger.exception("Erreur ajout extension SubjectAlternativeName")
+
+        return builder
+
+
 class GenererMQ(GenerateurNoeud):
 
     def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
@@ -2267,6 +2305,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
             ConstantesGenerateurCertificat.ROLE_VITRINE: GenererVitrine,
             ConstantesGenerateurCertificat.ROLE_BACKUP: GenererAgentBackup,
+            ConstantesGenerateurCertificat.ROLE_REDIS: GenererRedis,
 
             # Monitors de service pour noeuds middleware
             ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
