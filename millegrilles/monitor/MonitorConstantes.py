@@ -124,10 +124,10 @@ DICT_MODULES_INSTALLATION = {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
         'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
     },
-    ConstantesServiceMonitor.MODULE_REDIS: {
-        'nom': ConstantesServiceMonitor.MODULE_REDIS,
-        'nom_image': ConstantesServiceMonitor.MODULE_REDIS
-    },
+    # ConstantesServiceMonitor.MODULE_REDIS: {
+    #     'nom': ConstantesServiceMonitor.MODULE_REDIS,
+    #     'nom_image': ConstantesServiceMonitor.MODULE_REDIS
+    # },
 }
 
 # Liste de modules requis. L'ordre est important
@@ -135,22 +135,22 @@ MODULES_REQUIS_INSTALLATION = [
     ConstantesServiceMonitor.MODULE_CERTISSUER,
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX,
-    ConstantesServiceMonitor.MODULE_REDIS,
+    # ConstantesServiceMonitor.MODULE_REDIS,  # Cert pas pret
 ]
 
 MODULES_REQUIS_PRIVE_PUBLIC = [
     ConstantesServiceMonitor.MODULE_ACME,
-    ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_REDIS,
+    ConstantesServiceMonitor.MODULE_NGINX,
 ]
 
 MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_CERTISSUER,
+    ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_ACME,
     ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_MQ,
     ConstantesServiceMonitor.MODULE_MONGO,
-    ConstantesServiceMonitor.MODULE_REDIS,
     ConstantesServiceMonitor.MODULE_MAITREDESCLES,
     ConstantesServiceMonitor.MODULE_CORE,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
