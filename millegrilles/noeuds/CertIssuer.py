@@ -470,8 +470,8 @@ def signer_module(http_instance: ServeurHttp, request_data: dict, interne=False)
     enveloppe_certificat: EnveloppeCertificat = handler.verifier_message(request_data)
 
     # Aucune exception, la signature est valide
-    if 'monitor' not in enveloppe_certificat.get_roles:
-        logger.warning("Erreur - signer_module demande avec certificat autre que monitor - REFUSE")
+    if 'monitor' not in enveloppe_certificat.get_roles and Constantes.SECURITE_PROTEGE not in enveloppe_certificat.get_exchanges:
+        logger.warning("Erreur - signer_module demande avec certificat autre que monitor 3.protege - REFUSE")
         http_instance.send_error(403)
         return
 
@@ -564,7 +564,7 @@ def signer_csr(http_instance: ServeurHttp, request_data: dict, interne=False):
     if 'proprietaire' == delegation_globale:
         securite = [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
         pass  # Delegation globale, signature est autorisee
-    elif 'monitor' in roles or 'prive' in roles or 'public' in roles:
+    elif 'monitor' in roles:
         securite = enveloppe_certificat.get_exchanges
         logger.info("Certificat monitor, autorise pour niveaux %s" % securite)
         pass  # Monitor, signature est autorisee

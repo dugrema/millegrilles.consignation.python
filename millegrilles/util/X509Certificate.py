@@ -2056,7 +2056,7 @@ class GenererNoeudPrive(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE).encode('utf-8')
+        roles = ','.join([ConstantesGenerateurCertificat.ROLE_MONITOR, ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -2078,7 +2078,7 @@ class GenererNoeudPublic(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC).encode('utf-8')
+        roles = ','.join([ConstantesGenerateurCertificat.ROLE_MONITOR, ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC]).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -2290,6 +2290,7 @@ class RenouvelleurCertificat:
             # Roles 1.public
             ConstantesGenerateurCertificat.ROLE_POSTMASTER: Constantes.SECURITE_PUBLIC,
             ConstantesGenerateurCertificat.ROLE_NGINX: Constantes.SECURITE_PUBLIC,
+            ConstantesGenerateurCertificat.ROLE_REDIS: Constantes.SECURITE_PUBLIC,
         }
         self.__generateurs_par_role = {
             ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
