@@ -334,7 +334,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             if idmg_issuer == self.service_monitor.idmg:
                 try:
                     cert_pem = request_data['certificat']
-                except KeyError:
+                except (TypeError, KeyError):
                     # Fallback sur cert recu
                     cert_pem = self.headers.get('X-Client-Cert')
                     cert_pem = cert_pem.replace('\t', '')
@@ -351,6 +351,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             else:
                 self.send_response(403)
         except:
+            self.__logger.exception("Erreur ajout compte")
             self.send_response(503)
 
         self.end_headers()

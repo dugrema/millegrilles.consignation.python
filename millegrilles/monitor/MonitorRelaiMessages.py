@@ -679,8 +679,6 @@ class ConnexionMiddleware:
                 roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
 
                 roles_mongo = [
-                    ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-                    ConstantesGenerateurCertificat.ROLE_DOMAINES,
                     ConstantesGenerateurCertificat.ROLE_CORE,
                     ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
                 ]
@@ -706,11 +704,11 @@ class ConnexionMiddleware:
 
                         # Creer compte
                         roles_cert = clecert.get_roles
-                        if any([role in roles_mongo for role in roles_cert]):
-                            try:
-                                self.__mongo.creer_compte(clecert)
-                            except DuplicateKeyError:
-                                self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
+                        # if any([role in roles_mongo for role in roles_cert]):
+                        #     try:
+                        #         self.__mongo.creer_compte(clecert)
+                        #     except DuplicateKeyError:
+                        #         self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
 
                         try:
                             gestionnaire_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
