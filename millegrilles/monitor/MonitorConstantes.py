@@ -157,7 +157,7 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_MAITRECOMPTES,
     ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
     ConstantesServiceMonitor.MODULE_MEDIA,
-    ConstantesServiceMonitor.MODULE_AGENT_BACKUP,
+    # ConstantesServiceMonitor.MODULE_AGENT_BACKUP,
     ConstantesServiceMonitor.MODULE_ELASTICSEARCH,
 ]
 
