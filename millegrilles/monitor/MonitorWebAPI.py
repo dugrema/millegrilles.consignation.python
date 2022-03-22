@@ -7,6 +7,7 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 from json.decoder import JSONDecodeError
 
+from millegrilles import Constantes
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ForcerRedemarrage
 from millegrilles.SecuritePKI import EnveloppeCertificat
@@ -215,24 +216,6 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             reponse = {'err': str(e)}
             self.repondre_json(reponse, status_code=500)
 
-    # def return_csr_intermediaire(self):
-    #     csr_intermediaire = self.service_monitor.csr_intermediaire
-    #     if csr_intermediaire is None:
-    #         self.__logger.exception("CSR intermediaire n'est pas en memoire, le charger de docker")
-    #         try:
-    #             csr_intermediaire = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
-    #         except AttributeError:
-    #             self.__logger.info("Generer un nouveau CSR intermediaire")
-    #             csr_intermediaire = self.service_monitor.generer_csr_intermediaire()
-    #
-    #     # csr_intermediaire = csr_info['request']
-    #
-    #     self.send_response(200)
-    #     self.send_header("Content-type", "text/ascii")
-    #     self.send_header("Access-Control-Allow-Origin", "*")
-    #     self.end_headers()
-    #     self.wfile.write(csr_intermediaire)
-
     def return_csr(self):
         csr_monitor = self.service_monitor.csr
         self.send_response(200)
@@ -241,38 +224,6 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(csr_monitor)
     
-    #    # On est probablement dans un monitor instancie, charger avec docker
-    #     if csr_intermediaire is None:
-    #         try:
-    #             csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
-    #                 'pki.monitor.csr')
-    #         except AttributeError:
-    #             self.__logger.exception("CSR monitor introuvable, on verifier si le CSR intermediaire existe")
-    #             try:
-    #                 csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
-    #                     'pki.intermediaire.csr')
-    #             except AttributeError:
-    #                 csr_intermediaire_docker = None
-    #
-    #         if csr_intermediaire_docker is not None:
-    #             csr_b64 = csr_intermediaire_docker['config'].attrs['Spec']['Data'].encode('utf-8')
-    #             csr_intermediaire = b64decode(csr_b64)
-    #         else:
-    #             csr_intermediaire = None
-    #
-    #     if csr_intermediaire is not None:
-    #         self.send_response(200)
-    #         self.send_header("Content-type", "text/ascii")
-    #         self.send_header("Access-Control-Allow-Origin", "*")
-    #         self.end_headers()
-    #         self.wfile.write(csr_intermediaire)
-    #     else:
-    #         self.send_response(410)
-    #         self.send_header("Content-type", "text/ascii")
-    #         self.send_header("Access-Control-Allow-Origin", "*")
-    #         self.end_headers()
-    #         self.finish()
-
     def return_etat_certificat_web(self):
         gestionnaire_docker = self.service_monitor.gestionnaire_docker
         try:
@@ -307,11 +258,6 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.wfile.write(b"GET ADMINISTRATION, pas implemente")
 
     def _traiter_administration_POST(self, request_data):
-        if not self.headers.get('VERIFIED') == 'SUCCESS':
-            self.__logger.debug("/administration Access refuse, SSL invalide")
-            self.send_error(401)
-            return
-
         path_fichier = self.path
         path_split = path_fichier.split('/')
 
@@ -322,6 +268,61 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.send_error(404)
 
     def ajouter_compte(self, request_data):
+        try:
+            cert_pem = request_data['certificat']
+        except TypeError:
+            self.__logger.error("Certificat ajouterCompte Parametre certificat manquante a la requete - REFUSE")
+            return
+
+        try:
+            # Valider le certificat, s'assurer qu'il a au moins un exchange
+            certificat = EnveloppeCertificat(certificat_pem=cert_pem)
+            fingerprint = certificat.fingerprint
+            idmg_certificat = certificat.subject_organization_name
+            exchanges = certificat.get_exchanges
+
+            if idmg_certificat != self.service_monitor.idmg:
+                self.__logger.info("Certificat ajouterCompte fingerprint %s: mauvais idmg (%s) - REFUSE" % (fingerprint, idmg_certificat))
+                return self.send_response(403)
+
+            if len(exchanges) > 0:
+                self.service_monitor.ajouter_compte(cert_pem)
+                self.send_response(200)
+            else:
+                self.__logger.info("Certificat ajouterCompte fingerprint %s : aucuns exchange presents sur le certificat - REFUSE" % fingerprint)
+                self.send_response(403)
+
+        except:
+            self.__logger.exception("Erreur ajout compte")
+            self.send_response(503)
+
+        self.end_headers()
+        self.wfile.write(b"")
+
+
+class ServerMonitorHttpProtege(ServerMonitorHttp):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def _traiter_administration_GET(self):
+        if not self.headers.get('VERIFIED') == 'SUCCESS':
+            self.__logger.debug("/administration Access refuse, SSL invalide")
+            self.send_error(401)
+            return
+
+        self._traiter_administration_GET()
+
+    def _traiter_administration_POST(self, request_data):
+        if not self.headers.get('VERIFIED') == 'SUCCESS':
+            self.__logger.debug("/administration Access refuse, SSL invalide")
+            self.send_error(401)
+            return
+
+        super()._traiter_administration_POST(request_data)
+
+    def ajouter_compte(self, request_data):
         issuer_dn = self.headers.get('X-Client-Issuer-DN')
 
         issuer_info = dict()
@@ -329,33 +330,19 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             key, value = elem.split('=')
             issuer_info[key] = value
         idmg_issuer = issuer_info['O']
-        headers = self.headers
-        try:
-            if idmg_issuer == self.service_monitor.idmg:
-                try:
-                    cert_pem = request_data['certificat']
-                except (TypeError, KeyError):
-                    # Fallback sur cert recu
-                    cert_pem = self.headers.get('X-Client-Cert')
-                    cert_pem = cert_pem.replace('\t', '')
 
-                # Valider le certificat, s'assurer qu'il a au moins un exchange
-                certificat = EnveloppeCertificat(certificat_pem=cert_pem)
-                exchanges = certificat.get_exchanges
-                if len(exchanges) > 0:
-                    self.service_monitor.ajouter_compte(cert_pem)
-                    self.send_response(200)
-                else:
-                    self.__logger.info("Certificat ajouterCompte : aucuns exchange presents sur le certificat - REFUSE")
-                    self.send_response(403)
-            else:
-                self.send_response(403)
-        except:
-            self.__logger.exception("Erreur ajout compte")
-            self.send_response(503)
+        if idmg_issuer != self.service_monitor.idmg:
+            self.__logger.error("ajouter_compte avec mauvais idmg (%s), REJETE" % idmg_issuer)
+            self.send_response(403)
 
-        self.end_headers()
-        self.wfile.write(b"")
+        # try:
+        #     cert_pem = request_data['certificat']
+        # except (TypeError, KeyError):
+        #     # Fallback sur cert recu
+        #     cert_pem = self.headers.get('X-Client-Cert')
+        #     cert_pem = cert_pem.replace('\t', '')
+
+        super().ajouter_compte(request_data)
 
 
 class ServerWebAPI:
@@ -371,7 +358,11 @@ class ServerWebAPI:
         self.__thread.start()
 
     def run(self):
-        self.webServer = HTTPServer((hostName, serverPort), ServerMonitorHttp)
+        niveau_securite = self.__service_monitor.securite
+        if niveau_securite == Constantes.SECURITE_PROTEGE:
+            self.webServer = HTTPServer((hostName, serverPort), ServerMonitorHttpProtege)
+        else:
+            self.webServer = HTTPServer((hostName, serverPort), ServerMonitorHttp)
         self.webServer.service_monitor = self.__service_monitor
         self.webServer.webroot = self.__webroot
         self.__logger.info("Web API Server started http://%s:%s" % (hostName, serverPort))

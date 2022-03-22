@@ -265,8 +265,9 @@ class ServiceMonitorSatellite(ServiceMonitor):
         """
         commande = {'certificat_pem': certificat}
         self._connexion_middleware.commande(
-            commande, 'servicemonitor',
-            action=Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE
+            commande, 'monitor',
+            action=Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+            exchange=Constantes.SECURITE_PUBLIC,
         )
 
     def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
