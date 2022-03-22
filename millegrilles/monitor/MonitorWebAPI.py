@@ -358,7 +358,12 @@ class ServerWebAPI:
         self.__thread.start()
 
     def run(self):
-        niveau_securite = self.__service_monitor.securite
+        try:
+            niveau_securite = self.__service_monitor.securite
+        except NotImplementedError:
+            # Defaut protege (securite avec cert TLS client)
+            niveau_securite = Constantes.SECURITE_PROTEGE
+
         if niveau_securite == Constantes.SECURITE_PROTEGE:
             self.webServer = HTTPServer((hostName, serverPort), ServerMonitorHttpProtege)
         else:
