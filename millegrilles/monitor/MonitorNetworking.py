@@ -181,6 +181,8 @@ proxy_ssl_verify_depth 1;
         hostname = self.__docker_client.hostname
         # certissuer_url = 'http://certissuer:8380'
 
+        mq_host = os.environ.get('MG_MQ_HOST') or ''
+
         if self.__mode_dev:
             monitor_url = 'http://%s:8280' % hostname
             certissuer_url = 'http://%s:8380' % hostname
@@ -193,6 +195,7 @@ proxy_ssl_verify_depth 1;
             'hostname': hostname,
             'monitor_url': monitor_url,
             'certissuer_url': certissuer_url,
+            'MQ_HOST': mq_host,
         }
 
         try:
