@@ -142,7 +142,7 @@ class GestionnaireWeb:
             except FileExistsError:
                 self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
-    def __maj_proxypass_fichiers(self, hostname: str = 'fichiers', port: str = '443'):
+    def __maj_proxypass_fichiers(self, hostname: str = 'fichiers', port: str = '444'):
         """
         Compare et met a jour le fichiers proxypass_fichiers au besoin. Redemarre nginx s'il y a un changement.
         :param hostname:
@@ -161,6 +161,12 @@ class GestionnaireWeb:
             configuration = """
 set $upstream_fichiers %s; 
 proxy_pass $upstream_fichiers;
+
+proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+proxy_ssl_verify       on;
+proxy_ssl_verify_depth 1;
             """ % config_proxypass
             with open(path.join(self.__repertoire_modules, 'fichiers.proxypass'), 'w') as fichier:
                 fichier.write(configuration)
