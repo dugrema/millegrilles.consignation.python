@@ -1,2 +1,2 @@
-set $upstream_fichiers https://fichiers:443;
+set $upstream_fichiers https://{MQ_HOST}:444;
 proxy_pass $upstream_fichiers;
