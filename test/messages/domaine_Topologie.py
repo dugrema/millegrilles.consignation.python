@@ -280,7 +280,7 @@ class MessagesSample(DomaineTest):
 
     def get_fiche_millegrille(self):
         requete = {
-            'idmg': 'zXbUwE5h2xMJRpUweJd4Fq8gRYujcPfjxCbA3vp1LBvEB1ZMiiE1DhW8',
+            'idmg': 'zXSqVMV2oM8dKQCqrKmQtXGJefpxnN3DV5K5tzrkGwfEf9sTkRDwnjWT',
         }
         domaine_action = ConstantesTopologie.DOMAINE_NOM
         action = 'ficheMillegrille'
@@ -317,10 +317,10 @@ class MessagesSample(DomaineTest):
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
-        # sample.resolve_idmg()
+        sample.resolve_idmg()
         # sample.emettre_fiche_publique()
         # sample.get_fiche_millegrille()
-        sample.requete_applications_tiers()
+        # sample.requete_applications_tiers()
 
 # --- MAIN ---
 sample = MessagesSample()

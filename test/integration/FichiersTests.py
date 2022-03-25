@@ -14,7 +14,8 @@ class FichiersTest(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.url_fichiers = 'https://mg-dev5:3021/fichiers'
+        self.url_fichiers = 'https://mg-dev5:3021/fichiers_transfert'
+        self.url_poster = 'https://mg-dev5:3039/messagerie/poster'
         self.certfile = self.configuration.pki_certfile
         self.keyfile = self.configuration.pki_keyfile
         with open(self.configuration.pki_cafile, 'r') as fichier:
@@ -36,15 +37,28 @@ class FichiersTest(DomaineTest):
             self.__logger.warning("Erreur poster throttle en cours (429)")
         elif r.status_code == 200:
             self.__logger.info("HEAD OK, headers:\n%s" % r.headers)
+            self.__logger.debug("Reponse text : %s" % r.text)
         else:
             self.__logger.error("Erreur poster (%d)" % (r.status_code))
 
         return r
 
+    def poster_message(self):
+        url_poster_message = "%s/%s" % (self.url_poster, 'abcd-1234')
+        r = requests.post(
+            url_poster_message,
+            verify=False,
+        )
+        self.__logger.debug("Reponse poster message : %s\n%s" % (r.status_code, r.text))
+
+    def poster_attachment(self):
+        pass
+
     def executer(self):
         self.__logger.debug("Executer")
         try:
-            self.head_fichier()
+            # self.head_fichier()
+            self.poster_message()
         except:
             self.__logger.exception("Erreur")
         finally:
