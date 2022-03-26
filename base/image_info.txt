@@ -5,6 +5,6 @@ NAME=millegrilles_python_base
 BRANCH=`git name-rev --name-only HEAD`
 BUILD=0
 
-ARCH_SUPPORTEES=( x86_64 armv7l aarch64 )
+ARCH_SUPPORTEES=( x86_64 aarch64 )
 
 VERSION=$BRANCH.$BUILD
