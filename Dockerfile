@@ -3,7 +3,9 @@
 
 FROM docker.maceroc.com/millegrilles_python_base:2022.2.0
 
-ENV SRC_FOLDER=/opt/millegrilles/build/src
+ENV SRC_FOLDER=/opt/millegrilles/build/src \
+    MG_CONFIG_NGINX=$BUNDLE_FOLDER/config
+
 
 COPY scripts/ $BUILD_FOLDER/scripts
 COPY config/ $BUNDLE_FOLDER/config
