@@ -64,6 +64,16 @@ class TraitementMessagesMiddleware(BaseCallback):
             contenu.update(message_dict)
             commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict, enveloppe=enveloppe_certificat)
             self.__gestionnaire_commandes.ajouter_commande(commande)
+        elif routing_key.startswith('requete.'):
+            contenu = {
+                'commande': action,
+                'exchange': exchange,
+                'properties': properties,
+            }
+            contenu.update(message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict,
+                                       enveloppe=enveloppe_certificat)
+            self.__gestionnaire_commandes.ajouter_commande(commande)
         elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
             self.traiter_presence_domaine(message_dict)
         elif routing_key == Constantes.EVENEMENT_ROUTING_TOPOLOGIE_FICHEPUBLIQUE:
@@ -181,6 +191,7 @@ class TraitementMessagesMiddleware(BaseCallback):
 
         routing_keys_protege = [
             'commande.monitor.%s.#' % self._noeud_id,
+            'requete.monitor.%s.#' % self._noeud_id,
             # 'evenement.presence.domaine',
 
             # Backup
