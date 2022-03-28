@@ -308,7 +308,7 @@ class ServerMonitorHttpProtege(ServerMonitorHttp):
 
     def _traiter_administration_GET(self):
         if not self.headers.get('VERIFIED') == 'SUCCESS':
-            self.__logger.debug("/administration Access refuse, SSL invalide")
+            print("/administration Access refuse, SSL invalide")
             self.send_error(401)
             return
 
@@ -316,7 +316,7 @@ class ServerMonitorHttpProtege(ServerMonitorHttp):
 
     def _traiter_administration_POST(self, request_data):
         if not self.headers.get('VERIFIED') == 'SUCCESS':
-            self.__logger.debug("/administration Access refuse, SSL invalide")
+            print("/administration Access refuse, SSL invalide")
             self.send_error(401)
             return
 
