@@ -44,6 +44,13 @@ class ServiceMonitorPublic(ServiceMonitorSatellite):
             except Exception:
                 self.__logger.debug("Commande initialiser noeud : %s", commande.contenu)
 
+        params = commande.contenu
+        try:
+            hostname = params['hostname']
+            self._conserver_config_acme(hostname)
+        except KeyError:
+            self.__logger.warning("Hostname absent de la commande d'installation")
+
         self._renouveller_certificat_monitor(commande)
 
     @property

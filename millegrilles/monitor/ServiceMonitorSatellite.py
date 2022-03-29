@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import sys
@@ -269,6 +270,14 @@ class ServiceMonitorSatellite(ServiceMonitor):
             action=Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
             exchange=Constantes.SECURITE_PUBLIC,
         )
+
+    def _conserver_config_acme(self, domaine: str, methode: dict = None):
+        configuration_acme = {
+            'domain': domaine,
+            'methode': methode
+        }
+        gestionnaire_docker = self.gestionnaire_docker
+        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
 
     def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
         """
