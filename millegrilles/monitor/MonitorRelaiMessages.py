@@ -176,10 +176,11 @@ class TraitementMessagesMiddleware(BaseCallback):
                         callback=None
                     )
 
-        # Evenements publics
+        # Rk publics sur tous les monitors
         rk_public = [
             'evenement.CoreTopologie.fichePublique',
             'commande.monitor.' + ConstantesServiceMonitor.COMMANDE_RELAI_WEB,
+            'requete.monitor.%s.%s' % (self._noeud_id, ConstantesServiceMonitor.REQUETE_CONFIGURATION_ACME),
         ]
         for rk in rk_public:
             self.__channel.queue_bind(

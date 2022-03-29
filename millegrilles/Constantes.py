@@ -1823,6 +1823,8 @@ class ConstantesServiceMonitor:
     COMMANDE_ACTEUR_REPONSE_MDNS = 'acteur.reponseMdns'
     COMMANDE_RELAI_WEB = 'relaiWeb'
 
+    REQUETE_CONFIGURATION_ACME = 'configurationAcme'
+
     # Evenements recus par MQ
     EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE = 'fichePublique'
 

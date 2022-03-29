@@ -1061,6 +1061,14 @@ class ServiceMonitor:
         fiche_bytes = json.dumps(fiche).encode('utf-8')
         self._gestionnaire_web.publier_fichier(fiche_bytes, 'fiche.json.gz', True)
 
+    def charger_configuration_acme(self):
+        gestionnaire = self._gestionnaire_docker
+        try:
+            configuration_acme = json.loads(gestionnaire.charger_config('acme.configuration'))
+            return configuration_acme
+        except IndexError:
+            return {'ok': False, 'err': 'Configuration introuvable'}
+
     def relai_web(self, commande: CommandeMonitor):
         self.__logger.debug("Commande relai web : %s", commande)
         certificat = commande.certificat

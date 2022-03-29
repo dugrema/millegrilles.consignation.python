@@ -182,20 +182,14 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DEMARRER_APPLICATION:
                 reponse = self._service_monitor.gestionnaire_applications.commande_demarrer_application(commande)
 
-            # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR:
-            #     reponse = self._service_monitor.gestionnaire_certificats.commande_signer_navigateur(commande)
-
-            # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD:
-            #     reponse = self._service_monitor.gestionnaire_certificats.commande_signer_noeud(commande)
-
-            # elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RENOUVELLER_INTERMEDIAIRE:
-            #     reponse = self._service_monitor.gestionnaire_certificats.renouveller_intermediaire(commande)
-
             elif nom_commande == Constantes.ConstantesServiceMonitor.EVENEMENT_TOPOLOGIE_FICHEPUBLIQUE:
                 self.sauvegarder_fiche_publique(commande)
 
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RELAI_WEB:
                 reponse = self._service_monitor.relai_web(commande)
+
+            elif nom_commande == Constantes.ConstantesServiceMonitor.REQUETE_CONFIGURATION_ACME:
+                reponse = self._service_monitor.charger_configuration_acme()
 
             else:
                 self.__logger.error("Commande inconnue : %s", nom_commande)
