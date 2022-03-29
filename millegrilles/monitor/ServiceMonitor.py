@@ -864,6 +864,29 @@ class ServiceMonitor:
     def nom_service_nginx(self):
         return 'nginx'
 
+    def changer_domaine(self, commande):
+        params = commande.contenu
+        gestionnaire_docker = self.gestionnaire_docker
+
+        domaine = params['domaine']
+
+        try:
+            configuration_str = gestionnaire_docker.charger_config('acme.configuration')
+            configuration_acme = json.loads(configuration_str)
+        except:
+            configuration_acme = {
+                'domain': '',
+                'method': None
+            }
+
+        configuration_acme['domain'] = domaine
+
+        # Remplacement de la configuration
+        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
+
+        # Emettre nouvelle presence avec domaine modifie
+        self.emettre_presence()
+
     def initialiser_domaine(self, commande):
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker

@@ -6,6 +6,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 from json.decoder import JSONDecodeError
+from cryptography.x509 import extensions
 
 from millegrilles import Constantes
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
@@ -33,6 +34,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             '/installation/api/installer',
             '/installation/api/configurerMQ',
             '/installation/api/configurerDomaine',
+            '/installation/api/changerDomaine',
         ]
         if self.path in path_supportes:
             self.send_response(HTTPStatus.OK)
@@ -115,9 +117,17 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             if service_monitor.est_verrouille:
                 validateur_message = service_monitor.validateur_message
                 cert = validateur_message.verifier(request_data)
+                try:
+                    exchanges = cert.get_exchanges
+                except extensions.ExtensionNotFound:
+                    exchanges = []
+                try:
+                    delegation_globale = cert.get_delegation_globale
+                except extensions.ExtensionNotFound:
+                    delegation_globale = None
 
                 # S'assurer que le certificat est au moins de niveau protege ou de type navigateur
-                if 'navigateur' not in cert.get_roles and not any([s in ['3.protege', '4.secure'] for s in cert.get_exchanges]):
+                if delegation_globale is None and not any([s in ['3.protege', '4.secure'] for s in exchanges]):
                     return self.repondre_json({'ok': False, 'message': 'Certificat non autorise'}, 401)
 
         except (AttributeError, KeyError):
@@ -128,6 +138,8 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         else:
             if path_split[3] == 'configurerDomaine':
                 self.post_configurer_domaine(request_data)
+            elif path_split[3] == 'changerDomaine':
+                self.post_changer_domaine(request_data)
             elif path_split[3] == 'configurerIdmg':
                 self.post_configurer_idmg(request_data)
             elif path_split[3] == 'configurerMQ':
@@ -165,6 +177,19 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             'domaine': request_data['domaine'],
         }
         self.repondre_json(reponse, status_code=200)
+
+    def post_changer_domaine(self, request_data):
+        logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        logger.debug("POST recu changer domaine\n%s", json.dumps(request_data, indent=2))
+
+        request_data['commande'] = ConstantesServiceMonitor.COMMANDE_CHANGER_DOMAINE
+        commande = CommandeMonitor(request_data)
+        self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+
+        reponse = {
+            'domaine': request_data['domaine'],
+        }
+        self.repondre_json(reponse, status_code=202)
 
     def post_configurer_idmg(self, request_data):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)

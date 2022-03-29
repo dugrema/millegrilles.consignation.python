@@ -1795,6 +1795,7 @@ class ConstantesServiceMonitor:
     DOCKER_CONFIG_MONITOR_DEPENDANT_KEY = DOCKER_CONFIG_NAME_MONITOR_DEPENDANT + KEY_SUFFIX
     DOCKER_CONFIG_NOEUD_ID = 'millegrille.noeud_id'
 
+    COMMANDE_CHANGER_DOMAINE = 'changerDomaine'
     COMMANDE_CONFIGURER_DOMAINE = 'configurerDomaine'
     COMMANDE_CONFIGURER_IDMG = 'configurerIdmg'
     COMMANDE_INSTALLER_NOEUD = 'installerNoeud'
