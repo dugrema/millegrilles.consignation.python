@@ -1734,6 +1734,7 @@ class ConstantesServiceMonitor:
     DOCKER_LIBVAL_CONFIG_IDMG = 'millegrille.idmg'
     DOCKER_LIBVAL_CONFIG_SECURITE = 'millegrille.securite'
     DOCKER_LIBVAL_CONFIG = 'millegrille.configuration'
+    DOCKER_LIBVAL_NOEUD_ID = 'millegrille.noeud_id'
 
     MODULE_ACME = 'acme'
     MODULE_MQ = 'mq'

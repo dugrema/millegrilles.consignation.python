@@ -86,11 +86,16 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             raise ae
 
         self.__logger.info("Web API - attence connexion sur port 8444")
-        self.preparer_web_api()
+        if self.idmg is None:
+            self.preparer_web_api()
+            while not self.__event_attente.is_set():
+                self._run_entretien()
 
-        while not self.__event_attente.is_set():
-            self._run_entretien()
-            self.__event_attente.wait(10)
+                self.__event_attente.wait(10)
+        else:
+            # Attendre services, puis redemarrer.
+            self.__logger.info("config/secrets prets, redemarrage")
+            self.__event_attente.wait(1)
 
     def _run_entretien(self):
         """

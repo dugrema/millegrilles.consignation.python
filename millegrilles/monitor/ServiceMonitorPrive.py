@@ -23,6 +23,7 @@ class ServiceMonitorPrive(ServiceMonitorSatellite):
         self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
     def configurer_millegrille(self):
+        # Verifier si on doit generer un noeud_id (si premiere configuration)
         self._gestionnaire_docker = GestionnaireModulesDocker(
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIVE_PUBLIC.copy(),
             self,
@@ -30,6 +31,10 @@ class ServiceMonitorPrive(ServiceMonitorSatellite):
             insecure=self._args.dev,
             secrets=self._args.secrets
         )
+
+        noeud_id = self.noeud_id
+        if noeud_id is None:
+            self._gestionnaire_docker.initialiser_noeud()
 
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)

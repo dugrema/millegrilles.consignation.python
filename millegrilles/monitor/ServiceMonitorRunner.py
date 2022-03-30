@@ -129,6 +129,13 @@ class InitialiserServiceMonitor:
         self.__connecter_docker()
 
         try:
+            # Charger noeud_id et idmg - si absents, on tombe automatiquent en mode installation
+            config_noeud_id = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_NOEUD_ID)
+            noeud_id = b64decode(config_noeud_id.attrs['Spec']['Data']).decode('utf-8').strip()
+            config_idmg = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG)
+            idmg = b64decode(config_idmg.attrs['Spec']['Data']).decode('utf-8').strip()
+
+            # Charger niveau de securite - peut etre configure manuellement (installeur web)
             config_securite = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE)
             securite = b64decode(config_securite.attrs['Spec']['Data']).decode('utf-8').strip()
             self.__logger.debug("Niveau de securite millegrille : %s" % securite)
@@ -137,10 +144,10 @@ class InitialiserServiceMonitor:
             # Lance une exception si aucune configuration ne commence par pki.monitor.cert
             # monitor_cert = self.__docker.configs.list(filters={'name': 'pki.monitor.cert'})[0]
 
-            if securite == Constantes.SECURITE_PUBLIC:
+            if securite == Constantes.SECURITE_PUBLIC and noeud_id is not None:
                 self.__logger.info("Noeud public")
                 service_monitor_classe = ServiceMonitorPublic
-            elif securite == Constantes.SECURITE_PRIVE:
+            elif securite == Constantes.SECURITE_PRIVE and noeud_id is not None:
                 self.__logger.info("Noeud prive")
                 service_monitor_classe = ServiceMonitorPrive
             elif securite == Constantes.SECURITE_PROTEGE:
