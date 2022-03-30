@@ -1690,7 +1690,7 @@ class ConstantesGenerateurCertificat:
     ROLE_FICHIERS = 'fichiers'
     ROLE_COLLECTIONS = 'collections'
     ROLE_GROS_FICHIERS = 'grosfichiers'
-    ROLE_MESSAGERIE = 'messagerie'
+    ROLE_MESSAGERIE = 'messagerie_backend'
     ROLE_POSTMASTER = 'postmaster'
     ROLE_MESSAGERIE_WEB = 'messagerie_web'
     ROLE_MONGOEXPRESS = 'mongoexpress'
