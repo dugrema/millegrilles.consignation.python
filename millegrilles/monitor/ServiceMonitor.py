@@ -963,15 +963,20 @@ class ServiceMonitor:
         self.gestionnaire_docker.sauvegarder_config('acme.configuration', configuration_acme)
 
         # Retourner la reponse a la commande, poursuivre execution de ACME
-        generateur_transactions = self.generateur_transactions
         try:
-            mq_properties = commande.mq_properties
-            reply_to = mq_properties.reply_to
-            correlation_id = mq_properties.correlation_id
-            reponse = {'ok': True}
-            generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
-        except Exception:
-            self.__logger.exception("Erreur transmission reponse a initialiser_domaine %s" % domaine_noeud)
+            generateur_transactions = self.generateur_transactions
+        except AttributeError:
+            generateur_transactions = None
+
+        if generateur_transactions is not None:
+            try:
+                mq_properties = commande.mq_properties
+                reply_to = mq_properties.reply_to
+                correlation_id = mq_properties.correlation_id
+                reponse = {'ok': True}
+                generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
+            except Exception:
+                self.__logger.exception("Erreur transmission reponse a initialiser_domaine %s" % domaine_noeud)
 
         resultat_acme, output_acme = gestionnaire_docker.executer_script_blind(
             acme_container_id,
@@ -1018,22 +1023,24 @@ class ServiceMonitor:
             # Forcer reconfiguration nginx
             gestionnaire_docker.maj_service('nginx')
 
-            evenement_succes = {
-                'ok': True,
-                'code': resultat_acme,
-                'output': output_acme.decode('utf-8')
-            }
-            self._connexion_middleware.generateur_transactions.emettre_message(
-                evenement_succes, rk, action=action, partition=partition, ajouter_certificats=True)
+            if generateur_transactions is not None:
+                evenement_succes = {
+                    'ok': True,
+                    'code': resultat_acme,
+                    'output': output_acme.decode('utf-8')
+                }
+                generateur_transactions.emettre_message(
+                    evenement_succes, rk, action=action, partition=partition, ajouter_certificats=True)
         except Exception:
             self.__logger.exception("Erreur sauvegarde certificat ACME dans docker")
-            evenement_erreur = {
-                'ok': False,
-                'err': 'Erreur sauvegarde certificat ACME dans docker (note: certificat TLS genere OK)',
-                'output': output_acme.decode('utf-8')
-            }
-            self._connexion_middleware.generateur_transactions.emettre_message(
-                evenement_erreur, rk, action=action, partition=partition, ajouter_certificats=True)
+            if generateur_transactions is not None:
+                evenement_erreur = {
+                    'ok': False,
+                    'err': 'Erreur sauvegarde certificat ACME dans docker (note: certificat TLS genere OK)',
+                    'output': output_acme.decode('utf-8')
+                }
+                generateur_transactions.emettre_message(
+                    evenement_erreur, rk, action=action, partition=partition, ajouter_certificats=True)
 
     def configurer_mq(self, commande: CommandeMonitor):
         """
