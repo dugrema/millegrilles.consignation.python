@@ -11,6 +11,8 @@ from typing import cast, Optional
 import docker
 from pymongo.errors import ServerSelectionTimeoutError, DuplicateKeyError
 
+from cryptography.x509 import extensions
+
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
@@ -51,6 +53,18 @@ class TraitementMessagesMiddleware(BaseCallback):
 
         validateur = self.contexte.validateur_message
         enveloppe_certificat = validateur.verifier(message_dict)
+        try:
+            exchanges = enveloppe_certificat.get_exchanges
+        except extensions.ExtensionNotFound:
+            exchanges = list()
+        try:
+            delegation_globale = enveloppe_certificat.get_delegation_globale
+        except extensions.ExtensionNotFound:
+            delegation_globale = None
+
+        if len(exchanges) == 0 and delegation_globale is None:
+            # Refuser commande
+            return {'ok': False, 'err': 'Acces refuse'}
 
         self.__logger_verbose.debug("Message recu : %s" % message_dict)
         action = routing_key.split('.')[-1]

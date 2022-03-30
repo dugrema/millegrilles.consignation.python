@@ -888,72 +888,152 @@ class ServiceMonitor:
         self.emettre_presence()
 
     def initialiser_domaine(self, commande):
+        """
+        Obtient un nouveau certificat web TLS avec LetsEncrypt
+        """
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
 
         # Aller chercher le certificat SSL de LetsEncrypt
-        domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
-        mode_test = params.get('modeTest') or False  # self._args.dev or params.get('modeTest')
+        domaine_noeud = params['domaine']
+        mode_test = params.get('modeTest') or False
+        force = params.get('force') or False
+        mode_creation = params.get('modeCreation')
 
-        params_environnement = list()
-        params_secrets = list()
+        params_environnement = dict()
+        params_secrets = dict()
         mode_dns = False
-        if params.get('modeCreation') == 'dns_cloudns':
-            # Utiliser dnssleep, la detection de presence du record TXT marche rarement
-            dnssleep = params.get('dnssleep') or 240
-            methode_validation = '--dns dns_cloudns --dnssleep %s' % str(dnssleep)
-            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['cloudnsSubid'])
-            params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['cloudnsPassword'])
+
+        commande_str = ''
+
+        methode = {
+            'modeCreation': mode_creation,
+            'params_environnement': params_environnement,
+        }
+
+        if mode_creation == 'dns_cloudns':
+            subid = params['cloudns_subauthid']
+            params_environnement["CLOUDNS_SUB_AUTH_ID"] = subid
+            params_secrets["CLOUDNS_AUTH_PASSWORD"] = params['cloudns_password']
             mode_dns = True
+            commande_str = '--dns dns_cloudns'
         else:
-            methode_validation = '--webroot /usr/share/nginx/html'
+            commande_str = '--webroot /usr/share/nginx/html'
 
         configuration_acme = {
             'domain': domaine_noeud,
-            'methode': {
-                'commande': methode_validation,
-                'mode_test': mode_test,
-                'params_environnement': params_environnement,
-            }
+            'methode': methode,
+            'modeTest': mode_test,
         }
 
-        commande_acme = methode_validation
+        try:
+            # Utiliser dnssleep, la detection de presence du record TXT marche rarement
+            dnssleep = params['dnssleep']
+            methode['dnssleep'] = dnssleep
+            commande_str = commande_str + ' --dnssleep %s' % str(dnssleep)
+        except KeyError:
+            pass
+
+        # Ajouter le domaine principal
+        commande_str = commande_str + ' -d %s' % domaine_noeud
+
+        try:
+            domaines_additionnels = params['domainesAdditionnels']
+            configuration_acme['domaines_additionnels'] = domaines_additionnels
+            commande_str = commande_str + ' -d ' + ' -d '.join(domaines_additionnels)
+        except KeyError:
+            pass
+
+        if force is True:
+            commande_str = '--force ' + commande_str
+
         if mode_test:
-            commande_acme = '--test ' + methode_validation
+            commande_str = '--test ' + commande_str
 
         params_combines = list(params_environnement)
         params_combines.extend(params_secrets)
 
         acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
-        commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
-        if mode_dns:
-            self.__logger.info("Mode DNS, on ajoute wildcard *.%s" % domaine_noeud)
-            commande_acme = commande_acme + " -d '*.%s'" % domaine_noeud
+        commande_acme = "acme.sh --issue %s" % commande_str
+        configuration_acme['commande'] = commande_acme
+
+        print('commande ACME : %s' % commande_acme)
+
+        # Conserver la configuration ACME immediatement
+        self.gestionnaire_docker.sauvegarder_config('acme.configuration', configuration_acme)
+
+        # Retourner la reponse a la commande, poursuivre execution de ACME
+        generateur_transactions = self.generateur_transactions
+        try:
+            mq_properties = commande.mq_properties
+            reply_to = mq_properties.reply_to
+            correlation_id = mq_properties.correlation_id
+            reponse = {'ok': True}
+            generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
+        except Exception:
+            self.__logger.exception("Erreur transmission reponse a initialiser_domaine %s" % domaine_noeud)
+
         resultat_acme, output_acme = gestionnaire_docker.executer_script_blind(
             acme_container_id,
             commande_acme,
             environment=params_combines
         )
-        if resultat_acme != 0:
+
+        domaine = 'monitor'
+        action = 'resultatAcme'
+        partition = self.noeud_id
+        rk = 'evenement.%s.%s.%s' % (domaine, partition, action)
+
+        # Verifier resultat. 0=OK, 2=Reutilisation certificat existant
+        if resultat_acme not in [0, 2]:
             self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
+            erreur_string = "Erreur ACME, code : %d" % resultat_acme
+            evenement_echec = {
+                'ok': False,
+                'err': erreur_string,
+                'code': resultat_acme,
+                'output': output_acme.decode('utf-8')
+            }
+            self._connexion_middleware.generateur_transactions.emettre_message(
+                evenement_echec, rk, action=action, partition=partition, ajouter_certificats=True)
+            return
             #raise Exception("Erreur creation certificat avec ACME")
-        cert_bytes = gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
-        io_buffer = io.BytesIO(cert_bytes)
-        with tarfile.open(fileobj=io_buffer) as tar_content:
-            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
-            key_bytes = tar_content.extractfile(member_key).read()
-            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
-            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
 
-        # Inserer certificat, cle dans docker
-        secret_name, date_secret = gestionnaire_docker.sauvegarder_secret(
-            'pki.web.key', key_bytes, ajouter_date=True)
+        try:
+            cert_bytes = gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
+            io_buffer = io.BytesIO(cert_bytes)
+            with tarfile.open(fileobj=io_buffer) as tar_content:
+                member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
+                key_bytes = tar_content.extractfile(member_key).read()
+                member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
+                fullchain_bytes = tar_content.extractfile(member_fullchain).read()
 
-        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
-        gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
+            # Inserer certificat, cle dans docker
+            secret_name, date_secret = gestionnaire_docker.sauvegarder_secret(
+                'pki.web.key', key_bytes, ajouter_date=True)
 
-        # Forcer reconfiguration nginx
-        gestionnaire_docker.maj_service('nginx')
+            # gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
+            gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
+
+            # Forcer reconfiguration nginx
+            gestionnaire_docker.maj_service('nginx')
+
+            evenement_succes = {
+                'ok': True,
+                'code': resultat_acme,
+                'output': output_acme.decode('utf-8')
+            }
+            self._connexion_middleware.generateur_transactions.emettre_message(
+                evenement_succes, rk, action=action, partition=partition, ajouter_certificats=True)
+        except Exception:
+            self.__logger.exception("Erreur sauvegarde certificat ACME dans docker")
+            evenement_erreur = {
+                'ok': False,
+                'err': 'Erreur sauvegarde certificat ACME dans docker (note: certificat TLS genere OK)',
+                'output': output_acme.decode('utf-8')
+            }
+            self._connexion_middleware.generateur_transactions.emettre_message(
+                evenement_erreur, rk, action=action, partition=partition, ajouter_certificats=True)
 
     def configurer_mq(self, commande: CommandeMonitor):
         """
