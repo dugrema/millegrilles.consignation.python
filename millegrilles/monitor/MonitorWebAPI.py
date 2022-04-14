@@ -372,7 +372,7 @@ class ServerMonitorHttpProtege(ServerMonitorHttp):
 
 class ServerWebAPI:
 
-    def __init__(self, service_monitor, webroot='/var/opt/millegrilles/installeur'):
+    def __init__(self, service_monitor, webroot='/opt/millegrilles/dist/installation'):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__thread = Thread(name="WebApi", target=self.run)
         self.__service_monitor = service_monitor
