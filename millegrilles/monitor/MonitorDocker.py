@@ -588,11 +588,6 @@ class GestionnaireModulesDocker:
             config_image = kwargs.get('config_image')
             certificat_volume = config_image.get('certificat_volume')
             certificat_compte = config_image.get('certificat_compte')
-            # if config_image is not None:
-            #     self.__regenerer_certificat_container(container_name, kwargs.get('config_image'))
-            #     certificat_volume = config_image.get('certificat_volume')
-            # else:
-            #     certificat_volume = None
             configuration = self.__formatter_configuration_container(
                 container_name, config,
                 application=kwargs.get('application'),
@@ -1027,58 +1022,45 @@ class GestionnaireModulesDocker:
             mounts = list()
             dict_config_docker['mounts'] = mounts
 
-        # if self.__service_monitor.is_dev_mode:
-        #     # On est en mode developpment, utiliser /var/opt/millegrilles_secrets
-        #     self.__logger.debug("Configuration container : Path secret externe : %s" % MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT)
-        #     mounts.append({
-        #         'target': MonitorConstantes.PATH_SECRET_DEFAUT,
-        #         'source': MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT,
-        #         'type': 'bind'
-        #     })
-        # else:
-        #     self.__logger.debug("Configuration container : Path secret volume interne millegrille-secrets")
-        #     mounts.append({
-        #         'target': MonitorConstantes.PATH_SECRET_DEFAUT,
-        #         'source': 'millegrille-secrets',
-        #         'type': 'volume'
-        #     })
-
-        path_certificat = kwargs.get('certificat_volume')
-        if path_certificat is not None:
-            path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, container_name)
-            os.makedirs(path_secret_docker, mode=0o755, exist_ok=True)
-            mounts.append({
-                'target': path_certificat or MonitorConstantes.PATH_SECRET_DEFAUT,
-                'source': path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, container_name),
-                'type': 'bind'
-            })
-
         nom_certificat = kwargs.get('certificat_compte')
         if nom_certificat is not None:
-            self.__regenerer_certificat_container(container_name, nom_certificat)
+            self.__regenerer_certificat_container(nom_certificat)
+
+            path_certificat = kwargs.get('certificat_volume')
+            if path_certificat is not None:
+                path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, nom_certificat)
+                os.makedirs(path_secret_docker, mode=0o755, exist_ok=True)
+                mounts.append({
+                    'target': path_certificat or MonitorConstantes.PATH_SECRET_DEFAUT,
+                    'source': path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, nom_certificat),
+                    'type': 'bind'
+                })
 
         labels['mode_container'] = 'true'
         labels['application'] = kwargs['application']
 
         return dict_config_docker
 
-    def __regenerer_certificat_container(self, container_name: str, nom_certificat: str):
+    def __regenerer_certificat_container(self, nom_certificat: str):
         # nom_certificat = config_image.get('certificat_compte')
         nom_role = nom_certificat.split('.')[1]
-        path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, container_name)
+        path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, nom_certificat)
         os.makedirs(path_secret_docker, mode=0o755, exist_ok=True)
 
-        clecert = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(nom_role, self.__service_monitor.noeud_id)
-        secret_pem_bytes = clecert.private_key_bytes
-        chaine = clecert.chaine
-        ca_cert = clecert.ca
+        # Le reparer est cree, la methode va automatiquement conserver le certificat/cle/CA
+        self.__service_monitor.gestionnaire_certificats.generer_clecert_module(nom_role, self.__service_monitor.noeud_id)
+        # self.__sauvegarder_certificat_container(nom_certificat, clecert)
 
-        with open(path.join(path_secret_docker, 'cert.pem'), 'w') as fichier:
-            fichier.write(''.join(chaine))
-        with open(path.join(path_secret_docker, 'key.pem'), 'wb') as fichier:
-            fichier.write(secret_pem_bytes)
-        with open(path.join(path_secret_docker, 'millegrille.cert.pem'), 'w') as fichier:
-            fichier.write(ca_cert)
+        # secret_pem_bytes = clecert.private_key_bytes
+        # chaine = clecert.chaine
+        # ca_cert = clecert.ca
+        #
+        # with open(path.join(path_secret_docker, 'cert.pem'), 'w') as fichier:
+        #     fichier.write(''.join(chaine))
+        # with open(path.join(path_secret_docker, 'key.pem'), 'wb') as fichier:
+        #     fichier.write(secret_pem_bytes)
+        # with open(path.join(path_secret_docker, 'millegrille.cert.pem'), 'w') as fichier:
+        #     fichier.write(ca_cert)
 
     def __remplacer_variables(self, nom_service, config_service, mode_container=False, **kwargs):
         self.__logger.debug("Remplacer variables %s" % nom_service)

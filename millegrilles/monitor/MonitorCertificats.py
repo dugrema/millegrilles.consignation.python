@@ -261,6 +261,22 @@ class GestionnaireCertificats:
 
         return {'secrets': liste_secrets}
 
+    def sauvegarder_certificat_container(self, nom_certificat, clecert):
+        path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, nom_certificat)
+
+        if os.path.exists(path_secret_docker):
+            secret_pem_bytes = clecert.private_key_bytes
+            chaine = clecert.chaine
+            ca_cert = clecert.ca
+
+            self.__logger.info("Conserver certificat %s sous path secrets pour container" % nom_certificat)
+            with open(path.join(path_secret_docker, 'cert.pem'), 'w') as fichier:
+                fichier.write(''.join(chaine))
+            with open(path.join(path_secret_docker, 'key.pem'), 'wb') as fichier:
+                fichier.write(secret_pem_bytes)
+            with open(path.join(path_secret_docker, 'millegrille.cert.pem'), 'w') as fichier:
+                fichier.write(ca_cert)
+
     @property
     def idmg_tronque(self):
         return self.idmg[0:12]
@@ -682,6 +698,9 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
         self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
+
+        # Conserver sur disque (au besoin, seulement si folder correspondant existe deja)
+        self.sauvegarder_certificat_container('pki.%s.cert' % nomcle, clecert)
 
         return clecert
 
