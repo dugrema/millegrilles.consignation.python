@@ -586,12 +586,19 @@ class GestionnaireModulesDocker:
             image_tag = image.tags[0]
 
             config_image = kwargs.get('config_image')
-            if config_image is not None:
-                self.__regenerer_certificat_container(container_name, kwargs.get('config_image'))
-                certificat_volume = config_image.get('certificat_volume')
-            else:
-                certificat_volume = None
-            configuration = self.__formatter_configuration_container(container_name, config, application=kwargs.get('application'), certificat_volume=certificat_volume)
+            certificat_volume = config_image.get('certificat_volume')
+            certificat_compte = config_image.get('certificat_compte')
+            # if config_image is not None:
+            #     self.__regenerer_certificat_container(container_name, kwargs.get('config_image'))
+            #     certificat_volume = config_image.get('certificat_volume')
+            # else:
+            #     certificat_volume = None
+            configuration = self.__formatter_configuration_container(
+                container_name, config,
+                application=kwargs.get('application'),
+                certificat_volume=certificat_volume,
+                certificat_compte=certificat_compte
+            )
 
             self.__logger.debug("Configuration du container: %s" % configuration)
 
@@ -1046,29 +1053,32 @@ class GestionnaireModulesDocker:
                 'type': 'bind'
             })
 
+        nom_certificat = kwargs.get('certificat_compte')
+        if nom_certificat is not None:
+            self.__regenerer_certificat_container(container_name, nom_certificat)
+
         labels['mode_container'] = 'true'
         labels['application'] = kwargs['application']
 
         return dict_config_docker
 
-    def __regenerer_certificat_container(self, container_name: str, config_image: dict):
-        nom_certificat = config_image.get('certificat_compte')
-        if nom_certificat is not None:
-            nom_role = nom_certificat.split('.')[1]
-            path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, container_name)
-            os.makedirs(path_secret_docker, mode=0o755, exist_ok=True)
+    def __regenerer_certificat_container(self, container_name: str, nom_certificat: str):
+        # nom_certificat = config_image.get('certificat_compte')
+        nom_role = nom_certificat.split('.')[1]
+        path_secret_docker = path.join(MonitorConstantes.PATH_SOURCE_SECRET_DEFAUT, container_name)
+        os.makedirs(path_secret_docker, mode=0o755, exist_ok=True)
 
-            clecert = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(nom_role, self.__service_monitor.noeud_id)
-            secret_pem_bytes = clecert.private_key_bytes
-            chaine = clecert.chaine
-            ca_cert = clecert.ca
+        clecert = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(nom_role, self.__service_monitor.noeud_id)
+        secret_pem_bytes = clecert.private_key_bytes
+        chaine = clecert.chaine
+        ca_cert = clecert.ca
 
-            with open(path.join(path_secret_docker, 'cert.pem'), 'w') as fichier:
-                fichier.write(''.join(chaine))
-            with open(path.join(path_secret_docker, 'key.pem'), 'wb') as fichier:
-                fichier.write(secret_pem_bytes)
-            with open(path.join(path_secret_docker, 'millegrille.cert.pem'), 'w') as fichier:
-                fichier.write(ca_cert)
+        with open(path.join(path_secret_docker, 'cert.pem'), 'w') as fichier:
+            fichier.write(''.join(chaine))
+        with open(path.join(path_secret_docker, 'key.pem'), 'wb') as fichier:
+            fichier.write(secret_pem_bytes)
+        with open(path.join(path_secret_docker, 'millegrille.cert.pem'), 'w') as fichier:
+            fichier.write(ca_cert)
 
     def __remplacer_variables(self, nom_service, config_service, mode_container=False, **kwargs):
         self.__logger.debug("Remplacer variables %s" % nom_service)
