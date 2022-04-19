@@ -1717,6 +1717,7 @@ class ConstantesGenerateurCertificat:
     ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
     ROLE_SENSEURSPASSIFS = 'senseurspassifs'
     ROLE_SENSEURSPASSIFS_WEB = 'senseurspassifs_web'
+    ROLE_SENSEURSPASSIFS_HUB = 'senseurspassifs_hub'
     ROLE_MEDIA = 'media'
 
 

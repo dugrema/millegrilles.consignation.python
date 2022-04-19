@@ -506,6 +506,7 @@ class GestionnaireApplications:
                 self.__gestionnaire_modules_docker.demarrer_container(nom_container_docker,
                                                                       nom_image=nom_image_docker,
                                                                       config=config_elem,
+                                                                      config_image=config_image,
                                                                       images=gestionnaire_images_applications,
                                                                       application=nom_application)
             else:
