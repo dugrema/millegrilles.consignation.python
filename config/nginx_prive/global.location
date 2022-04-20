@@ -1,3 +1,7 @@
+location = / {{
+  return 307 https://$http_host/installation;
+}}
+
 location /certs {{
   root /usr/share/nginx/files;
   include /etc/nginx/conf.d/component_cors.include;

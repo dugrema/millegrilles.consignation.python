@@ -294,9 +294,12 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def ajouter_compte(self, request_data):
         try:
-            cert_pem = request_data['certificat']
+            if self.headers.get('VERIFIED') == 'SUCCESS':
+                cert_pem = self.headers.get('X-Client-Cert')
+            else:
+                cert_pem = request_data['certificat']
         except TypeError:
-            self.__logger.error("Certificat ajouterCompte Parametre certificat manquante a la requete - REFUSE")
+            self.__logger.error("MonitorWebAPI.ajouterCompte Parametre 'certificat' manquant a la requete - REFUSE")
             return
 
         try:

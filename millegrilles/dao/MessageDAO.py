@@ -375,7 +375,7 @@ class ConnexionWrapper:
         #  nginx : de l'interne, est le proxy web qui est mappe vers le monitor
         #  mq_host : de l'exterieur, est le serveur mq qui est sur le meme swarm docker que nginx
         hosts = ['nginx', self.configuration.mq_host]
-        port = 443
+        port = 444  # 443
         path = 'administration/ajouterCompte'
 
         with open(self.configuration.mq_certfile, 'r') as fichier:
@@ -389,7 +389,7 @@ class ConnexionWrapper:
                 try:
                     path_complet = 'https://%s:%d/%s' % (host, port, path)
                     self._logger.debug("Creation compte avec path %s" % path_complet)
-                    reponse = requests.post(path_complet, json=chaine_cert, cert=cle_cert, verify=False)
+                    reponse = requests.post(path_complet, json=chaine_cert, cert=cle_cert, verify=self.configuration.mq_cafile)
                     if reponse.status_code == 200:
                         return True
                     if reponse.status_code != 200:
