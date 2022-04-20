@@ -679,7 +679,8 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
         # Sauvegarder l'enveloppe dans le buffer d'evenements
         evenement = json.dumps(enveloppe).encode('utf-8') + b'\n'
-        os.write(self._fp_buffer, evenement)
+        if self._fp_buffer is not None:
+            os.write(self._fp_buffer, evenement)
 
         return enveloppe
 
