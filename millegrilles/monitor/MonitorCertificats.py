@@ -466,6 +466,9 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
         self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
         self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
 
+        # Conserver sur disque (au besoin, seulement si folder correspondant existe deja)
+        self.sauvegarder_certificat_container('pki.%s.cert' % nomcle, clecert)
+
         return clecert
 
 
