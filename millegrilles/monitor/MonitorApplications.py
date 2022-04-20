@@ -521,6 +521,7 @@ class GestionnaireApplications:
             self.__wait_container_event.wait(60)
             if self.__wait_container_event.is_set() is False:
                 raise Exception("Erreur demarrage " + module_name)
+            self.__service_monitor.emettre_presence()
             self.__service_monitor.emettre_evenement('applicationDemarree', {'nom_application': module_name})
         except APIError as apie:
             if apie.status_code == 409:
@@ -545,6 +546,7 @@ class GestionnaireApplications:
 
         # Trouver le service/container en faisant la recherche des labels
         dict_app = self.__gestionnaire_modules_docker.trouver_application(nom_image_docker)
+        noms_applications = list()
         for container in dict_app['containers']:
             nom_application = container.attrs['Config']['Labels']['application']
 
@@ -553,12 +555,20 @@ class GestionnaireApplications:
                 container.remove()
             except:
                 pass  # Ok, container devrait se supprimer automatiquement
-            self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_application})
+            #self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_application})
+            noms_applications.append(nom_application)
 
         for service in dict_app['services']:
             service.remove()
             nom_application = service.attrs['Spec']['Labels']['application']
-            self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_application})
+            # self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_application})
+            noms_applications.append(nom_application)
+
+        # Emettre la presence en premier
+        # Permet de mettre a jour topologie avant les evenements de fermeture d'applications
+        self.__service_monitor.emettre_presence()
+        for nom_app in noms_applications:
+            self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_app})
 
     def trouver_applications_backup(self, commande: dict):
 
