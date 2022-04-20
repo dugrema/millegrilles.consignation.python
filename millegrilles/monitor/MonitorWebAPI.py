@@ -287,6 +287,12 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         path_split = path_fichier.split('/')
 
         # S'assurer que la verification du certificat client est OK
+        if self.headers.get('VERIFIED') != 'SUCCESS':
+            self.__logger.warning(
+                "MonitorWebAPI._traiter_administration_POST Requete SSL CLIENT invalide : header VERIFIED=%s" % self.headers.get(
+                    'VERIFIED'))
+            return self.send_response(403)
+
         if path_split[2] == 'ajouterCompte':
             self.ajouter_compte(request_data)
         else:
@@ -294,13 +300,10 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def ajouter_compte(self, request_data):
         try:
-            if self.headers.get('VERIFIED') == 'SUCCESS':
-                cert_pem = self.headers.get('X-Client-Cert')
-            else:
-                cert_pem = request_data['certificat']
+            cert_pem = request_data['certificat']
         except TypeError:
             self.__logger.error("MonitorWebAPI.ajouterCompte Parametre 'certificat' manquant a la requete - REFUSE")
-            return
+            return self.send_error(400)
 
         try:
             # Valider le certificat, s'assurer qu'il a au moins un exchange

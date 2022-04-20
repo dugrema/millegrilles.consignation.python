@@ -50,7 +50,8 @@ class EnveloppeCertificat:
         if certificat_pem is not None:
             chaine_cert = None
             if isinstance(certificat_pem, str):
-                chaine_cert = self.__split_chaine_certificats(certificat_pem)
+                certificat_pem_clean = certificat_pem.replace('\t', '').strip()   #.replace('\n', '').strip()
+                chaine_cert = self.__split_chaine_certificats(certificat_pem_clean)
             elif isinstance(certificat_pem, list):
                 chaine_cert = certificat_pem
 
