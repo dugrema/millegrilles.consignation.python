@@ -441,9 +441,10 @@ class GestionnaireCertificatsSatellite(GestionnaireCertificats):
         try:
             chaine = reponse_json['certificat']
             if len(chaine) > 2:
+                ca = chaine[-1]
+                clecert.ca = ca
                 chaine = chaine[:2]  # Retirer cert millegrille (CA)
             clecert.chaine = chaine
-            clecert.ca = reponse_json['ca']
         except KeyError:
             raise ErreurSignatureCertificatException("Erreur signature certificat pour role %s, reponse\n%s" % (role, json.dumps(reponse_json, indent=2)))
 
