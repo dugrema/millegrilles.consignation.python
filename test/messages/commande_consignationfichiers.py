@@ -23,7 +23,7 @@ class TestConsignationFichiers(DomaineTest):
         self.__fuuid = 'z8VxkTYUqqHGUUXPncjp96NfnrM9xSQpQDQGBinaGQWS7rrS6uYpJbSRig4UfZwRVHRJwJv54oQkuqD2hY922NG7U1o'
         self.event_termine = Event()
 
-        self.__awss3_secret_access_key = os.environ['AWSS3_SECRET']
+        # self.__awss3_secret_access_key = os.environ['AWSS3_SECRET']
 
     def commande_restaurerGrosFichiers(self):
         params = {
@@ -48,7 +48,11 @@ class TestConsignationFichiers(DomaineTest):
         requete = dict()
         domaine = 'requete.fichiers.getPublicKeySsh'
         self.generateur.transmettre_requete(
-            requete, domaine, reply_to=self.queue_name, correlation_id='requete_getclessh')
+            requete, domaine,
+            reply_to=self.queue_name,
+            correlation_id='requete_getclessh',
+            securite=Constantes.SECURITE_PRIVE
+        )
 
     def commande_publier_fichier_ssh(self):
         params = {
@@ -341,7 +345,7 @@ class TestConsignationFichiers(DomaineTest):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
-        # self.requete_getclessh()
+        self.requete_getclessh()
         # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
@@ -355,7 +359,7 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_creer_cle_ipns()
         # self.put_publier_fichier_ipns()
         # self.commande_publier_vitrine_ssh()
-        self.commande_publier_vitrine_ipfs()
+        # self.commande_publier_vitrine_ipfs()
 
     # def demander_permission(self, fuuid):
     #     requete_cert_maitredescles = {
