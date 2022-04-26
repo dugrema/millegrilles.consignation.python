@@ -1,4 +1,5 @@
 # Script de test pour transmettre message de transaction
+import datetime
 import logging
 import os
 import requests
@@ -52,6 +53,33 @@ class TestConsignationFichiers(DomaineTest):
             reply_to=self.queue_name,
             correlation_id='requete_getclessh',
             securite=Constantes.SECURITE_PRIVE
+        )
+
+    def requete_get_configuration(self):
+        # permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
+        requete = dict()
+        domaine = 'requete.fichiers.getConfiguration'
+        self.generateur.transmettre_requete(
+            requete, domaine,
+            reply_to=self.queue_name,
+            correlation_id='requete_getclessh',
+            securite=Constantes.SECURITE_PRIVE
+        )
+
+    def commande_modifier_configuration(self):
+        # permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
+        # commande = {'typeStore': 'local'}
+        commande = {
+            'typeStore': 'sftp', 'hostname': 'pi-dev7', 'username': 'mathieu',
+            'remotePath': '/var/opt/millegrilles/nginx/html/fichiers',
+            'urlDownload': 'https://pi-dev7.maple.maceroc.com/fichiers'
+        }
+        domaine = 'commande.fichiers.modifierConfiguration'
+        self.generateur.transmettre_commande(
+            commande, domaine,
+            reply_to=self.queue_name,
+            correlation_id='commande_get_configuration',
+            exchange=Constantes.SECURITE_PRIVE
         )
 
     def commande_publier_fichier_ssh(self):
@@ -345,7 +373,11 @@ class TestConsignationFichiers(DomaineTest):
         self.__logger.debug("Executer")
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
+
         self.requete_getclessh()
+        # self.requete_get_configuration()
+        # self.commande_modifier_configuration()
+
         # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
         # self.commande_publier_fichier_awss3()
