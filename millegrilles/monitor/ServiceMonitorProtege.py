@@ -5,6 +5,7 @@ from threading import BrokenBarrierError
 from typing import Optional
 
 import docker
+import pytz
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -161,6 +162,8 @@ class ServiceMonitorProtege(ServiceMonitor):
         """
         clecert_monitor = self._gestionnaire_certificats.clecert_monitor
 
+        date_now = datetime.datetime.now(tz=pytz.UTC)
+
         try:
             not_valid_before = clecert_monitor.not_valid_before
             not_valid_after = clecert_monitor.not_valid_after
@@ -169,12 +172,12 @@ class ServiceMonitorProtege(ServiceMonitor):
             # Calculer 2/3 de la duree du certificat
             delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
             epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers, tz=pytz.UTC)
         except AttributeError:
             self.__logger.warning("Certificat monitor inexistant, on le fait renouveller")
             date_renouvellement = None
 
-        if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
+        if date_renouvellement is None or date_renouvellement < date_now:
             self.__logger.warning("Certificat monitor expire, on doit attendre une reinitialisation via app web")
 
             # MAJ date pour creation de certificats
