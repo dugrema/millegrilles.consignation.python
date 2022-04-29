@@ -302,8 +302,13 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         try:
             cert_pem = request_data['certificat']
         except TypeError:
-            self.__logger.error("MonitorWebAPI.ajouterCompte Parametre 'certificat' manquant a la requete - REFUSE")
-            return self.send_error(400)
+            cert_pem = self.headers.get('X-Client-Cert')
+            if cert_pem is None:
+                self.__logger.error("MonitorWebAPI.ajouterCompte Parametre 'certificat' manquant a la requete - REFUSE")
+                return self.send_error(400)
+            else:
+                # Nettoyer tabs
+                cert_pem = cert_pem.replace('\t', '')
 
         try:
             # Valider le certificat, s'assurer qu'il a au moins un exchange

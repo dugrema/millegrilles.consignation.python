@@ -13,6 +13,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
+from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert, ConstantesGenerateurCertificat
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ForcerRedemarrage
 
@@ -230,8 +231,12 @@ class GestionnaireCommandes:
         # certificat = EnveloppeCleCert()
         # certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
 
-        validateur = self._service_monitor.validateur_certificat
-        certificat = validateur.valider(cert_pem)
+        #validateur = self._service_monitor.validateur_certificat
+        #certificat = validateur.valider(cert_pem)
+        # Note : le certificat peut etre recu sans la valeur intermediaire.
+        #        On ne le valide pas pour ajouter le compte. Ne devrait pas etre un probleme, le middleware (MQ, Mongo)
+        #        doivent faire une validation complete (date, chaine, etc.) a chaque connexion.
+        certificat = EnveloppeCertificat(certificat_pem=cert_pem)
         certificat_clecert = EnveloppeCleCert()
         certificat_clecert.cert_from_pem_bytes(cert_pem)
 

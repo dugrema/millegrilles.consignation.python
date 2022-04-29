@@ -391,7 +391,7 @@ class ServiceMonitor:
                 try:
                     self._gestionnaire_certificats.generer_clecert_module(
                         nom_role,
-                        domaine_noeud,
+                        self._nodename,
                         nom_role,
                         liste_dns=[fqdn_noeud, domaine_noeud, nom_role, nom_role + '.' + domaine_noeud]
                     )
