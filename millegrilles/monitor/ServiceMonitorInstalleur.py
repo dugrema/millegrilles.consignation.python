@@ -257,15 +257,17 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self._gestionnaire_web.regenerer_configuration(mode_installe=True)
 
         # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
-        try:
-            gestionnaire_docker.maj_service('nginx')
-        except docker.errors.APIError as apie:
-            if apie.status_code == 500:
-                self.__logger.warning("Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
-                self.__event_attente.wait(15)
+        for i in range(0, 3):
+            try:
+                self.__event_attente.wait(1)
                 gestionnaire_docker.maj_service('nginx')
-            else:
-                raise apie
+                break  # Succes
+            except docker.errors.APIError as apie:
+                if apie.status_code == 500:
+                    self.__logger.warning("Erreur mise a jour, probablement update concurrentes. On attend 5 secondes puis on reessaie")
+                    self.__event_attente.wait(5)
+                else:
+                    raise apie
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")

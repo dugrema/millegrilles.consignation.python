@@ -6,6 +6,7 @@ from typing import Optional
 
 import docker
 import pytz
+import json
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -154,6 +155,20 @@ class ServiceMonitorProtege(ServiceMonitor):
         }
         commande = CommandeMonitor(commande_dict)
         self.gestionnaire_commandes.ajouter_commande(commande)
+
+    def initialiser_noeud(self, commande: CommandeMonitor):
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug("Commande initialiser noeud : %s", json.dumps(commande.contenu, indent=2))
+
+        params = commande.contenu
+
+        gestionnaire_certs = GestionnaireCertificatsNoeudProtegePrincipal(
+            self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
+        clecert_monitor = gestionnaire_certs.recuperer_monitor_initial(params)
+
+        self.__logger.debug("Certificat intermediaire e tmonitor reinstalle avec succes, redemarrage")
+
+        raise ForcerRedemarrage("Redemarrage")
 
     def _entretien_certificats(self):
         """

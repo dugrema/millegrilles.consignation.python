@@ -159,6 +159,12 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         logger.debug("post_installer : recu\n%s", json.dumps(request_data, indent=2))
 
+        if self.service_monitor.est_verrouille:
+            # Verifier que le certificat recu correspond au idmg
+            cert_pem = request_data['chainePem']
+            validateur_certificat = self.service_monitor.validateur_certificat
+            certificat = validateur_certificat.valider(cert_pem, idmg=self.service_monitor.idmg)
+
         request_data['commande'] = ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD
         commande = CommandeMonitor(request_data)
         self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)

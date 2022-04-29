@@ -11,6 +11,7 @@ from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.SecuritePKI import CertificatExpire
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.ServiceMonitorInstalleur import ServiceMonitorInstalleur
+from millegrilles.monitor.ServiceMonitorExpire import ServiceMonitorExpire
 from millegrilles.monitor.ServiceMonitorPrive import ServiceMonitorPrive
 from millegrilles.monitor.ServiceMonitorProtege import ServiceMonitorProtege
 from millegrilles.monitor.ServiceMonitorPublic import ServiceMonitorPublic
@@ -170,7 +171,7 @@ class InitialiserServiceMonitor:
         except CertificatExpire:
             # Lancer en mode installation
             self.__logger.exception("Certificat expire, on lance en mode installeur")
-            installeur = ServiceMonitorInstalleur(self.__args, self.__docker, self._configuration_json)
+            installeur = ServiceMonitorExpire(self.__args, self.__docker, self._configuration_json)
             installeur.run()
 
 
