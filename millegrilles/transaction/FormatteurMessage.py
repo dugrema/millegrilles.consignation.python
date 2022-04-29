@@ -3,6 +3,7 @@ import json
 import logging
 import multibase
 import uuid
+import pytz
 
 from typing import Union
 from cryptography.hazmat.primitives import hashes
@@ -109,7 +110,8 @@ class FormatteurMessageMilleGrilles:
         meta = dict()
         meta[Constantes.CONFIG_IDMG] = self.__idmg
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
+        date_courante_utc = datetime.datetime.now(tz=pytz.UTC)
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(date_courante_utc.timestamp())
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = version
         if domaine is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
