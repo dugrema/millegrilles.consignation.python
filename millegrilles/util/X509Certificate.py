@@ -2326,6 +2326,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS: Constantes.SECURITE_SECURE,
 
             # Roles 2.prive
+            ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_MAITRE_COMPTES: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS_WEB: Constantes.SECURITE_PRIVE,
             ConstantesGenerateurCertificat.ROLE_SENSEURSPASSIFS_HUB: Constantes.SECURITE_PRIVE,

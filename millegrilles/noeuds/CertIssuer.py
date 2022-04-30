@@ -136,6 +136,7 @@ class HandlerCertificats:
         # Parse request data au besoin
         try:
             role = request_data.get('role')
+            self.__logger.info("Signer CSR pour role %s", role)
         except KeyError:
             role = None
         securite_role = self.__renouvelleur.get_securite_role(role)
