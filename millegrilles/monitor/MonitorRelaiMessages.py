@@ -664,7 +664,11 @@ class ConnexionMiddleware:
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
         self._channel = channel
-        self._certificat_event_handler.initialiser()
+        try:
+            self._certificat_event_handler.initialiser()
+        except Constantes.ErreurFatale:
+            self.__logger.exception("Erreur fatale sur ouverture channel, on ferme le monitor")
+            self._fermeture_event.set()
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         self._channel = None

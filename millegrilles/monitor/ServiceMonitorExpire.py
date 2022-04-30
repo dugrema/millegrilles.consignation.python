@@ -124,7 +124,27 @@ class ServiceMonitorExpire(ServiceMonitor):
         self.__logger.info("Fin execution de la boucle d'entretien du service monitor")
 
     def preparer_gestionnaire_certificats(self):
-        pass
+        # Verifier si le certificat nginx existe deja - generer un cert self-signed au besoin
+        try:
+            docker_cert_nginx = self._gestionnaire_docker.charger_config_recente('pki.nginx.cert')
+        except AttributeError:
+            # Certificat absent, on genere un certificat et cle nginx
+            self._gestionnaire_certificats.generer_certificat_nginx_selfsigned()
+
+            self._gestionnaire_web.regenerer_configuration(mode_installe=True)
+            # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
+            for i in range(0, 3):
+                try:
+                    self.__event_attente.wait(1)
+                    self._gestionnaire_docker.maj_service('nginx')
+                    break  # Succes
+                except docker.errors.APIError as apie:
+                    if apie.status_code == 500:
+                        self.__logger.warning(
+                            "Erreur mise a jour, probablement update concurrentes. On attend 5 secondes puis on reessaie")
+                        self.__event_attente.wait(5)
+                    else:
+                        raise apie
 
         # params = dict()
         # if self._args.dev:
