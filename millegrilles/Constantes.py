@@ -1731,6 +1731,7 @@ class ConstantesServiceMonitor:
     ETAT_SYSTEME_FERMETURE = '6.systeme_fermeture'
 
     EXIT_REDEMARRAGE = 2
+    EXIT_ERREUR_FATALE = 4
 
     DOCKER_LIBVAL_CONFIG_IDMG = 'millegrille.idmg'
     DOCKER_LIBVAL_CONFIG_SECURITE = 'millegrille.securite'

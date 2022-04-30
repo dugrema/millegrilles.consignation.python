@@ -158,16 +158,20 @@ class ConnexionWrapper:
         self.__thread_ioloop = None
 
     def register_channel_listener(self, listener):
+        if self.__liste_listeners_channels is not None:
+            # Protection leak
+            LIMITE_CHANNELS = 60
+            nombre_listeners = len(self.__liste_listeners_channels)
+            if nombre_listeners > LIMITE_CHANNELS:
+                self._logger.error("MessageDAO.register_channel_listener Limite channels attente (%s > %s), leak detecte. On ferme." % (nombre_listeners, LIMITE_CHANNELS))
+                raise Constantes.ErreurFatale('Leak listeners > %s detectes (nb=%s)' % (LIMITE_CHANNELS, nombre_listeners))
+
         nom_listener = listener.__class__.__name__
         self._logger.info("Enregistrer listener pour channel %s" % nom_listener)
         if self.__liste_listeners_channels is None:
             self.__liste_listeners_channels = list()
         self.__liste_listeners_channels.append(listener)
-        nombre_listeners = len(self.__liste_listeners_channels)
         self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
-        if nombre_listeners > 100:
-            self._logger.error("MessageDAO.register_channel_listener Limite channels attente (%s > 100), leak detecte. On ferme." % nombre_listeners)
-            raise Constantes.ErreurFatale('Leak listeners > 100 detectes (nb=%s)' % nombre_listeners)
 
         # On verifie si on peut ouvrir le channel immediatement
         if self.__connexionmq is not None and not self.__connexionmq.is_closed and not self._in_error:
@@ -296,12 +300,20 @@ class ConnexionWrapper:
         self._logger.info("Connexion / channel prets")
 
     def __on_connection_close(self, connection=None, code=None, reason=None):
+        if self.__connexionmq is None:
+            return
+
         self.__connexionmq = None
         self.__channel = None
         self.__thread_ioloop = None
         if not self.__stop_event.is_set():
-            self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
-            self.enter_error_state()
+            self.__stop_event.set()
+            if isinstance(code, Constantes.ErreurFatale):
+                self._logger.error("Erreur fatale durant traitement MQ, on doit fermer l'application")
+                quit()  # Todo, trouver methode pour faire monter exception
+            else:
+                self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
+                self.enter_error_state()
         else:
             self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
 

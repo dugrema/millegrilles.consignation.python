@@ -79,7 +79,7 @@ class ServiceMonitorSatellite(ServiceMonitor):
         if self.securite == Constantes.SECURITE_PRIVE:
             self._connexion_middleware = ConnexionMiddlewarePrive(
                 self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
-                secrets=self._args.secrets)
+                secrets=self._args.secrets, stop_event=self._fermeture_event)
         elif self.securite == Constantes.SECURITE_PUBLIC:
             self._connexion_middleware = ConnexionMiddlewarePublic(
                 self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
@@ -131,10 +131,14 @@ class ServiceMonitorSatellite(ServiceMonitor):
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
+                except Constantes.ErreurFatale:
+                    self.__logger.exception("Erreur fatale, on ferme le monitor")
+                    self.exit_code = 4
+                    self.fermer()
                 except Exception as e:
                     self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
-                finally:
-                    self._attente_event.wait(30)
+
+                self._attente_event.wait(30)
 
         except ForcerRedemarrage:
             self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")

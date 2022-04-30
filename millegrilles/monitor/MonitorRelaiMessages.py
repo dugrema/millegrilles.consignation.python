@@ -853,9 +853,10 @@ class ConnexionMiddlewarePrive(ConnexionMiddleware):
     """
 
     def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
-                 service_monitor, certificats: dict, **kwargs):
+                 service_monitor, certificats: dict, stop_event=None, **kwargs):
         super().__init__(configuration, client_docker, service_monitor, certificats, **kwargs)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._stop_event = stop_event
 
     def initialiser(self, init_document=False):
         super().initialiser(init_document=init_document)
