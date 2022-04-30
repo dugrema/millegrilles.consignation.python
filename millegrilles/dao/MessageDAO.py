@@ -163,7 +163,11 @@ class ConnexionWrapper:
         if self.__liste_listeners_channels is None:
             self.__liste_listeners_channels = list()
         self.__liste_listeners_channels.append(listener)
+        nombre_listeners = len(self.__liste_listeners_channels)
         self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
+        if nombre_listeners > 100:
+            self._logger.error("MessageDAO.register_channel_listener Limite channels attente (%s > 100), leak detecte. On ferme." % nombre_listeners)
+            raise Constantes.ErreurFatale('Leak listeners > 100 detectes (nb=%s)' % nombre_listeners)
 
         # On verifie si on peut ouvrir le channel immediatement
         if self.__connexionmq is not None and not self.__connexionmq.is_closed and not self._in_error:

@@ -2137,3 +2137,8 @@ class ConstantesForum:
     CHAMP_POST_IDS = 'post_ids'
 
     TRI_PLUSRECENT = 'plusRecent'
+
+
+class ErreurFatale(Exception):
+    pass
+
