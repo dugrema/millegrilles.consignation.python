@@ -211,22 +211,11 @@ class ServiceMonitorSatellite(ServiceMonitor):
         :return:
         """
         clecert_monitor = self._gestionnaire_certificats.clecert_monitor
-
-        try:
-            not_valid_before = clecert_monitor.not_valid_before
-            not_valid_after = clecert_monitor.not_valid_after
-            self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
-        except AttributeError:
-            self.__logger.exception("Certificat monitor absent")
-            date_renouvellement = None
-        else:
-            # Calculer 2/3 de la duree du certificat
-            delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
-            epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+        info_renouvellement = clecert_monitor.calculer_expiration()
+        peut_renouveler = info_renouvellement['renouveler']
 
         flag_force_renew = os.environ.get('MGDEBUG_FORCE_RENEW') == '1'
-        if flag_force_renew or date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
+        if flag_force_renew or peut_renouveler:
             # MAJ date pour creation de certificats
             self._gestionnaire_certificats.maj_date()
 
@@ -257,7 +246,6 @@ class ServiceMonitorSatellite(ServiceMonitor):
                     self.__logger.exception("Connexion MQ pas prete")
 
         # Nettoyer certificats monitor
-        # self._supprimer_certificats_expires(['monitor'])
         super()._entretien_certificats()
 
     def ajouter_compte(self, certificat: str):

@@ -50,6 +50,7 @@ class GestionnaireCommandes:
         # self.__pipe_acteur = PipeActeur()  # Demarre une thread implicitement
 
     def stop(self):
+        self.__logger.info("MonitorCommandes.stop()")
         self.__action_event.set()
         self.__action_event = None
 

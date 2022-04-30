@@ -491,6 +491,29 @@ class EnveloppeCleCert:
 
         return x25519_private_key
 
+    def calculer_expiration(self):
+        date_expiration = self.not_valid_after
+
+        if date_expiration is None:
+            # Le certificat n'a pas de date d'expiration
+            return {'expire': False, 'renouveler': False}
+
+        date_courante = datetime.datetime.now(tz=pytz.UTC)
+        est_expire = date_expiration < date_courante
+
+        # Calculer 2/3 de la duree du certificat
+        not_valid_before = self.not_valid_before
+        if not_valid_before is None:
+            date_renouvellement = date_expiration - datetime.timedelta(days=2)
+        else:
+            delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
+            epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers, tz=pytz.UTC)
+
+        peut_renouveler = date_renouvellement < date_courante
+
+        return {'expire': est_expire, 'renouveler': peut_renouveler}
+
 
 class GenerateurCertificat:
 

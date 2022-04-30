@@ -78,7 +78,7 @@ class ServiceMonitor:
         # Delais entretien pour differents modules et services
         self._certificats_entretien_date = None
         # self._certificats_entretien_frequence = datetime.timedelta(minutes=5)
-        self._certificats_entretien_frequence = datetime.timedelta(seconds=30)
+        self._certificats_entretien_frequence = datetime.timedelta(minutes=1)
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
 
@@ -412,8 +412,6 @@ class ServiceMonitor:
                 'est_expire': True,
             }
 
-        date_courante = datetime.datetime.now(tz=pytz.UTC)
-
         for config in self._docker.configs.list(filters=filtre):
             self.__logger.debug("Config : %s", str(config))
             nom_config = config.name.split('.')
@@ -425,36 +423,29 @@ class ServiceMonitor:
                 clecert = EnveloppeCleCert()
                 clecert.cert_from_pem_bytes(pem)
                 date_expiration = clecert.not_valid_after
+                info_expiration = clecert.calculer_expiration()
+                peut_renouveler = info_expiration['renouveler']
+                est_expire = info_expiration['expire']
+
+                role_info['expiration'] = date_expiration
+                role_info['est_expire'] = peut_renouveler
                 role_info['clecert'] = clecert
 
-                if date_expiration is not None:
-                    role_info['expiration'] = date_expiration
-
-                    # Calculer 2/3 de la duree du certificat
-                    not_valid_before = clecert.not_valid_before
-                    delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
-                    epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-                    date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers, tz=pytz.UTC)
-
-                    # Verifier si on renouvelle
-                    if date_renouvellement < date_courante:
-                        role_info['est_expire'] = True
-                    else:
-                        role_info['est_expire'] = False
-
-                    # Verifier si on supprime
-                    if date_expiration < date_courante:
-                        # Le certificat n'est plus valide, on le supprime immediatement
-                        try:
-                            config.remove()
-                            self.__logger.info(
-                                "Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
-                        except Exception:
-                            self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (
-                            date_expiration, config.name))
-                else:
+                if date_expiration is None:
                     # Le certificat n'a pas de date d'expiration (invalide)
                     role_info['est_expire'] = True
+                    return role_info
+
+                # Verifier si on supprime
+                if est_expire:
+                    # Le certificat n'est plus valide, on le supprime immediatement
+                    try:
+                        config.remove()
+                        self.__logger.info(
+                            "Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
+                    except Exception:
+                        self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (
+                        date_expiration, config.name))
 
         return roles
 
