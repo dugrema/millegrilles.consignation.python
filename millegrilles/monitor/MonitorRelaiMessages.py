@@ -408,6 +408,11 @@ class ConnexionPrincipal:
     def enregistrer_domaine(self, nom_domaine: str, exchanges_routing: dict):
         self.__transfert_messages_principal.ajouter_domaine(nom_domaine, exchanges_routing)
 
+    def in_error(self):
+        if self.__contexte is not None:
+            return self.__contexte.in_error()
+        return False
+
 
 class TraitementMessagesConnexionPrincipale(BaseCallback):
     """
@@ -826,6 +831,11 @@ class ConnexionMiddleware:
 
     def requete(self, *args, **argv):
         return self._reply_queue_handler.requete(*args, **argv)
+
+    def in_error(self):
+        if self._contexte is not None:
+            return self._contexte.in_error()
+        return False
 
 
 class ConnexionMiddlewarePublic(ConnexionMiddleware):

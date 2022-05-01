@@ -626,6 +626,11 @@ class ContexteRessourcesMilleGrilles:
         #     raise ValueError("MessageDAO n'est pas initialise")
         return self._message_dao
 
+    def in_error(self):
+        if self._message_dao is not None:
+            return self._message_dao.in_error
+        return False
+
     @message_dao.setter
     def message_dao(self, message_dao):
         self._message_dao = message_dao

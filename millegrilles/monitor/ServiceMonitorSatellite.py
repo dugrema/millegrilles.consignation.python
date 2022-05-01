@@ -130,6 +130,9 @@ class ServiceMonitorSatellite(ServiceMonitor):
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
+                    else:
+                        self._entretien_mq()
+
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
                 except Constantes.ErreurFatale:
                     self.__logger.exception("Erreur fatale, on ferme le monitor")
@@ -208,6 +211,20 @@ class ServiceMonitorSatellite(ServiceMonitor):
 
         else:
             raise Exception("Path secret n'existe pas : %s" % volume_secrets)
+
+    def _entretien_mq(self):
+        try:
+            if self._connexion_middleware.in_error():
+                self._cycles_erreur_mq = self._cycles_erreur_mq + 1
+            else:
+                self._cycles_erreur_mq = 0  # Reset
+        except:
+            self.__logger.exception("Erreur verification etat erreur MQ, on ajoute cycle erreur")
+            self._cycles_erreur_mq = self._cycles_erreur_mq + 1
+
+        if self._cycles_erreur_mq > 4:
+            self.__logger.error("Erreurs MQ detectees : %d, on redemarre" % self._cycles_erreur_mq)
+            raise ForcerRedemarrage("Exces d'erreurs MQ")
 
     def _entretien_certificats(self):
         """

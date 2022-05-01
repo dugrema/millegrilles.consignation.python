@@ -32,6 +32,7 @@ class ServiceMonitorProtege(ServiceMonitor):
 
         self._certificat_pret = False  # Flag qui indique que le certificat est pret et valide
         self._connexion_middleware: Optional[ConnexionMiddleware] = None
+        self._cycles_erreur_mq = 0  # Compter le nombre de cycles d'entretien en erreur avec MQ, force redemarrage
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -204,6 +205,20 @@ class ServiceMonitorProtege(ServiceMonitor):
                 raise CertificatExpire("Erreur renouvellement certificat")
             self._gestionnaire_docker.configurer_monitor()
             raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
+
+        if self._connexion_middleware is not None:
+            try:
+                if self._connexion_middleware.in_error():
+                    self._cycles_erreur_mq = self._cycles_erreur_mq + 1
+                else:
+                    self._cycles_erreur_mq = 0  # Reset
+            except:
+                self.__logger.exception("Erreur verification etat erreur MQ, on ajoute cycle erreur")
+                self._cycles_erreur_mq = self._cycles_erreur_mq + 1
+
+        if self._cycles_erreur_mq > 4:
+            self.__logger.error("Erreurs MQ detectees : %d, on redemarre" % self._cycles_erreur_mq)
+            raise ForcerRedemarrage("Exces d'erreurs MQ")
 
         super()._entretien_certificats()
 
