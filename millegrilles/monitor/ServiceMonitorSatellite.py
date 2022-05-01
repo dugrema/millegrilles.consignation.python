@@ -135,7 +135,7 @@ class ServiceMonitorSatellite(ServiceMonitor):
                         self._entretien_mq()
 
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-                except Constantes.ErreurFatale:
+                except (ForcerRedemarrage, Constantes.ErreurFatale):
                     self.__logger.exception("Erreur fatale, on ferme le monitor")
                     self.exit_code = 4
                     self.fermer()
@@ -225,7 +225,7 @@ class ServiceMonitorSatellite(ServiceMonitor):
 
         if self._cycles_erreur_mq > 4:
             self.__logger.error("Erreurs MQ detectees : %d, on redemarre" % self._cycles_erreur_mq)
-            raise ForcerRedemarrage("Exces d'erreurs MQ")
+            raise Constantes.ErreurFatale("Exces d'erreurs MQ")
 
     def _entretien_certificats(self):
         """
