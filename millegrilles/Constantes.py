@@ -1732,6 +1732,7 @@ class ConstantesServiceMonitor:
 
     EXIT_REDEMARRAGE = 2
     EXIT_ERREUR_FATALE = 4
+    EXIT_ERREUR_CLES_MQ = 5
 
     DOCKER_LIBVAL_CONFIG_IDMG = 'millegrille.idmg'
     DOCKER_LIBVAL_CONFIG_SECURITE = 'millegrille.securite'

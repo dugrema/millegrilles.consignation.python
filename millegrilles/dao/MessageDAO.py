@@ -140,6 +140,13 @@ class ConnexionWrapper:
             self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop, daemon=True)
             self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
 
+        except ssl.SSLError as e:
+            if e.errno == 116:
+                self._logger.exception("Erreur SSL a la connexion")
+                raise Constantes.ErreurFatale('Erreur SSL sur connexion, probablement mismatch cles')
+            else:
+                raise e
+
         except Exception as e:
             self.enter_error_state()
             raise e  # S'assurer de mettre le flag d'erreur
@@ -1204,6 +1211,9 @@ class PikaDAO:
                     else:
                         self._logger.debug("Rien a faire pour reconnecter a MQ")
 
+                except ssl.SSLError:
+                    self._logger.exception("Erreur SSL dans boucle de maintenance, on ferme")
+                    raise Constantes.ErreurFatale('Erreur SSL dans boucle de maintenant, probablement erreur de cles')
                 except Exception as e:
                     self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
                     self.enter_error_state()

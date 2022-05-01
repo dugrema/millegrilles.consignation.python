@@ -34,6 +34,7 @@ class ServiceMonitorSatellite(ServiceMonitor):
 
         # Flag pour redemarrer les app mode containers apres rotation de certificats
         self.__containers_redemarres_rotation = False
+        self._cycles_erreur_mq = 0
 
     def _entretien_modules(self):
         if not self.limiter_entretien:

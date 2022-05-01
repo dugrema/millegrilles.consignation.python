@@ -67,8 +67,9 @@ class ServiceMonitorProtege(ServiceMonitor):
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-                except ForcerRedemarrage as e:
+                except (Constantes.ErreurFatale, ForcerRedemarrage) as e:
                     self.__logger.exception("ServiceMonitor: Redemarrer : " + str(e))
+                    self.exit_code = ConstantesServiceMonitor.EXIT_ERREUR_FATALE
                     self.fermer()
                 except Exception as e:
                     self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
