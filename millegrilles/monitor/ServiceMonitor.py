@@ -941,8 +941,9 @@ class ServiceMonitor:
         if mode_test:
             commande_str = '--test ' + commande_str
 
-        params_combines = list(params_environnement)
-        params_combines.extend(params_secrets)
+        params_combines = dict(params_environnement)
+        params_combines.update(params_secrets)
+        params_combines = ['%s=%s' % item for item in params_combines.items()]
 
         acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
         commande_acme = "acme.sh --issue %s" % commande_str
