@@ -195,8 +195,8 @@ class MessagesSample(BaseCallback):
 
         try:
             # self.poster_message()
-            # self.get_liste_messages()
-            self.get_attachment_requis()
+            self.get_liste_messages()
+            # self.get_attachment_requis()
         except:
             logger.exception("Erreur execution")
 

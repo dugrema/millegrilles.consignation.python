@@ -55,6 +55,23 @@ class TestConsignationFichiers(DomaineTest):
             securite=Constantes.SECURITE_PRIVE
         )
 
+    def requete_existance_fuuid(self):
+        requete = {'fuuids': [
+            'zSEfXUE5u4gbKbzZrYqFwLZPaaghpGhSFiWAyGTDYLm651VRAdySWsW3Tzct5iy9EW8qXc41MLyYxm4kqjTc4rjKv7Fbpu',
+            'zSEfXUEk8JVQZzcCWJZ3s1UQhWfy63Q4L9TVtUUbHFtMQhyoChf1s9cNJCPEH5A91NLa9tvqwT4DjpNtGBDVqZevFB5W4L',
+            'zSEfXUDtdw7z1hTeYyBkfuGQBY9CahNCq2mwUMKqngXh3Y2SnhLXJk3LaMXPtwQJVg9RLkXdqvrnCSqmbtfJWo8z2jjySt',
+            'zSEfXUBzjFVyE3zUSz3PaC8Hc3nK9BqyAujCxByiXUPDoTs1bmncoepGgoBZkspEEzicEqxYhEhwpzdUxksh3tdNPgYLKBZ',
+        ]}
+        domaine = 'fichiers'
+        action = 'fuuidVerifierExistance'
+        self.generateur.transmettre_requete(
+            requete, domaine,
+            action=action,
+            reply_to=self.queue_name,
+            correlation_id='requete_getclessh',
+            securite=Constantes.SECURITE_PRIVE
+        )
+
     def requete_get_configuration(self):
         # permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
         requete = dict()
@@ -374,9 +391,10 @@ class TestConsignationFichiers(DomaineTest):
         # self.commande_restaurerGrosFichiers()
         # self.commande_transcoderVideo()
 
-        self.requete_getclessh()
+        # self.requete_getclessh()
         # self.requete_get_configuration()
         # self.commande_modifier_configuration()
+        self.requete_existance_fuuid()
 
         # self.commande_publier_fichier_ssh()
         # self.commande_publier_fichier_ipfs()
