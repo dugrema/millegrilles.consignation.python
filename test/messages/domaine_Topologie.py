@@ -307,7 +307,7 @@ class MessagesSample(DomaineTest):
 
     def executer(self):
         # sample.requete_liste_domaines()
-        # sample.requete_liste_noeuds()
+        sample.requete_liste_noeuds()
         # sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
@@ -317,7 +317,7 @@ class MessagesSample(DomaineTest):
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
         # self.requete_neuds_awss3()
-        sample.resolve_idmg()
+        # sample.resolve_idmg()
         # sample.emettre_fiche_publique()
         # sample.get_fiche_millegrille()
         # sample.requete_applications_tiers()
